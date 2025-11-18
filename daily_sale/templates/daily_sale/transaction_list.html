@@ -1,0 +1,32 @@
+{% extends 'daily_sale/daily_sale_base.html' %}
+
+{% block title %}لیست تراکنش‌ها{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold">لیست تراکنش‌ها</h2>
+<table class="table table-striped mt-4">
+    <thead>
+        <tr>
+            <th>فاکتور</th>
+            <th>تاریخ</th>
+            <th>نوع تراکنش</th>
+            <th>مجموع مبلغ</th>
+            <th>عملیات</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for transaction in transactions %}
+        <tr>
+            <td>{{ transaction.invoice_number }}</td>
+            <td>{{ transaction.date }}</td>
+            <td>{{ transaction.get_transaction_type_display }}</td>
+            <td>{{ transaction.total_amount }} تومان</td>
+            <td>
+                <a href="{% url 'daily_sale:transaction_edit' pk=transaction.pk %}" class="btn btn-warning btn-sm">ویرایش</a>
+                <a href="{% url 'daily_sale:transaction_delete' pk=transaction.pk %}" class="btn btn-danger btn-sm">حذف</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

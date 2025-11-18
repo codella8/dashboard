@@ -1,0 +1,88 @@
+<!-- accounts/templates/dashboard.html -->
+{% extends "accounts_base.html" %}
+{% load static %}
+
+{% block title %}داشبورد مرکزی{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    <!-- هدر داشبورد -->
+    <div class="dashboard-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="display-5 fw-bold">🚀 داشبورد مرکزی</h1>
+                <p class="lead mb-0">مدیریت یکپارچه تمام بخش‌های شرکت </p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="bg-white rounded-pill px-3 py-2 d-inline-block">
+                    <small class="text-muted">کاربر: {{ request.user.get_full_name|default:request.user.username}}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- آمار کلی -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>{{ quick_stats.total_sales }}</h3>
+                    <p>تراکنش فروش</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h3>{{ quick_stats.total_inventory }}</h3>
+                    <p>آیتم موجودی</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <h3>{{ quick_stats.active_containers }}</h3>
+                    <p>کانتینر فعال</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <h3>{{ quick_stats.pending_expenses }}</h3>
+                    <p>هزینه معلق</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- اپ‌های سیستم -->
+    <div class="row g-4">
+        {% for app in apps %}
+        <div class="col-xl-3 col-lg-4 col-md-6">
+            <div class="dashboard-card bg-{{ app.color }} {% if app.active %}active{% else %}inactive{% endif %}" {% if app.active %}onclick="window.location.href='{% url app.url %}'" {% endif %}>
+                <div class="card-body text-center p-4">
+                    <!-- آیکون -->
+                    <div class="app-icon">{{ app.icon }}</div>
+
+                    <!-- عنوان -->
+                    <h5 class="card-title fw-bold mb-2">{{ app.name }}</h5>
+
+                    <!-- توضیحات -->
+                    <p class="card-text text-muted small mb-3">{{ app.description }}</p>
+
+                    <!-- وضعیت -->
+                    <span
+                        class="status-badge {% if app.active %}bg-success{% else %}bg-secondary{% endif %} text-white">
+                        {% if app.active %}فعال{% else %}به زودی{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

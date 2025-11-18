@@ -1,0 +1,238 @@
+<!-- daily_sale/templates/daily_sale/dashboard.html -->
+{% extends 'daily_sale/daily_sale_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}داشبورد فروش روزانه{% endblock %}
+
+{% block content %}
+<div class="dashboard-header mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h1 class="h2 mb-2">📊 داشبورد فروش روزانه</h1>
+            <p class="text-muted mb-0">آمار و تحلیل‌های لحظه‌ای سیستم فروش</p>
+        </div>
+        <div class="col-md-4 text-left">
+            <div class="date-filter-container">
+                <input type="date" class="form-control date-filter" id="datePicker" value="{{ date }}">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- آمار کلی -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="analytics-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="metric-value text-primary">
+                            {{ daily_stats.total_sales|default:0|intcomma }}
+                        </div>
+                        <div class="metric-label">فروش کل امروز</div>
+                    </div>
+                    <div class="metric-icon">
+                        <i class="fas fa-dollar-sign fa-2x text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="analytics-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="metric-value text-success">
+                            {{ daily_stats.transaction_count|default:0 }}
+                        </div>
+                        <div class="metric-label">تعداد تراکنش‌ها</div>
+                    </div>
+                    <div class="metric-icon">
+                        <i class="fas fa-shopping-cart fa-2x text-success"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="analytics-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="metric-value text-warning">
+                            {{ daily_stats.total_balance|default:0|intcomma }}
+                        </div>
+                        <div class="metric-label">موجودی معلق</div>
+                    </div>
+                    <div class="metric-icon">
+                        <i class="fas fa-clock fa-2x text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="analytics-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="metric-value text-info">
+                            {{ daily_stats.total_quantity|default:0 }}
+                        </div>
+                        <div class="metric-label">تعداد آیتم‌ها</div>
+                    </div>
+                    <div class="metric-icon">
+                        <i class="fas fa-cubes fa-2x text-info"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- پرفروش‌ترین آیتم‌ها -->
+    <div class="col-lg-6 mb-4">
+        <div class="stat-card card-primary h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="fas fa-trophy me-2"></i>پرفروش‌ترین آیتم‌ها
+                </h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>آیتم</th>
+                                <th>تعداد</th>
+                                <th>درآمد</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in top_items %}
+                            <tr>
+                                <td>{{ item.item__name|default:"نامشخص" }}</td>
+                                <td>{{ item.total_sold }}</td>
+                                <td class="text-success">{{ item.total_revenue|intcomma }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-3">داده‌ای برای نمایش وجود ندارد</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- تراکنش‌های اخیر -->
+    <div class="col-lg-6 mb-4">
+        <div class="stat-card card-success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>تراکنش‌های اخیر
+                    </h5>
+                    <a href="{% url 'daily_sale:transaction_list' %}"
+                        class="btn btn-sm btn-daily-sale btn-daily-sale-primary">
+                        مشاهده همه
+                    </a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>فاکتور</th>
+                                <th>مشتری</th>
+                                <th>مبلغ</th>
+                                <th>وضعیت</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in recent_transactions %}
+                            <tr>
+                                <td>{{ transaction.invoice_number }}</td>
+                                <td>{{ transaction.customer.user.get_full_name|default:"-" }}</td>
+                                <td>{{ transaction.total_amount|intcomma }}</td>
+                                <td>
+                                    <span class="status-badge badge-{{ transaction.status }}">
+                                        {{ transaction.get_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">تراکنشی یافت نشد</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="stat-card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">دسترسی سریع</h5>
+                <div class="row">
+                    <div class="col-md-3 col-6 mb-3">
+                        <a href="{% url 'daily_sale:transaction_create' %}"
+                            class="btn btn-daily-sale btn-daily-sale-primary w-100">
+                            <i class="fas fa-plus-circle me-2"></i>تراکنش جدید
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <a href="{% url 'daily_sale:financial_analytics' %}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-chart-pie me-2"></i>تحلیل مالی
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <a href="{% url 'daily_sale:sales_summary' %}" class="btn btn-outline-success w-100">
+                            <i class="fas fa-chart-bar me-2"></i>گزارش فروش
+                        </a> 
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <a href="{% url 'daily_sale:customer_analysis' %}" class="btn btn-outline-info w-100">
+                            <i class="fas fa-users me-2"></i>تحلیل مشتریان
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Date Picker Functionality
+    document.getElementById('datePicker').addEventListener('change', function () {
+        const selectedDate = this.value;
+        window.location.href = `?date=${selectedDate}`;
+    });
+
+    // Real-time Data Refresh
+    function refreshData() {
+        fetch('{% url "daily_sale:real_time_stats" %}')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Data updated:', data);
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // Refresh every 30 seconds
+    setInterval(refreshData, 30000);
+</script>
+{% endblock %}

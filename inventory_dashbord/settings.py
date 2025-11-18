@@ -30,7 +30,7 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
-INSTALLED_APPS = [
+INSTALLED_APPS = [ 
     'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -40,9 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'daily_sale',
     'containers',
-    'crm',
+    'accounts',
     'finance',
-    'inventory',
     'reports',
     'expenses',
     'employee',

@@ -1,0 +1,13 @@
+<!-- transaction_form.html -->
+{% extends 'daily_sale/daily_sale_base.html' %}
+
+{% block title %}افزودن/ویرایش تراکنش{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold">افزودن/ویرایش تراکنش</h2>
+<form method="post" class="mt-4">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">ذخیره</button>
+</form>
+{% endblock %}

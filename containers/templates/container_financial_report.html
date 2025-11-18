@@ -1,0 +1,27 @@
+{% extends 'base_generic.html' %}
+
+{% block content %}
+<h1>گزارش وضعیت مالی کانتینر: {{ container.container_number }}</h1>
+<table>
+    <thead>
+        <tr>
+            <th>تاریخ</th>
+            <th>مجموع قیمت</th>
+            <th>وضعیت فروش</th>
+            <th>وضعیت حمل و نقل</th>
+            <th>وضعیت پرداخت</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for transaction in transactions %}
+        <tr>
+            <td>{{ transaction.created_at }}</td>
+            <td>{{ transaction.total_price }}</td>
+            <td>{{ transaction.get_sale_status_display }}</td>
+            <td>{{ transaction.get_transport_status_display }}</td>
+            <td>{{ transaction.get_payment_status_display }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

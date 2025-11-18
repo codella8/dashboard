@@ -1,0 +1,14 @@
+<!-- transaction_confirm_delete.html -->
+{% extends 'daily_sale/daily_sale_base.html' %}
+
+{% block title %}حذف تراکنش{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold">آیا مطمئنید که می‌خواهید این تراکنش را حذف کنید؟</h2>
+<p>فاکتور: {{ transaction.invoice_number }}</p>
+<form method="post" class="mt-4">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">حذف</button>
+    <a href="{% url 'daily_sale:transaction_list' %}" class="btn btn-secondary">لغو</a>
+</form>
+{% endblock %}

@@ -1,0 +1,25 @@
+<!-- sales_by_item.html -->
+{% extends 'daily_sale/daily_sale_base.html' %}
+{% block title %}گزارش فروش بر اساس آیتم{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold">گزارش فروش بر حسب آیتم — {{ date }}</h2>
+<table class="table table-striped mt-4">
+    <thead>
+        <tr>
+            <th>آیتم</th>
+            <th>مجموع فروش</th>
+            <th>تعداد فروش</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items_sales %}
+        <tr>
+            <td>{{ item.item__name }}</td>
+            <td>{{ item.total_amount }} تومان</td>
+            <td>{{ item.total_quantity }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

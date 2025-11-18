@@ -1,0 +1,23 @@
+<h2>گزارش تراز مالی سراف‌ها</h2>
+<table>
+    <thead>
+        <tr>
+            <th>نام</th>
+            <th>مجموع دریافتی</th>
+            <th>مجموع پرداختی</th>
+            <th>مجموع بدهی</th>
+            <th>تراز</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for saraf in sarafs %}
+        <tr>
+            <td>{{ saraf.user }}</td>
+            <td>{{ saraf.total_received }}</td>
+            <td>{{ saraf.total_paid }}</td>
+            <td>{{ saraf.total_debit }}</td>
+            <td>{{ saraf.balance }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

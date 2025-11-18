@@ -1,0 +1,74 @@
+    .dashboard-card {
+        background: white;
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        height: 100%;
+        border-left: 5px solid;
+    }
+
+    .dashboard-card.active {
+        cursor: pointer;
+    }
+
+    .dashboard-card.active:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .dashboard-card.inactive {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .app-icon {
+        font-size: 2.5rem;
+        margin-bottom: 15px;
+    }
+
+    .bg-success {
+        border-left-color: #28a745;
+    }
+
+    .bg-primary {
+        border-left-color: #007bff;
+    }
+
+    .bg-info {
+        border-left-color: #17a2b8;
+    }
+
+    .bg-warning {
+        border-left-color: #ffc107;
+    }
+
+    .bg-danger {
+        border-left-color: #dc3545;
+    }
+
+    .bg-secondary {
+        border-left-color: #6c757d;
+    }
+
+    .bg-dark {
+        border-left-color: #343a40;
+    }
+
+    .bg-light {
+        border-left-color: #f8f9fa;
+    }
+
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        color: white;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .status-badge {
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 0.7rem;
+    }
