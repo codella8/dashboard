@@ -1,0 +1,82 @@
+{% load static %}
+
+<nav class="navbar navbar-expand-lg navbar-glass bg-body-tertiary">
+    <div class="container">
+        <a href="{% url 'accounts:home' %}">
+            <img src="{% static '' %}" alt="pic" class="logo mb-2" width="120">
+        </a>
+
+        <div class="d-lg-none d-flex ms-auto align-items-center">
+            <!-- سرچ -->
+            <button class="btn btn-link p-2" data-bs-toggle="collapse" data-bs-target="#searchBar">
+                <i class="bi bi-search fs-5"></i>
+            </button>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="offcanvas"
+                data-bs-target="#mobileMenu">
+                <i class="bi bi-list fs-3"></i>
+            </button>
+        </div>
+
+        <div class="collapse navbar-collapse d-none d-lg-block" id="navbarContent">
+            <div id="searchBar" class="collapse">
+                <div class="container py-3">
+                    <form method="get" action="">
+                        <input type="text" name="q" class="form-control form-control-lg" placeholder="جستجو کنید...">
+                    </form>
+                </div>
+            </div>
+            <ul class="navbar-nav mx-auto">
+                <li class="nav-item"><a class="nav-link hover-underline" href={% url 'accounts:about' %}>about</a></li>
+
+                {% if user.is_authenticated %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle hover-underline d-flex align-items-center" href="accounts:update_info" role="button"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle fs-5 me-1 text-danger"></i>
+                        <span class="small">profile</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-glass">
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" href="{% url 'accounts:update_user' %}">
+                                <i class="bi bi-person fs-5 me-2 text-danger"></i>user profile
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" href="{% url 'accounts:update_info' %}">
+                                <i class="bi bi-pencil-square fs-5 me-2 text-danger"></i>user Info
+                            </a>
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item text-danger d-flex align-items-center" href="{% url 'accounts:logout' %}">
+                                <i class="bi bi-box-arrow-right fs-5 me-2"></i>logout
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                {% if user.is_staff %}
+                <li class="nav-item">
+                    <a class="nav-link hover-underline d-flex align-items-center" href="{% url 'admin:index' %}">
+                        <i class="bi bi-gear fs-5 me-1 text-primary"></i>
+                        <span class="small">admin panel</span>
+                    </a>
+                </li>
+                {% endif %}
+                {% else %}
+                <li class="nav-item">
+                    <a class="nav-link hover-underline d-flex align-items-center" href="{% url 'accounts:login' %}">
+                        <i class="bi bi-box-arrow-in-right fs-5 me-1 text-danger"></i>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link hover-underline d-flex align-items-center" href="{% url 'accounts:signup' %}">
+                        <i class="bi bi-person-plus fs-5 me-1 text-danger"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>

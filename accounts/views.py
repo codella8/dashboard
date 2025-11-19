@@ -35,156 +35,66 @@ def about(request):
 
 
 def login_user(request):
+    """Login view that handles user login with appropriate messages"""
     if request.user.is_authenticated:
-        messages.info(request, _("you logged in once!"))
-        return redirect("accounts:dashboard")  # 🔥 استفاده از نام URL
+        messages.info(request, _("You are already logged in!"))
+        return redirect("accounts:dashboard")  # Redirect to dashboard after login
 
     if request.method == "POST":
-        username = request.POST.get('username', '').strip()
-        password = request.POST.get('password', '').strip()
-
+        username = request.POST.get('username').strip()
+        password = request.POST.get('password').strip()
         user = authenticate(request, username=username, password=password)
 
-        if user is not None:
+        if user:
             login(request, user)
-            
-            # 🔥 استفاده از نام URL به جای آدرس مستقیم
             next_page = request.GET.get('next', 'accounts:dashboard')
-            
             if '/admin/' in next_page and not user.is_staff:
-                messages.error(request, _("you don not have access to admin panel"))
+                messages.error(request, _("You don't have permission to access the admin panel"))
                 return redirect('accounts:dashboard')
-                
-            return redirect('accounts:dashboard')
+
+            return redirect(next_page)
         else:
-            messages.error(request, _("incorrect email or password!"))
-    
+            messages.error(request, _("Incorrect username or password!"))
+
     return render(request, 'login.html')
- 
+
 def signup_user(request):
-    if request.method == "POST": # بررسی درخواست از نوع post
+    """User registration view that handles form submission for user signup"""
+    if request.method == "POST":
         form = SignUpForm(request.POST)
-        if form.is_valid(): #فرم وارد شده را اعتبارسنجی می‌کنیم
-            username = form.cleaned_data['username']
-            email = form.cleaned_data['email']
+        if form.is_valid():
+            form.save()  # Save user and their profile data
+            messages.success(request, _("Registration successful!"))
+            return redirect('accounts:login')
+        else:
+            messages.error(request, _("Please correct the form errors"))
+            return render(request, 'signup.html', {'form': form})
 
-        messages.error(request, _("please correct forms errors!")) #در صورتی که فرم معتبر نباشد
-        return render(request, 'signup.html', {'form': form})
-
-    else:
-        form = SignUpForm()
+    form = SignUpForm()
     return render(request, 'signup.html', {'form': form})
-
-# accounts/views.py
-@login_required
-def dashboard(request):
-    # 📊 آمار سریع
-    try:
-        total_sales = DailySaleTransaction.objects.filter(transaction_type='sale').count()
-    except:
-        total_sales = 0
-    
-    try:
-        active_containers = Container.objects.filter(status='in_transit').count()
-    except:
-        active_containers = 0
-    
-    try:
-        total_inventory = Inventory_List.objects.count()
-    except:
-        total_inventory = 0
-    
-    try:
-        pending_expenses = ExpenseItem.objects.filter(status='pending').count()
-    except:
-        pending_expenses = 0
-
-    quick_stats = {
-        'total_sales': total_sales,
-        'active_containers': active_containers,
-        'total_inventory': total_inventory,
-        'pending_expenses': pending_expenses,
-    }
-    
-    # 🚀 لیست اپ‌ها - فقط اپ‌هایی که مطمئن هستیم کار می‌کنند
-    apps = [
-        {
-            'name': 'فروش روزانه',
-            'url': 'daily_sale:dashboard',
-            'icon': '📈',
-            'color': 'success',
-            'description': 'مدیریت فروش روزانه و تراکنش‌ها',
-            'active': True
-        },
-        {
-            'name': 'مدیریت موجودی',
-            'url': 'inventory:dashboard',
-            'icon': '📦', 
-            'color': 'primary',
-            'description': 'مدیریت موجودی و انبار',
-            'active': False  # موقتاً غیرفعال
-        },
-        {
-            'name': 'کانتینرها',
-            'url': 'containers:saraf_list',
-            'icon': '🚢',
-            'color': 'info',
-            'description': 'پیگیری کانتینرها و محموله‌ها',
-            'active': True
-        },
-        {
-            'name': 'امور مالی',
-            'url': 'finance:dashboard',
-            'icon': '💰',
-            'color': 'warning',
-            'description': 'گزارش‌های مالی و حسابداری',
-            'active': False
-        },
-        {
-            'name': 'هزینه‌ها',
-            'url': 'expenses:dashboard',
-            'icon': '💸',
-            'color': 'danger',
-            'description': 'مدیریت هزینه‌ها و مخارج', 
-            'active': False
-        },
-        {
-            'name': 'کارمندان',
-            'url': 'employee:dashboard',
-            'icon': '👥',
-            'color': 'secondary',
-            'description': 'مدیریت پرسنل و حقوق',
-            'active': False
-        },
-        {
-            'name': 'حساب کاربری',
-            'url': 'accounts:dashboard', 
-            'icon': '👤',
-            'color': 'dark',
-            'description': 'مدیریت کاربران و پروفایل',
-            'active': True
-        },
-        {
-            'name': 'گزارش‌ها',
-            'url': 'reports:dashboard',
-            'icon': '📊',
-            'color': 'light',
-            'description': 'گزارش‌های جامع و آنالیز',
-            'active': False
-        },
-    ]
-    
-    context = {
-        'quick_stats': quick_stats,
-        'apps': apps,
-    }
-    
-    return render(request, 'dashboard.html', context)
 
 @login_required
 def home_dashboard(request):
     """صفحه اصلی - می‌تونی به داشبورد ریدایرکت کنی یا صفحه جدا بسازی"""
     return dashboard(request)
+
+@login_required
+def dashboard(request):
+    """User Dashboard with quick stats and app navigation"""
+    
+
+    # App navigation setup
+    apps = [
+        {'name': 'daily_sale', 'url': 'daily_sale:dashboard', 'icon': '📈', 'active': True},
+        {'name': 'Containers', 'url': 'containers:saraf_list', 'icon': '🚢', 'active': True},
+        {'name': 'expenses', 'url': 'expenses:dashboard', 'icon': '💸', 'active': True},
+        {'name': 'Employee', 'url': 'employee:dashboard', 'icon': '👥', 'active': True},
+        {'name': 'Reports', 'url': 'reports:dashboard', 'icon': '📊', 'active': True},
+        {'name': 'Fiance', 'url': 'finance:dashboard', 'icon': '📊', 'active': True},
+    ]
+
+    context = { 'apps': apps}
+    return render(request, 'dashboard.html', context)
 
 def logout_user(request):
 	logout(request)

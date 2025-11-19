@@ -1,0 +1,35 @@
+{% extends 'containers/container_base.html' %}
+{% block title %}تراکنش‌های صراف — {{ saraf.user.get_full_name|default:saraf.user }}{% endblock %}
+{% block content %}
+<h4>تراکنش‌های صراف: {{ saraf.user.get_full_name|default:saraf.user }}</h4>
+
+{% include 'containers/includes/_filters.html' %}
+
+<table class="table table-sm table-striped">
+  <thead>
+    <tr>
+      <th>تاریخ</th>
+      <th>کانتینر</th>
+      <th>دریافت</th>
+      <th>پرداخت</th>
+      <th>ارز</th>
+      <th>توضیحات</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for tx in transactions %}
+      <tr>
+        <td>{{ tx.transaction_time|date:"Y-m-d H:i" }}</td>
+        <td>{{ tx.container.container_number if tx.container else "-" }}</td>
+        <td>{{ tx.received_from_saraf|floatformat:2 }}</td>
+        <td>{{ tx.paid_by_company|floatformat:2 }}</td>
+        <td>{{ tx.get_currency_display }}</td>
+        <td>{{ tx.description|truncatechars:60 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="text-center">تراکنشی وجود ندارد</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% include 'containers/_pagination.html' %}
+{% endblock %}

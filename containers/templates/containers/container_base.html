@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'fa' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}{{ site_name|default:"Azin Dashboard" }}{% endblock %}</title>
+
+  <!-- CSS (قرار بده در static و لینک بده) -->
+  <link rel="stylesheet" href="{% static 'css/vendors/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/containers.css' %}">
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <nav class="navbar navbar-expand-md navbar-light bg-light">
+      <div class="container">
+        <a class="navbar-brand" href="{% url 'accounts:dashboard' %}">{{ site_name|default:"Azin" }}</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav mr-auto">
+            <li class="nav-item"><a class="nav-link" href="{% url 'containers:container_list' %}">کانتینرها</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'containers:saraf_list' %}">صراف‌ها</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'containers:total_report' %}">گزارش تراکنش‌ها</a></li>
+          </ul>
+
+          <ul class="navbar-nav ml-auto">
+            {% if user.is_authenticated %}
+              <li class="nav-item"><a class="nav-link" href="#">{{ user.get_username }}</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'accounts:logout' %}">خروج</a></li>
+            {% else %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'accounts:login' %}">ورود</a></li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main class="py-4">
+    <div class="container">
+      {% include 'containers/includes/_messages.html' %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="footer py-3 bg-light">
+    <div class="container text-center small">
+      © {{ now.year }} {{ site_name|default:"Azin" }} — همه حقوق محفوظ است.
+    </div>
+  </footer>
+
+  <script src="{% static 'js/vendors/jquery.min.js' %}"></script>
+  <script src="{% static 'js/vendors/bootstrap.bundle.min.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

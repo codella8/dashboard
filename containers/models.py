@@ -78,18 +78,20 @@ class Inventory_List(models.Model):
 class SarafTransaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     saraf = models.ForeignKey(
-        Saraf, on_delete=models.CASCADE, related_name="transactions"
+        'Saraf', on_delete=models.CASCADE, related_name="transactions"
     )
     container = models.ForeignKey(
-        Container, on_delete=models.SET_NULL, null=True, blank=True, related_name="Saraf_transactions"
+        'Container', on_delete=models.SET_NULL, null=True, blank=True, related_name="Saraf_transactions"
     )
 
-    received_from_saraf = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-    paid_by_company = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-    debit_company = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    received_from_saraf = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
+    paid_by_company = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
+    debit_company = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
 
     balance = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
-    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default="usd", db_index=True)
+    currency = models.CharField(max_length=10, choices=[
+        ("usd", "USD"), ("eur", "EUR"), ("aed", "AED"),
+    ], default="usd", db_index=True)
 
     description = models.TextField(blank=True)
     transaction_time = models.DateTimeField(default=timezone.now, db_index=True)
@@ -109,30 +111,35 @@ class SarafTransaction(models.Model):
         return f"{self.saraf} | {self.currency} | {self.transaction_time.date()}"
 
     def save(self, *args, **kwargs):
-        """محاسبه خودکار balance هنگام ذخیره"""
-        if self.balance is None:
-            agg = SarafTransaction.objects.filter(saraf=self.saraf).aggregate(
-                total_received_from_saraf=models.Sum("received_from_saraf"),
-                total_paid_by_company=models.Sum("paid_by_company"),
-                total_=models.Sum(""),
-                total_debit_company=models.Sum("debit_company"),
-            )
+        """
+        Compute balance automatically:
+        balance = previous_balance + (received_from_saraf + debit_company) - paid_by_company
+        previous sums exclude this instance (handle create/update safely).
+        """
+        from django.db.models import Sum
 
-            prev_received_from_saraf = agg["total_received_from_saraf"] or Decimal("0.00")
-            prev_paid_by_company = agg["total_paid_by_company"] or Decimal("0.00")
-            prev_ = agg["total_"] or Decimal("0.00")
-            prev_debit_company = agg["total_debit_company"] or Decimal("0.00")
+        # Aggregates of previous transactions for this saraf excluding self (if already exists)
+        qs = SarafTransaction.objects.filter(saraf=self.saraf)
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
 
-            prev_balance = (prev_received_from_saraf + prev_debit_company) - (
-                prev_paid_by_company + prev_
-            )
-            self.balance = prev_balance + (
-                self.received_from_saraf - self.paid_by_company 
-            )
+        agg = qs.aggregate(
+            prev_received=Sum("received_from_saraf"),
+            prev_paid=Sum("paid_by_company"),
+            prev_debit=Sum("debit_company")
+        )
+
+        prev_received = agg.get("prev_received") or Decimal("0.00")
+        prev_paid = agg.get("prev_paid") or Decimal("0.00")
+        prev_debit = agg.get("prev_debit") or Decimal("0.00")
+
+        prev_balance = (prev_received + prev_debit) - prev_paid
+
+        # current balance = prev_balance + (this_received + this_debit) - this_paid
+        self.balance = prev_balance + (self.received_from_saraf + self.debit_company) - self.paid_by_company
 
         super().save(*args, **kwargs)
-
-
+        
 class ContainerTransaction(models.Model):
     SALE_STATUS = [
         ("in_store", "In Store"),
@@ -165,6 +172,13 @@ class ContainerTransaction(models.Model):
     )
 
     product = models.CharField(max_length=255, blank=True)
+    quantity = models.DecimalField(
+    max_digits=18,
+    decimal_places=3,
+    default=Decimal("0.000"),
+    validators=[MinValueValidator(Decimal("0.000"))],
+    help_text="Quantity of product involved in this transaction"
+)
     port_of_origin = models.CharField(max_length=255, blank=True)
     port_of_discharge = models.CharField(max_length=255, blank=True)
     total_price = models.DecimalField(max_digits=14, decimal_places=0, validators=[MinValueValidator(0)], null=True, blank=True)
@@ -189,5 +203,19 @@ class ContainerTransaction(models.Model):
             models.Index(fields=["arrived_date"]),
         ]
 
+    
     def __str__(self):
-        return f"{self.container.container_number} | {self.get_transport_status_display()} | {self.get_payment_status_display()}"
+        return f"{self.container.container_number} | {self.product} | {self.sale_status}"
+
+    def save(self, *args, **kwargs):
+        # Auto-update product price and quantity in Inventory_List
+        if self.sale_status == "sold_to_company" or self.sale_status == "sold_to_customer":
+            inventory_item = Inventory_List.objects.filter(container=self.container).first()
+            if inventory_item:
+                inventory_item.in_stock_qty -= self.quantity
+                inventory_item.sold_price = self.total_price / self.quantity if self.quantity else 0
+                inventory_item.total_sold_qty += self.quantity
+                inventory_item.total_sold_count += 1
+                inventory_item.save()
+
+        super().save(*args, **kwargs)

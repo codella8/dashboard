@@ -16,7 +16,7 @@
             </div>
             <div class="col-md-4 text-end">
                 <div class="bg-white rounded-pill px-3 py-2 d-inline-block">
-                    <small class="text-muted">کاربر: {{ request.user.get_full_name|default:request.user.username}}</small>
+                    <small class="text-muted">کاربر: {{request.user.get_full_name|default:request.user.username}}</small>
                 </div>
             </div>
         </div>
@@ -62,7 +62,7 @@
     <div class="row g-4">
         {% for app in apps %}
         <div class="col-xl-3 col-lg-4 col-md-6">
-            <div class="dashboard-card bg-{{ app.color }} {% if app.active %}active{% else %}inactive{% endif %}" {% if app.active %}onclick="window.location.href='{% url app.url %}'" {% endif %}>
+            <div class="dashboard-card bg-{{ app.color }} {% if app.active %}active{% else %}inactive{% endif %}" {% if apps.active %} onclick="window.location.href='{% url app.url %}'" {% endif %}>
                 <div class="card-body text-center p-4">
                     <!-- آیکون -->
                     <div class="app-icon">{{ app.icon }}</div>

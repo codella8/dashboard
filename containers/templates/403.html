@@ -1,0 +1,9 @@
+{% extends 'containers/container_base.html' %}
+{% block title %}دسترسی غیرمجاز{% endblock %}
+{% block content %}
+<div class="text-center">
+  <h1 class="display-4">403</h1>
+  <p class="lead">شما دسترسی لازم برای مشاهده این صفحه را ندارید.</p>
+  <a class="btn btn-primary" href="{% url 'accounts:dashboard' %}">بازگشت به داشبورد</a>
+</div>
+{% endblock %}

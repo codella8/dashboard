@@ -1,0 +1,66 @@
+{% extends 'containers/container_base.html' %}
+{% block title %}گزارش مالی کانتینر — {{ container.container_number }}{% endblock %}
+{% block content %}
+<div class="mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h4>کانتینر: {{ container.container_number }}</h4>
+    <p class="text-muted">{{ container.name }}</p>
+  </div>
+
+  <div class="text-right">
+    <a class="btn btn-outline-secondary" href="{% url 'containers:container_list' %}">بازگشت</a>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-4">
+    <div class="card p-3">
+      <h6>کل درآمد</h6>
+      <div class="display-4">{{ financial_summary.total_income|default:0|floatformat:2 }}</div>
+      <small class="text-muted">از تراکنش‌های فروش</small>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3">
+      <h6>کل تعداد فروخته‌شده</h6>
+      <div class="display-4">{{ financial_summary.total_sold_qty|default:0|floatformat:3 }}</div>
+      <small class="text-muted">به تفکیک واحد</small>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3">
+      <h6>موجودی فعلی (محصول‌ها)</h6>
+      <div class="display-4">{{ container.Inventory_container.aggregate(total=Sum('in_stock_qty')).total|default:0|floatformat:3 }}</div>
+      <small class="text-muted">جمع موجودی کالاها</small>
+    </div>
+  </div>
+</div>
+
+<h5>تراکنش‌ها</h5>
+<table class="table table-sm table-striped">
+  <thead>
+    <tr>
+      <th>تاریخ</th>
+      <th>محصول</th>
+      <th>تعداد</th>
+      <th>قیمت کل</th>
+      <th>وضعیت فروش</th>
+      <th>وضعیت پرداخت</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for tx in transactions %}
+      <tr>
+        <td>{{ tx.created_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ tx.product }}</td>
+        <td>{{ tx.quantity|default:0 }}</td>
+        <td>{{ tx.total_price|floatformat:2 }}</td>
+        <td>{{ tx.get_sale_status_display }}</td>
+        <td>{{ tx.get_payment_status_display }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="text-center">تراکنشی ثبت نشده</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

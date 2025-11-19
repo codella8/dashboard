@@ -6,34 +6,30 @@ from .models import UserProfile
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+
 class UpdateUserInfo(forms.ModelForm):
+    """Form for updating user's personal information"""
     phone = forms.CharField(
-        label="", 
         required=True,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('تلفن')})
     )
     address1 = forms.CharField(
-        label="",
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('1 آدرس')}),
         required=False
     )
     address2 = forms.CharField(
-        label="",
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('2 آدرس')}),
         required=False
     )
     city = forms.CharField(
-        label="",
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('شهر')}),
         required=False
     )
     country = forms.CharField(
-        label="",
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('کشور')}),
         required=False
     )
-    
-    
+
     class Meta:
         model = UserProfile
         fields = ['phone', 'address1', 'address2', 'city', 'country']
@@ -94,14 +90,13 @@ class UserUpdateForm(UserChangeForm):
         model = User
         fields = ('first_name', 'last_name', 'email', 'username')
 
-
 class SignUpForm(UserCreationForm):
+    """Form for new user registration"""
     first_name = forms.CharField(
         label="",
         max_length=50,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('نام ')})
     )
-
 
     last_name = forms.CharField(
         label="",
@@ -122,28 +117,14 @@ class SignUpForm(UserCreationForm):
 
     password1 = forms.CharField(
         label="",
-        widget=forms.PasswordInput(
-            attrs={
-                'class': 'form-control',
-                'name': 'password1',
-                'type': 'password1',
-                'placeholder': _('رمز خودرا وارد کنید')
-            }
-        )
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': _('رمز خود را وارد کنید')})
     )
 
     password2 = forms.CharField(
         label="",
-        widget=forms.PasswordInput(
-            attrs={
-                'class': 'form-control',
-                'name': 'password2',
-                'type': 'password2',
-                'placeholder': _('دوباره رمز خودرا وارد کنید')
-            }
-        )
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': _('رمز را دوباره وارد کنید')})
     )
 
     class Meta:
         model = User
-        fields = ('first_name', 'last_name', 'email', 'username', 'password1', 'password2')
+        fields = ['first_name', 'last_name', 'email', 'username', 'password1', 'password2']

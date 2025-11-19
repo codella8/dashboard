@@ -1,0 +1,30 @@
+{% extends 'containers/container_base.html' %}
+{% block title %}گزارش مانده صراف‌ها{% endblock %}
+{% block content %}
+<h3>گزارش مانده صراف‌ها</h3>
+
+<table class="table table-hover">
+  <thead>
+    <tr>
+      <th>صراف</th>
+      <th>کل دریافت</th>
+      <th>کل پرداخت</th>
+      <th>کل بدهی</th>
+      <th>مانده</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in sarafs %}
+      <tr>
+        <td>{{ s.user.get_full_name|default:s.user }}</td>
+        <td>{{ s.total_received|default:0|floatformat:2 }}</td>
+        <td>{{ s.total_paid|default:0|floatformat:2 }}</td>
+        <td>{{ s.total_debit|default:0|floatformat:2 }}</td>
+        <td>{{ s.balance|default:0|floatformat:2 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center">موردی یافت نشد</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

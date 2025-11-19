@@ -52,7 +52,6 @@ class Company(models.Model):
     def active_status(self):
         return "Active" if self.is_active else "Inactive"
 
-
 class UserProfile(models.Model):
     ROLE_CUSTOMER = "customer"
     ROLE_EMPLOYEE = "employee"
@@ -62,17 +61,36 @@ class UserProfile(models.Model):
     ROLE_CHOICES = [
         (ROLE_CUSTOMER, "Customer"),
         (ROLE_EMPLOYEE, "Employee"),
-        (ROLE_SARAF, "saraf"),
+        (ROLE_SARAF, "Saraf"),
         (ROLE_COMPANY, "Company"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="profile",
         verbose_name="User Account"
     )
+
+    # فیلدهایی که کاربر باید خود پر کند
+    first_name = models.CharField(max_length=120, blank=True)
+    last_name = models.CharField(max_length=120, blank=True)
+    email = models.EmailField(max_length=255, blank=True, db_index=True)
+    phone = models.CharField(
+        max_length=30,
+        blank=True,
+        db_index=True,
+        validators=[RegexValidator(r'^[\d\+\-\s\(\)]+$', 'Invalid phone number format')],
+    )
+    address = models.CharField(max_length=255, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    national_id = models.CharField(max_length=50, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    zipcode = models.CharField(max_length=20, blank=True)
+
+    # فیلدهایی که توسط ادمین پر می‌شوند
     account = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
@@ -88,33 +106,17 @@ class UserProfile(models.Model):
         db_index=True,
         verbose_name="Role"
     )
-
-    first_name = models.CharField(max_length=120, blank=True)
-    last_name = models.CharField(max_length=120, blank=True)
-    email = models.EmailField(max_length=255, blank=True, db_index=True)
-    phone = models.CharField(
-        max_length=30,
-        blank=True,
-        db_index=True,
-        validators=[RegexValidator(r'^[\d\+\-\s\(\)]+$', 'Invalid phone number format')],
-    )
-    address = models.CharField(max_length=255, blank=True)
-    date_of_birth = models.DateField(null=True, blank=True)
-    national_id = models.CharField(max_length=50, blank=True, unique=False)
-    state = models.CharField(max_length=100, blank=True)
-    zipcode = models.CharField(max_length=20, blank=True)
-
     company = models.ForeignKey(
-        Company,
+        'accounts.Company',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="employees",
         verbose_name="Company"
     )
-
     is_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+
     created_at = models.DateTimeField(default=timezone.now, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -123,7 +125,6 @@ class UserProfile(models.Model):
         verbose_name_plural = "User Profiles"
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["account"]),
             models.Index(fields=["email"]),
             models.Index(fields=["phone"]),
         ]
@@ -132,11 +133,11 @@ class UserProfile(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.full_name or self.user.username} – {self.get_account_display()}"
+        return self.full_name or self.user.username
 
     @property
     def full_name(self):
-        return f"{self.first_name} {self.last_name}".strip() or self.user.get_full_name()
+        return f"{self.first_name} {self.last_name}".strip()
 
     @property
     def short_name(self):
@@ -155,11 +156,3 @@ class UserProfile(models.Model):
         """Soft deactivate the user profile."""
         self.is_active = False
         self.save(update_fields=["is_active", "updated_at"])
-        
-    @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}".strip()
-
-    @property
-    def is_staff_or_admin(self):
-        return self.role in [self.ROLE_EMPLOYEE, self.ROLE_ADMIN]

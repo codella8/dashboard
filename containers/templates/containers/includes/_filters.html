@@ -1,0 +1,30 @@
+<form method="get" class="form-inline mb-3">
+  {% csrf_token %}
+  <div class="form-row w-100">
+    <div class="col-auto">
+      <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="جستجو..." />
+    </div>
+
+    <div class="col-auto">
+      <input type="date" name="start_date" value="{{ request.GET.start_date|default:'' }}" class="form-control" />
+    </div>
+
+    <div class="col-auto">
+      <input type="date" name="end_date" value="{{ request.GET.end_date|default:'' }}" class="form-control" />
+    </div>
+
+    <div class="col-auto">
+      <select name="currency" class="form-control">
+        <option value="">{{ 'تمام ارزها' }}</option>
+        <option value="usd" {% if request.GET.currency == 'usd' %}selected{% endif %}>USD</option>
+        <option value="eur" {% if request.GET.currency == 'eur' %}selected{% endif %}>EUR</option>
+        <option value="aed" {% if request.GET.currency == 'aed' %}selected{% endif %}>AED</option>
+      </select>
+    </div>
+
+    <div class="col-auto">
+      <button class="btn btn-outline-primary" type="submit">اعمال</button>
+      <a class="btn btn-outline-secondary ml-2" href="{% url request.resolver_match.view_name %}">بازنشانی</a>
+    </div>
+  </div>
+</form>
