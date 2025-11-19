@@ -74,7 +74,7 @@ class UserProfile(models.Model):
         verbose_name="User Account"
     )
 
-    # فیلدهایی که کاربر باید خود پر کند
+    # فیلدهای اطلاعات شخصی
     first_name = models.CharField(max_length=120, blank=True)
     last_name = models.CharField(max_length=120, blank=True)
     email = models.EmailField(max_length=255, blank=True, db_index=True)
@@ -89,23 +89,15 @@ class UserProfile(models.Model):
     national_id = models.CharField(max_length=50, blank=True)
     state = models.CharField(max_length=100, blank=True)
     zipcode = models.CharField(max_length=20, blank=True)
-
-    # فیلدهایی که توسط ادمین پر می‌شوند
-    account = models.CharField(
-        max_length=20,
-        choices=ROLE_CHOICES,
-        default=ROLE_CUSTOMER,
-        db_index=True,
-        verbose_name="Account Type",
-        help_text="Defines the user role and permissions in the system"
-    )
     role = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
         default=ROLE_CUSTOMER,
         db_index=True,
-        verbose_name="Role"
+        verbose_name="Role",
+        help_text="Defines the user role and permissions in the system"
     )
+    
     company = models.ForeignKey(
         'accounts.Company',
         on_delete=models.SET_NULL,
@@ -127,6 +119,7 @@ class UserProfile(models.Model):
         indexes = [
             models.Index(fields=["email"]),
             models.Index(fields=["phone"]),
+            models.Index(fields=["role"]),
         ]
         constraints = [
             models.UniqueConstraint(fields=["user"], name="unique_user_profile")
@@ -145,7 +138,9 @@ class UserProfile(models.Model):
 
     @property
     def company_name(self):
-        return self.company.name if self.company else "No company assigned"
+        if self.company and hasattr(self.company, 'name'):
+            return self.company.name
+        return "No company assigned"
 
     def mark_verified(self):
         """Mark the profile as verified and save."""

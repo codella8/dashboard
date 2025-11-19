@@ -127,8 +127,11 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
-
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -136,16 +139,85 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 #jazzmin setting
+# settings.py
 JAZZMIN_SETTINGS = {
-    "site_title": "DailySale Admin",
-    "site_header": "DailySale Dashboard",
-    "welcome_sign": "Welcome Sham!",
-    "show_sidebar": True,
+    # عنوان سایت
+    "site_title": "🚀 Management Panel",
+    "site_header": "🏭Vehichle Management System",
+    "site_brand": "Dashboard",
+    
+    # لوگو
+    "site_logo": "assets/logo.png",
+    "login_logo": "assets/logo-login.png",
+    
+    # رنگ‌بندی مدرن
+    "theme": "darkly",  # یا: flatly, material, modern
+    "dark_mode_theme": "darkly",
+    
+    # استایل کاستوم
+    "custom_css": "css/admin-custom.css",
+    "custom_js": "js/admin-custom.js",
+    
+    # منوی کناری
     "navigation_expanded": True,
+    "show_sidebar": True,
+    "show_ui_builder": True,
+    
+    # آیکون‌های حرفه‌ای
     "icons": {
-        "daily_sale.SaleInvoice": "fas fa-file-invoice-dollar",
-        "inventory.Item": "fas fa-cogs",
-        "crm.Customer": "fas fa-user-tag",
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "auth.Group": "fas fa-users",
+        "machines.Machine": "fas fa-cogs",
+        "machines.Maintenance": "fas fa-tools",
+        "machines.Production": "fas fa-chart-line",
+        "inventory.Product": "fas fa-boxes",
+        "sales.Transaction": "fas fa-shopping-cart",
+        "containers.Container": "fas fa-ship",
+    },
+    
+    # منوی سفارشی
+    "topmenu_links": [
+        {"name": "داشبورد اصلی", "url": "/", "permissions": ["auth.view_user"]},
+        {"name": "گزارشات", "url": "/reports/", "permissions": ["auth.view_user"]},
+    ],
+    
+    # ویدجت‌های داشبورد
+    "usermenu_links": [
+        {"name": "پشتیبانی", "url": "https://t.me/yourchannel", "new_window": True},
+    ],
+}
+
+# رنگ‌بندی مدرن
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-indigo",
+    "accent": "accent-primary",
+    "navbar": "navbar-indigo navbar-dark",
+    "no_navbar_border": False,
+    "navbar_fixed": True,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-dark-indigo",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": False,
+    "sidebar_nav_compact_style": False,
+    "sidebar_nav_legacy_style": True,
+    "sidebar_nav_flat_style": False,
+    "theme": "cosmo",
+    "dark_mode_theme": "darkly",
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success"
     },
 }
 

@@ -1,0 +1,131 @@
+/* استایل‌دهی حرفه‌ای پنل ادمین */
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --success-color: #2ecc71;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+}
+
+/* هدر مدرن */
+#header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+    color: white !important;
+    border-bottom: 3px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* منوی کناری */
+.main-sidebar {
+    background: linear-gradient(180deg, #2c3e50, #34495e) !important;
+}
+
+.sidebar-dark-primary .nav-sidebar>.nav-item>.nav-link.active {
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)) !important;
+    border-left: 4px solid var(--success-color) !important;
+}
+
+/* کارت‌های مدرن */
+.card {
+    border: none !important;
+    border-radius: 15px !important;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1) !important;
+    margin-bottom: 20px !important;
+}
+
+.card-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+    color: white !important;
+    border-radius: 15px 15px 0 0 !important;
+    font-weight: bold !important;
+}
+
+/* دکمه‌های شیک */
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4) !important;
+}
+
+/* جدول‌های مدرن */
+.table {
+    border-radius: 10px !important;
+    overflow: hidden !important;
+}
+
+.table thead th {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+    color: white !important;
+    border: none !important;
+}
+
+/* فرم‌های زیبا */
+.form-control {
+    border-radius: 8px !important;
+    border: 2px solid #e9ecef !important;
+    transition: all 0.3s ease !important;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+}
+
+/* استایل لاگین صفحه */
+.login-box,
+.register-box {
+    width: 400px !important;
+}
+
+.login-logo a,
+.register-logo a {
+    color: var(--primary-color) !important;
+    font-weight: bold !important;
+    font-size: 28px !important;
+}
+
+.login-card-body,
+.register-card-body {
+    border-radius: 20px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* وضعیت‌ها */
+.badge-success {
+    background: linear-gradient(135deg, var(--success-color), #27ae60) !important;
+}
+
+.badge-warning {
+    background: linear-gradient(135deg, var(--warning-color), #e67e22) !important;
+}
+
+.badge-danger {
+    background: linear-gradient(135deg, var(--danger-color), #c0392b) !important;
+}
+
+/* نمودارها و آمار */
+.small-box {
+    border-radius: 15px !important;
+    overflow: hidden !important;
+}
+
+.small-box .icon {
+    font-size: 70px !important;
+    opacity: 0.3 !important;
+}
+
+/* ریسپانسیو */
+@media (max-width: 768px) {
+    .content-wrapper {
+        padding: 10px !important;
+    }
+
+    .card {
+        margin-bottom: 15px !important;
+    }
+}

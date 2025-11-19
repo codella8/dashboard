@@ -74,23 +74,19 @@ def signup_user(request):
     return render(request, 'signup.html', {'form': form})
 
 @login_required
-def home_dashboard(request):
-    """صفحه اصلی - می‌تونی به داشبورد ریدایرکت کنی یا صفحه جدا بسازی"""
-    return dashboard(request)
-
-@login_required
 def dashboard(request):
     """User Dashboard with quick stats and app navigation"""
     
 
     # App navigation setup
     apps = [
+        {'name': 'accounts', 'url': 'accounts:dashboard', 'icon': '📈', 'active': True},
         {'name': 'daily_sale', 'url': 'daily_sale:dashboard', 'icon': '📈', 'active': True},
         {'name': 'Containers', 'url': 'containers:saraf_list', 'icon': '🚢', 'active': True},
         {'name': 'expenses', 'url': 'expenses:dashboard', 'icon': '💸', 'active': True},
         {'name': 'Employee', 'url': 'employee:dashboard', 'icon': '👥', 'active': True},
-        {'name': 'Reports', 'url': 'reports:dashboard', 'icon': '📊', 'active': True},
         {'name': 'Fiance', 'url': 'finance:dashboard', 'icon': '📊', 'active': True},
+        {'name': 'Reports', 'url': 'reports:dashboard', 'icon': '📊', 'active': True},
     ]
 
     context = { 'apps': apps}

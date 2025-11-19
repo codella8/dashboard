@@ -89,31 +89,48 @@ class CompanyAdmin(admin.ModelAdmin):
         ])
     ]
 
-
-# -----------------------------------------------------
-# USER PROFILE ADMIN
-# -----------------------------------------------------
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = (
         "short_name", "email", "phone",
-        "account", "company", "is_verified", "is_active",
+        "role", "company_name", "is_verified", "is_active",  # ✅ company_name به جای company
         "created_at",
     )
     search_fields = (
         "first_name", "last_name", "email",
         "phone", "company__name"
     )
-    list_filter = ("account", "is_verified", "is_active", "company")
+    list_filter = ("role", "is_verified", "is_active", "company")
     ordering = ("-created_at",)
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at", "company_name")  # ✅ اضافه کردن
     list_per_page = 25
+    
+    # اضافه کردن fieldsets برای سازماندهی بهتر
+    fieldsets = (
+        ("Personal Information", {
+            "fields": (
+                "user", "first_name", "last_name", "email", "phone",
+                "date_of_birth", "national_id"
+            )
+        }),
+        ("Address Information", {
+            "fields": ("address", "state", "zipcode"),
+            "classes": ("collapse",)
+        }),
+        ("System Information", {
+            "fields": ("role", "company", "is_verified", "is_active")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at", "company_name"),
+            "classes": ("collapse",)
+        }),
+    )
 
     actions = [
         verify_profiles,
         deactivate_profiles,
         export_as_csv([
             "id", "first_name", "last_name", "email",
-            "phone", "account", "company__name", "is_verified"
+            "phone", "role", "company_name", "is_verified"  # ✅ company_name به جای company__name
         ])
     ]
