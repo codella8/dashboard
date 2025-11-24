@@ -1,6 +1,6 @@
 # containers/views.py
 from django.shortcuts import render, get_object_or_404
-from django.views.generic import ListView, DetailView, TemplateView, View
+from django.views.generic import ListView, DetailView, TemplateView, View, CreateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
@@ -10,9 +10,11 @@ from datetime import datetime
 from .models import Saraf, Container, ContainerTransaction, Inventory_List, SarafTransaction
 from . import report
 from django.utils.dateparse import parse_date
-from django.views.generic import CreateView
 from django.urls import reverse_lazy
 from django import forms
+from django.db.models import Sum, F, DecimalField
+from django.db.models.functions import Coalesce
+from decimal import Decimal
 
 
 def container_financial_report(request, container_id):
@@ -43,7 +45,42 @@ def saraf_balance_report(request):
         balance=F('total_received') + F('total_debit') - F('total_paid')
     )
 
-    return render(request, 'contaoners/saraf_balance_report.html', {'sarafs': sarafs})
+    return render(request, 'containers/saraf_balance_report.html', {'sarafs': sarafs})  # اصلاح typo
+
+# containers/views.py
+@login_required
+def saraf_transactions_report(request, saraf_id):
+    """
+    گزارش تراکنش‌های یک صراف خاص
+    """
+    saraf = get_object_or_404(Saraf, id=saraf_id)
+    
+    # فیلتر کردن بر اساس تاریخ اگر وجود دارد
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    transactions = saraf.transactions.select_related('container').all()
+    
+    if start_date:
+        transactions = transactions.filter(transaction_time__gte=parse_date(start_date))
+    if end_date:
+        transactions = transactions.filter(transaction_time__lte=parse_date(end_date))
+    
+    # محاسبه جمع‌های مالی
+    total_received = transactions.aggregate(total=Sum('received_from_saraf'))['total'] or 0
+    total_paid = transactions.aggregate(total=Sum('paid_by_company'))['total'] or 0
+    total_debit = transactions.aggregate(total=Sum('debit_company'))['total'] or 0
+    
+    context = {
+        'saraf': saraf,
+        'transactions': transactions.order_by('-transaction_time'),
+        'total_received': total_received,
+        'total_paid': total_paid,
+        'total_debit': total_debit,
+        'net_balance': total_received + total_debit - total_paid,
+    }
+    
+    return render(request, 'containers/saraf_transactions_report.html', context)
 
 def total_container_transactions_report(request):
     start_date = request.GET.get('start_date')
@@ -64,7 +101,7 @@ def total_container_transactions_report(request):
         total_amount=Sum('total_price')
     )
 
-    return render(request, 'containers/container_transactions_report.html', {
+    return render(request, 'containers/total_container_transactions_report.html', {
         'report': report
     })
 
@@ -89,16 +126,19 @@ class SarafListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
+
         qs = Saraf.objects.select_related("user")
         company = self.get_company()
         if company:
             qs = qs.filter(user__company=company)
-        # annotate balances (DB-side) using report utility
+        
+        # محاسبات فقط در ویو
         return qs.annotate(
-            total_received=Sum("transactions__received_from_saraf"),
-            total_paid=Sum("transactions__paid_by_company"),
-            total_debit=Sum("transactions__debit_company"),
-        ).annotate(balance=F("total_received") + F("total_debit") - F("total_paid")).order_by("-balance")
+            total_received=Coalesce(Sum("transactions__received_from_saraf"), Decimal('0')),
+            total_paid=Coalesce(Sum("transactions__paid_by_company"), Decimal('0')),
+        ).annotate(
+            balance=F("total_received") - F("total_paid")
+        ).order_by("-balance")
 
 class SarafDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
     model = Saraf
@@ -117,11 +157,12 @@ class SarafDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
         ctx = super().get_context_data(**kwargs)
         saraf = self.object
         ctx["transactions"] = saraf.transactions.select_related("container").order_by("-transaction_time")[:200]
-        ctx["summary"] = report.saraf_balance_summary()  # can be narrowed by company if needed
+        ctx["summary"] = report.saraf_balance_summary()
         return ctx
 
 # --- Container views ---
 
+# containers/views.py
 class ContainerListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
     model = Container
     template_name = "containers/container_list.html"
@@ -133,23 +174,40 @@ class ContainerListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
         company = self.get_company()
         if company:
             qs = qs.filter(company=company)
+        
+        # استفاده از نام فیلدهای صحیح بر اساس مدل Container
         qs = qs.annotate(
-            products_count=Count('Inventory_container', distinct=True),
-            total_in_stock_qty=Sum('Inventory_container__in_stock_qty'),
-            total_inventory_value=Sum(F('Inventory_container__in_stock_qty') * F('Inventory_container__unit_price'))
-    )
+            products_count=Count('inventory_items', distinct=True),  # اصلاح به inventory_items
+            total_in_stock_qty=Sum('inventory_items__in_stock_qty'),
+            total_inventory_value=Sum(F('inventory_items__in_stock_qty') * F('inventory_items__unit_price'))
+        )
         return qs.order_by('-created_at')
+
+# اضافه کردن view های جدید
+class ContainerDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
+    model = Container
+    template_name = "containers/container_detail.html"
+    context_object_name = "container"
 
     def get_queryset(self):
         qs = Container.objects.select_related("company")
         company = self.get_company()
         if company:
             qs = qs.filter(company=company)
-        # annotate with aggregated inventory value & product count
-        qs = qs.annotate(
-            product_count=Sum("Inventory_container__in_stock_qty")  # NOTE: alternative is to use report.container_inventory_summary
-        )
-        return qs.order_by("-created_at")
+        return qs
+
+class ContainerCreateView(LoginRequiredMixin, CompanyAccessMixin, CreateView):
+    model = Container
+    template_name = "containers/container_form.html"
+    fields = ['name', 'container_number', 'company', 'description']  # تنظیم فیلدهای مورد نیاز
+    success_url = reverse_lazy("containers:list")
+
+    def form_valid(self, form):
+        # اگر کاربر متعلق به شرکت است، به صورت خودکار شرکت را تنظیم کنید
+        company = self.get_company()
+        if company:
+            form.instance.company = company
+        return super().form_valid(form)
 
 @login_required
 def container_financial_report_view(request, container_id):
@@ -160,12 +218,20 @@ def container_financial_report_view(request, container_id):
     container = get_object_or_404(Container, id=container_id)
     start = request.GET.get("start_date")
     end = request.GET.get("end_date")
+    
     if start:
-        start_parsed = datetime.fromisoformat(start)
+        try:
+            start_parsed = datetime.fromisoformat(start)
+        except ValueError:
+            start_parsed = None
     else:
         start_parsed = None
+        
     if end:
-        end_parsed = datetime.fromisoformat(end)
+        try:
+            end_parsed = datetime.fromisoformat(end)
+        except ValueError:
+            end_parsed = None
     else:
         end_parsed = None
 
@@ -212,11 +278,10 @@ class InventoryCreateView(LoginRequiredMixin, CreateView):
     model = Inventory_List
     form_class = InventoryCreateForm
     template_name = "containers/inventory_add.html"
-    success_url = reverse_lazy("containers:container_list")
+    success_url = reverse_lazy("containers:list")
 
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
-        # restrict containers to user's company if available
         company = getattr(self.request.user.profile, "company", None)
         if company:
             form.fields["container"].queryset = Container.objects.filter(company=company)

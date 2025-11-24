@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Sales Analytics - Inventory System{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="analytics-card p-4">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h1 class="h3 mb-2">📊 Sales Analytics</h1>
+                        <p class="text-muted mb-0">Advanced insights and performance metrics</p>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="exportAnalytics()">
+                                <i class="fas fa-download me-2"></i>Export Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Date Range Selector -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="analytics-card p-4">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start-date" value="{{ start_date|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end-date" value="{{ end_date|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Analysis Type</label>
+                        <select class="form-select" id="analysis-type">
+                            <option value="product">Product Analysis</option>
+                            <option value="customer">Customer Analysis</option>
+                            <option value="time">Time Series</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary w-100" onclick="updateAnalytics()">
+                            <i class="fas fa-chart-bar me-2"></i>Update Analysis
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="metric-card p-3 text-center">
+                <h5 class="mb-1">{{ time_series|length }}</h5>
+                <small class="opacity-8">Analysis Days</small>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="metric-card p-3 text-center">
+                <h5 class="mb-1">{{ product_analysis|length }}</h5>
+                <small class="opacity-8">Products Analyzed</small>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="metric-card p-3 text-center">
+                <h5 class="mb-1">{{ customer_analysis|length }}</h5>
+                <small class="opacity-8">Customers</small>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="metric-card p-3 text-center">
+                <h5 class="mb-1">
+                    {% with total_sales=product_analysis|sum_attr:"total_sales" %}
+                    ${{ total_sales|floatformat:0|intcomma }}
+                    {% endwith %}
+                </h5>
+                <small class="opacity-8">Total Sales</small>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="metric-card p-3 text-center">
+                <h5 class="mb-1">
+                    {% with total_qty=product_analysis|sum_attr:"total_quantity" %}
+                    {{ total_qty|intcomma }}
+                    {% endwith %}
+                </h5>
+                <small class="opacity-8">Total Quantity</small>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="metric-card p-3 text-center">
+                <h5 class="mb-1">
+                    {% with avg=product_analysis|avg_attr:"avg_price" %}
+                    ${{ avg|default:0|floatformat:0|intcomma }}
+                    {% endwith %}
+                </h5>
+                <small class="opacity-8">Avg Price</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Product Performance -->
+        <div class="col-xl-6 mb-4">
+            <div class="analytics-card p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0">🏆 Top Performing Products</h5>
+                    <span class="badge bg-primary">{{ product_analysis|length }} products</span>
+                </div>
+
+                {% for product in product_analysis %}
+                <div class="border-bottom pb-3 mb-3">
+                    <div class="row align-items-center">
+                        <div class="col-8">
+                            <h6 class="mb-1">{{ product.item__product_name|default:"Unknown Product" }}</h6>
+                            <div class="d-flex gap-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-shopping-cart me-1"></i>
+                                    {{ product.total_quantity }} sold
+                                </small>
+                                <small class="text-muted">
+                                    <i class="fas fa-receipt me-1"></i>
+                                    {{ product.transaction_count }} transactions
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-4 text-end">
+                            <h6 class="text-success mb-1">${{ product.total_sales|floatformat:0|intcomma }}</h6>
+                            <small class="text-muted">
+                                ${{ product.avg_price|floatformat:0|intcomma }} avg
+                            </small>
+                        </div>
+                    </div>
+                    <div class="progress mt-2" style="height: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ product.percentage }}%"
+                             aria-valuenow="{{ product.percentage }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-5">
+                    <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">No product data available</h6>
+                    <p class="text-muted small">Sales data will appear here once transactions are recorded</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Customer Analysis -->
+        <div class="col-xl-6 mb-4">
+            <div class="analytics-card p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0">👥 Customer Insights</h5>
+                    <span class="badge bg-info">{{ customer_analysis|length }} customers</span>
+                </div>
+
+                {% for customer in customer_analysis %}
+                <div class="border-bottom pb-3 mb-3">
+                    <div class="row align-items-center">
+                        <div class="col-8">
+                            <h6 class="mb-1">
+                                {{ customer.customer__first_name }} {{ customer.customer__last_name }}
+                            </h6>
+                            <div class="d-flex gap-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-receipt me-1"></i>
+                                    {{ customer.purchase_count }} purchases
+                                </small>
+                                <small class="text-muted">
+                                    <i class="fas fa-dollar-sign me-1"></i>
+                                    ${{ customer.avg_purchase|floatformat:0|intcomma }} avg
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-4 text-end">
+                            <h6 class="text-primary mb-1">${{ customer.total_purchases|floatformat:0|intcomma }}</h6>
+                            <span class="performance-badge bg-{% if customer.purchase_count > 5 %}success{% else %}warning{% endif %}">
+                                {% if customer.purchase_count > 5 %}VIP{% else %}Regular{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-5">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">No customer data available</h6>
+                    <p class="text-muted small">Customer insights will appear here once sales are recorded</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Time Series Analysis -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="analytics-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0">📈 Sales Trend Analysis</h5>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary active">Daily</button>
+                        <button class="btn btn-sm btn-outline-primary">Weekly</button>
+                        <button class="btn btn-sm btn-outline-primary">Monthly</button>
+                    </div>
+                </div>
+
+                <!-- Chart Placeholder -->
+                <div class="text-center py-5" style="background: #f8f9fa; border-radius: 10px;">
+                    <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">Sales Trend Visualization</h6>
+                    <p class="text-muted small">Interactive chart showing sales performance over time</p>
+                </div>
+
+                <!-- Time Series Data -->
+                <div class="table-responsive mt-4">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Daily Sales</th>
+                                <th>Daily Profit</th>
+                                <th>Growth</th>
+                                <th>Trend</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for day in time_series %}
+                            <tr>
+                                <td>{{ day.date|date:"M d, Y" }}</td>
+                                <td><strong>${{ day.daily_sales|floatformat:0|intcomma }}</strong></td>
+                                <td>
+                                    <span class="{% if day.daily_profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                                        ${{ day.daily_profit|floatformat:0|intcomma }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if day.growth > 0 %}
+                                    <span class="text-success">↑ {{ day.growth }}%</span>
+                                    {% elif day.growth < 0 %}
+                                    <span class="text-danger">↓ {{ day.growth }}%</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if day.trend == 'up' %}
+                                    <i class="fas fa-arrow-up text-success"></i>
+                                    {% elif day.trend == 'down' %}
+                                    <i class="fas fa-arrow-down text-danger"></i>
+                                    {% else %}
+                                    <i class="fas fa-minus text-muted"></i>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4">
+                                    <i class="fas fa-calendar fa-2x text-muted mb-3"></i>
+                                    <p class="text-muted">No time series data available</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insights Summary -->
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="analytics-card p-4">
+                <h6 class="mb-3">💡 Key Insights</h6>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <i class="fas fa-rocket text-success me-2"></i>
+                        <strong>Top Product:</strong> 
+                        {% with top_product=product_analysis|first %}
+                        {{ top_product.item__product_name|default:"N/A" }}
+                        {% endwith %}
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-user text-primary me-2"></i>
+                        <strong>Best Customer:</strong> 
+                        {% with top_customer=customer_analysis|first %}
+                        {{ top_customer.customer__first_name|default:"N/A" }}
+                        {% endwith %}
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-trending-up text-info me-2"></i>
+                        <strong>Growth Trend:</strong> 
+                        {% if time_series|last.growth > 0 %}Positive{% else %}Stable{% endif %}
+                    </li>
+                    <li class="mb-0">
+                        <i class="fas fa-calendar text-warning me-2"></i>
+                        <strong>Period:</strong> {{ start_date|date:"M d" }} - {{ end_date|date:"M d, Y" }}
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="analytics-card p-4">
+                <h6 class="mb-3">📋 Performance Metrics</h6>
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <h5 class="text-primary mb-1">
+                            {% with total=product_analysis|sum_attr:"total_quantity" %}
+                            {{ total|default:0 }}
+                            {% endwith %}
+                        </h5>
+                        <small class="text-muted">Units Sold</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <h5 class="text-success mb-1">
+                            {% with total=product_analysis|sum_attr:"total_sales" %}
+                            ${{ total|default:0|floatformat:0|intcomma }}
+                            {% endwith %}
+                        </h5>
+                        <small class="text-muted">Total Revenue</small>
+                    </div>
+                    <div class="col-6">
+                        <h5 class="text-info mb-1">{{ customer_analysis|length }}</h5>
+                        <small class="text-muted">Active Customers</small>
+                    </div>
+                    <div class="col-6">
+                        <h5 class="text-warning mb-1">
+                            {% with avg=customer_analysis|avg_attr:"purchase_count" %}
+                            {{ avg|default:0|floatformat:1 }}
+                            {% endwith %}
+                        </h5>
+                        <small class="text-muted">Avg Purchases</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="analytics-card p-4">
+                <h6 class="mb-3">🎯 Recommendations</h6>
+                <div class="alert alert-light border">
+                    <small>
+                        <strong>Based on your analytics:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Focus on top-performing products</li>
+                            <li>Engage with VIP customers</li>
+                            <li>Monitor daily sales trends</li>
+                            <li>Optimize pricing strategies</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateAnalytics() {
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const analysisType = document.getElementById('analysis-type').value;
+    
+    if (!startDate || !endDate) {
+        alert('Please select both start and end dates.');
+        return;
+    }
+    
+    // Redirect with new parameters
+    window.location.href = `?start_date=${startDate}&end_date=${endDate}&type=${analysisType}`;
+}
+
+function exportAnalytics() {
+    // In a real implementation, this would generate and download a report
+    alert('Export feature would generate a comprehensive analytics report');
+}
+
+// Set date range constraints
+document.getElementById('start-date').addEventListener('change', function() {
+    document.getElementById('end-date').min = this.value;
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const startDate = document.getElementById('start-date').value;
+    if (startDate) {
+        document.getElementById('end-date').min = startDate;
+    }
+});
+</script>
+{% endblock %}

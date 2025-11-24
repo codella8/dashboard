@@ -64,10 +64,10 @@ class SarafAdmin(admin.ModelAdmin):
 
 @admin.register(SarafTransaction)
 class SarafTransactionAdmin(admin.ModelAdmin):
-    list_display = ("saraf", "currency", "received_from_saraf", "paid_by_company", "debit_company", "balance", "transaction_time")
+    list_display = ("saraf", "currency", "received_from_saraf", "paid_by_company",  "transaction_time")
     search_fields = ("saraf__user__user__username", "saraf__user__first_name", "saraf__user__last_name")
     list_filter = ("currency",)
-    readonly_fields = ("balance","created_at","updated_at")
+    readonly_fields = ("created_at","updated_at")
     date_hierarchy = "transaction_time"
     actions = ["export_selected_csv"]
 
@@ -75,9 +75,9 @@ class SarafTransactionAdmin(admin.ModelAdmin):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=saraf_transactions.csv"
         writer = csv.writer(response)
-        writer.writerow(["id","saraf","container","currency","received_from_saraf","paid_by_company","debit_company","balance","transaction_time"])
+        writer.writerow(["id","saraf","container","currency","received_from_saraf","paid_by_company""transaction_time"])
         for obj in queryset:
-            writer.writerow([str(obj.id), str(obj.saraf), str(obj.container or ""), obj.currency, str(obj.received_from_saraf), str(obj.paid_by_company), str(obj.debit_company), str(obj.balance), obj.transaction_time.isoformat()])
+            writer.writerow([str(obj.id), str(obj.saraf), str(obj.container or ""), obj.currency, str(obj.received_from_saraf), str(obj.paid_by_company), str(obj.balance), obj.transaction_time.isoformat()])
         return response
     export_selected_csv.short_description = _("Export selected saraf transactions")
 

@@ -4,26 +4,26 @@ from . import views
 app_name = 'daily_sale'
 
 urlpatterns = [
-    path('', views.dashboard_overview, name='dashboard'),
-    path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
-
-    # صفحات گزارش و آنالیز
-    path('sales-summary/', views.sales_summary_view, name='sales_summary'),
-    path('sales-by-item/', views.sales_by_item_view, name='sales_by_item'),
-    path('outstanding-customers/', views.outstanding_customers_view, name='outstanding_customers'),
-    path('sales-purchases-range/', views.sales_and_purchases_range_view, name='sales_purchases_range'),
-    path('financial-analytics/', views.financial_analytics_view, name='financial_analytics'),
-    path('customer-analysis/', views.customer_analysis_view, name='customer_analysis'),
-    path('container-sales/', views.container_sales_view, name='container_sales'),
-
-    # مدیریت تراکنش‌ها (CRUD)
-    path('transaction-list/', views.transaction_list_view, name='transaction_list'),
-    path('transaction/create/', views.transaction_create_view, name='transaction_create'),
-    path('transaction/<uuid:pk>/edit/', views.transaction_edit_view, name='transaction_edit'),
-    path('transaction/<uuid:pk>/delete/', views.transaction_delete_view, name='transaction_delete'),
-
-    # API endpoints (JSON) برای استفاده در داشبورد frontend (Chart.js / Ajax)
-    path('api/real-time-stats/', views.real_time_stats_api, name='api_real_time_stats'),
-    path('api/sales-timeseries/', views.sales_timeseries_api, name='api_sales_timeseries'),
-    path('api/sales-by-item/', views.sales_by_item_api, name='api_sales_by_item'),
+    
+    path('transactions/', views.transaction_list, name='transaction_list'),
+    path('transactions/create/', views.create_transaction, name='create_transaction'),
+    path('transactions/<uuid:transaction_id>/edit/', views.edit_transaction, name='edit_transaction'),
+    path('transactions/<uuid:transaction_id>/delete/', views.delete_transaction, name='delete_transaction'),
+    path('transactions/bulk-action/', views.bulk_action, name='bulk_action'),
+    
+    # گزارش‌ها و تحلیل‌ها
+    path('dashboard/', views.dashboard, name='dashboard'),
+    path('reports/financial/', views.financial_reports, name='financial_reports'),
+    path('reports/analytics/', views.sales_analytics, name='sales_analytics'),
+    path('reports/inventory/', views.inventory_reports, name='inventory_reports'),
+    
+    # API‌های هوشمند
+    path('api/dashboard-stats/', views.api_dashboard_stats, name='api_dashboard_stats'),
+    path('api/quick-summary/', views.api_quick_summary, name='api_quick_summary'),
+    path('api/recent-activity/', views.api_recent_activity, name='api_recent_activity'),
+    path('api/system-alerts/', views.api_system_alerts, name='api_system_alerts'),
+    
+    # مدیریت
+    path('admin/control-panel/', views.admin_control_panel, name='admin_control_panel'),
+    path('admin/bulk-operations/', views.admin_bulk_operations, name='admin_bulk_operations'),
 ]

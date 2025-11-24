@@ -10,7 +10,7 @@
 /* هدر مدرن */
 #header {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
-    color: white !important;
+    color: rgb(22, 22, 22) !important;
     border-bottom: 3px solid rgba(255, 255, 255, 0.2) !important;
 }
 
@@ -34,7 +34,7 @@
 
 .card-header {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
-    color: white !important;
+    color: rgb(39, 36, 36) !important;
     border-radius: 15px 15px 0 0 !important;
     font-weight: bold !important;
 }
@@ -60,7 +60,7 @@
 
 .table thead th {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
-    color: white !important;
+    color: rgb(7, 5, 5) !important;
     border: none !important;
 }
 

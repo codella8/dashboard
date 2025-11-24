@@ -1,25 +1,20 @@
 {% extends "accounts_base.html" %}
 {% load static %}
-
-{% block title %}داشبورد مرکزی هوشمند{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
-{% endblock %}
+{% block title %}Main Dashboard - Inventory System{% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
-    <!-- هدر حرفه‌ای -->
+<div class="dashboard-container-fluid vh-100">
+    <!-- Professional Header -->
     <div class="dashboard-header-professional py-4 mb-5">
         <div class="container-fluid">
             <div class="row align-items-center">
                 <div class="col-lg-8">
                     <div class="fade-in-up">
                         <h1 class="display-4 fw-bold text-dark mb-2">
-                            🚀 داشبورد مرکزی هوشمند
+                            🚀 Main Dashboard
                         </h1>
                         <p class="lead text-muted mb-0">
-                            مدیریت یکپارچه و لحظه‌ای تمام بخش‌های شرکت
+                            Central Management System - All Modules in One Place
                         </p>
                     </div>
                 </div>
@@ -27,13 +22,13 @@
                     <div class="fade-in-up">
                         <div class="user-badge-pro d-inline-flex align-items-center">
                             <i class="fas fa-user-circle me-2"></i>
-                            <span>کاربر: {{ request.user.get_full_name|default:request.user.username }}</span>
+                            <span>User: {{ request.user.get_full_name|default:request.user.username }}</span>
                             <div class="ms-3 pulse-dot"></div>
                         </div>
                         <div class="mt-2">
                             <small class="text-muted">
                                 <i class="fas fa-clock me-1"></i>
-                                <span id="persian-date">--</span>
+                                <span id="current-time">--:--:--</span>
                             </small>
                         </div>
                     </div>
@@ -43,22 +38,22 @@
     </div>
 
     <div class="container-fluid">
-        <!-- آمار کلی پیشرفته -->
+        <!-- Quick Stats -->
         <div class="row mb-5">
             <div class="col-xl-3 col-md-6 mb-4">
                 <div class="stat-card-pro success fade-in-up" style="animation-delay: 0.1s;">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h2 class="display-6 fw-bold mb-1">{{ quick_stats.total_sales }}</h2>
-                                <p class="mb-0 opacity-90">تراکنش فروش</p>
-                                <small class="opacity-75">
-                                    <i class="fas fa-arrow-up me-1"></i>
-                                    ۱۲٪ رشد نسبت به ماه قبل
+                                <h2 class="display-6 fw-bold mb-1 text-dark">{{ quick_stats.total_sales|default:"1,247"}}</h2>
+                                <p class="mb-0 opacity-90 text-dark">Sales Transactions</p>
+                                <small class="opacity-75 text-dark">
+                                    <i class="fas fa-arrow-up me-1 text-success"></i>
+                                    12% growth this month
                                 </small>
                             </div>
                             <div class="stat-icon">
-                                <i class="fas fa-shopping-cart fa-2x opacity-50"></i>
+                                <i class="fas fa-shopping-cart fa-2x opacity-50 text-success"></i>
                             </div>
                         </div>
                     </div>
@@ -69,15 +64,15 @@
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h2 class="display-6 fw-bold mb-1">{{ quick_stats.total_inventory }}</h2>
-                                <p class="mb-0 opacity-90">آیتم موجودی</p>
-                                <small class="opacity-75">
-                                    <i class="fas fa-boxes me-1"></i>
-                                    در ۸ انبار مختلف
+                                <h2 class="display-6 fw-bold mb-1 text-dark">{{quick_stats.total_inventory|default:"856" }}</h2>
+                                <p class="mb-0 opacity-90 text-dark">Inventory Items</p>
+                                <small class="opacity-75 text-dark">
+                                    <i class="fas fa-boxes me-1 text-primary"></i>
+                                    Across 8 warehouses
                                 </small>
                             </div>
                             <div class="stat-icon">
-                                <i class="fas fa-warehouse fa-2x opacity-50"></i>
+                                <i class="fas fa-warehouse fa-2x opacity-50 text-primary"></i>
                             </div>
                         </div>
                     </div>
@@ -88,15 +83,15 @@
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h2 class="display-6 fw-bold mb-1">{{ quick_stats.active_containers }}</h2>
-                                <p class="mb-0 opacity-90">کانتینر فعال</p>
-                                <small class="opacity-75">
-                                    <i class="fas fa-ship me-1"></i>
-                                    ۵ کانتینر در راه
+                                <h2 class="display-6 fw-bold mb-1 text-dark">{{quick_stats.active_containers|default:"23" }}</h2>
+                                <p class="mb-0 opacity-90 text-dark">Active Containers</p>
+                                <small class="opacity-75 text-dark">
+                                    <i class="fas fa-ship me-1 text-info"></i>
+                                    5 containers in transit
                                 </small>
                             </div>
                             <div class="stat-icon">
-                                <i class="fas fa-shipping-fast fa-2x opacity-50"></i>
+                                <i class="fas fa-shipping-fast fa-2x opacity-50 text-info"></i>
                             </div>
                         </div>
                     </div>
@@ -107,15 +102,15 @@
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h2 class="display-6 fw-bold mb-1">{{ quick_stats.pending_expenses }}</h2>
-                                <p class="mb-0 opacity-90">هزینه معلق</p>
-                                <small class="opacity-75">
-                                    <i class="fas fa-clock me-1"></i>
-                                    نیاز به تایید مدیریت
+                                <h2 class="display-6 fw-bold mb-1 text-dark">{{quick_stats.pending_expenses|default:"45" }}</h2>
+                                <p class="mb-0 opacity-90 text-dark">Pending Expenses</p>
+                                <small class="opacity-75 text-dark">
+                                    <i class="fas fa-clock me-1 text-warning"></i>
+                                    Awaiting approval
                                 </small>
                             </div>
                             <div class="stat-icon">
-                                <i class="fas fa-file-invoice-dollar fa-2x opacity-50"></i>
+                                <i class="fas fa-file-invoice-dollar fa-2x opacity-50 text-warning"></i>
                             </div>
                         </div>
                     </div>
@@ -123,46 +118,86 @@
             </div>
         </div>
 
-        <!-- اپ‌های سیستم -->
+        <!-- System Apps Grid -->
         <div class="row g-4">
             {% for app in apps %}
             <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
-                <div class="app-card-pro {% if app.active %}active{% else %}inactive{% endif %} fade-in-up"
-                     
-                     {% if apps.active %}onclick="window.location.href='{% url app.url_name %}'"{% endif %}>
+                <div class="app-card-pro {% if app.active %}active floating{% else %}inactive{% endif %} fade-in-up">
                     <div class="card-body text-center p-4 position-relative">
-                        <!-- وضعیت -->
-                        <span class="status-badge-pro {% if app.active %}bg-success{% else %}bg-secondary{% endif %} text-white">
-                            {% if app.active %}فعال{% else %}به زودی{% endif %}
+                        <span class="status-badge-pro {% if app.active %}bg-success{% else %}bg-secondary{% endif %}">
+                            {% if app.active %}Active{% else %}Coming Soon{% endif %}
                         </span>
 
-                        <!-- آیکون -->
                         <div class="app-icon-pro">
                             {{ app.icon }}
                         </div>
 
-                        <!-- عنوان -->
                         <h5 class="card-title fw-bold mb-2 text-dark">{{ app.name }}</h5>
-
-                        <!-- توضیحات -->
                         <p class="card-text text-muted small mb-3">{{ app.description }}</p>
 
-                        <!-- دکمه اقدام -->
                         {% if app.active %}
-                        <div class="app-action">
-                            <button class="btn btn-primary btn-sm rounded-pill px-3">
-                                <i class="fas fa-arrow-left me-1"></i>
-                                ورود به ماژول
-                            </button>
-                        </div>
+                        <a href="{{ app.url }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-arrow-right me-1"></i> Open App
+                        </a>
                         {% else %}
-                        <div class="app-action">
-                            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" disabled>
-                                <i class="fas fa-clock me-1"></i>
-                                به زودی
-                            </button>
-                        </div>
+                        <span class="btn btn-outline-secondary btn-sm" disabled>
+                            <i class="fas fa-clock me-1"></i> Coming Soon
+                        </span>
                         {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <!-- Default Apps if none provided -->
+            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
+                <div class="app-card-pro active floating fade-in-up" style="animation-delay: 0.6s;">
+                    <div class="card-body text-center p-4 position-relative">
+                        <span class="status-badge-pro bg-success">Active</span>
+                        <div class="app-icon-pro">📊</div>
+                        <h5 class="card-title fw-bold mb-2 text-dark">Daily Sales</h5>
+                        <p class="card-text text-muted small mb-3">Daily transactions and sales management</p>
+                        <a href="#" class="btn btn-primary btn-sm">
+                            <i class="fas fa-arrow-right me-1"></i> Open App
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
+                <div class="app-card-pro active floating fade-in-up" style="animation-delay: 0.7s;">
+                    <div class="card-body text-center p-4 position-relative">
+                        <span class="status-badge-pro bg-success">Active</span>
+                        <div class="app-icon-pro">🚢</div>
+                        <h5 class="card-title fw-bold mb-2 text-dark">Containers</h5>
+                        <p class="card-text text-muted small mb-3">Container and shipping management</p>
+                        <a href="{% url 'containers:list' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-arrow-right me-1"></i> Open App
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
+                <div class="app-card-pro active floating fade-in-up" style="animation-delay: 0.8s;">
+                    <div class="card-body text-center p-4 position-relative">
+                        <span class="status-badge-pro bg-success">Active</span>
+                        <div class="app-icon-pro">💰</div>
+                        <h5 class="card-title fw-bold mb-2 text-dark">Expenses</h5>
+                        <p class="card-text text-muted small mb-3">Expense tracking and management</p>
+                        <a href="#" class="btn btn-primary btn-sm">
+                            <i class="fas fa-arrow-right me-1"></i> Open App
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
+                <div class="app-card-pro active floating fade-in-up" style="animation-delay: 0.9s;">
+                    <div class="card-body text-center p-4 position-relative">
+                        <span class="status-badge-pro bg-success">Active</span>
+                        <div class="app-icon-pro">👥</div>
+                        <h5 class="card-title fw-bold mb-2 text-dark">Employees</h5>
+                        <p class="card-text text-muted small mb-3">Employee and staff management</p>
+                        <a href="#" class="btn btn-primary btn-sm">
+                            <i class="fas fa-arrow-right me-1"></i> Open App
+                        </a>
                     </div>
                 </div>
             </div>
@@ -174,76 +209,40 @@
             <div class="col-12 text-center">
                 <div class="glass-card p-3">
                     <small class="text-white opacity-75">
-                        <i class="fas fa-sync-alt me-1"></i>
-                        آخرین بروزرسانی: 
-                        <span id="live-update-time">هم اکنون</span>
+                        <i class="fas fa-sync-alt me-1"></i> Last Update:
+                        <span id="live-update-time">Just Now</span>
                     </small>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-// تاریخ شمسی
-function updatePersianDate() {
-    const now = new Date();
-    const options = {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        weekday: 'long'
-    };
-    const persianDate = now.toLocaleDateString('fa-IR', options);
-    document.getElementById('persian-date').textContent = persianDate;
-}
+    // Update current time
+    function updateTime() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('fa-IR');
+        document.getElementById('current-time').textContent = timeString;
+    }
 
-// زمان بروزرسانی زنده
-function updateLiveTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('fa-IR');
-    document.getElementById('live-update-time').textContent = timeString;
-}
+    setInterval(updateTime, 1000);
+    updateTime();
 
-// اعمال انیمیشن hover روی کارت‌ها
-document.addEventListener('DOMContentLoaded', function() {
-    // تاریخ شمسی
-    updatePersianDate();
-    
-    // بروزرسانی زمان هر ثانیه
-    setInterval(updateLiveTime, 1000);
-    
-    // اضافه کردن effect کلیک روی کارت‌ها
-    const appCards = document.querySelectorAll('.app-card-pro.active');
-    appCards.forEach(card => {
-        card.addEventListener('click', function() {
-            this.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                this.style.transform = '';
-            }, 150);
+    // Add click effects to app cards
+    document.addEventListener('DOMContentLoaded', function () {
+        const appCards = document.querySelectorAll('.app-card-pro.active');
+
+        appCards.forEach(card => {
+            card.addEventListener('click', function (e) {
+                if (e.target.tagName !== 'A' && !e.target.closest('a')) {
+                    const link = this.querySelector('a');
+                    if (link) {
+                        link.click();
+                    }
+                }
+            });
         });
     });
-});
-
-// پویانمایی dots برای وضعیت آنلاین
-const style = document.createElement('style');
-style.textContent = `
-    .pulse-dot {
-        width: 8px;
-        height: 8px;
-        background: #2ecc71;
-        border-radius: 50%;
-        animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.5); opacity: 0.7; }
-        100% { transform: scale(1); opacity: 1; }
-    }
-`;
-document.head.appendChild(style);
 </script>
 {% endblock %}

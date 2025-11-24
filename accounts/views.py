@@ -13,14 +13,20 @@ from django.contrib.auth.models import User
 from django.utils.translation import gettext as _
 from django.contrib.auth.decorators import user_passes_test
 from django.utils.translation import get_language
+from functools import wraps
 
-def my_view(request):
-    print("Current language:", get_language())
+def admin_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('accounts:login')
+        if not request.user.is_staff:
+            messages.error(request, _("Admin access required"))
+            return redirect('accounts:home')
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
 
-def admin_only(user): #بررسی اینکه کاربر ادمین هست یا نه
-    return user.is_staff 
-
-@user_passes_test(admin_only) #فقط به ادمین‌ها اجازه ورود می‌دهد
+@user_passes_test(admin_required) #فقط به ادمین‌ها اجازه ورود می‌دهد
 def admin_panel(request):
     return redirect('admin:index')
 
@@ -72,25 +78,70 @@ def signup_user(request):
 
     form = SignUpForm()
     return render(request, 'signup.html', {'form': form})
-
 @login_required
 def dashboard(request):
     """User Dashboard with quick stats and app navigation"""
     
+    # Quick statistics
+    quick_stats = {
+        'total_sales': 1247,
+        'total_inventory': 856,
+        'active_containers': 23,
+        'pending_expenses': 45,
+    }
 
-    # App navigation setup
+    # App navigation setup - with direct URLs
     apps = [
-        {'name': 'accounts', 'url': 'accounts:dashboard', 'icon': '📈', 'active': True},
-        {'name': 'daily_sale', 'url': 'daily_sale:dashboard', 'icon': '📈', 'active': True},
-        {'name': 'Containers', 'url': 'containers:saraf_list', 'icon': '🚢', 'active': True},
-        {'name': 'expenses', 'url': 'expenses:dashboard', 'icon': '💸', 'active': True},
-        {'name': 'Employee', 'url': 'employee:dashboard', 'icon': '👥', 'active': True},
-        {'name': 'Fiance', 'url': 'finance:dashboard', 'icon': '📊', 'active': True},
-        {'name': 'Reports', 'url': 'reports:dashboard', 'icon': '📊', 'active': True},
+        {
+            'name': 'Daily Sales', 
+            'url': '/daily_sale/dashboard/',  # URL مستقیم
+            'icon': '💰', 
+            'active': True,
+            'description': 'Daily transactions and sales management'
+        },
+        {
+            'name': 'Containers', 
+            'url': '/containers/transactions/report/',  # URL مستقیم
+            'icon': '🚢', 
+            'active': True,
+            'description': 'Container and shipping management'
+        },
+        {
+            'name': 'Expenses', 
+            'url': '/expenses/home_expenses/',  # URL مستقیم
+            'icon': '💸', 
+            'active': True,
+            'description': 'Expense tracking and management'
+        },
+        {
+            'name': 'Employees', 
+            'url': '/employee/overview/',  # URL مستقیم
+            'icon': '👥', 
+            'active': True,
+            'description': 'Employee and staff management'
+        },
+        {
+            'name': 'Finance', 
+            'url': '/finance/home_finance/',  # URL مستقیم
+            'icon': '📊', 
+            'active': True,
+            'description': 'Financial reports and analysis'
+        },
+        {
+            'name': 'Reports', 
+            'url': '/reports/home_reports/',  # URL مستقیم
+            'icon': '📋', 
+            'active': True,
+            'description': 'Comprehensive reporting system'
+        },
     ]
 
-    context = { 'apps': apps}
+    context = {
+        'quick_stats': quick_stats,
+        'apps': apps
+    }
     return render(request, 'dashboard.html', context)
+
 
 def logout_user(request):
 	logout(request)

@@ -147,7 +147,7 @@ JAZZMIN_SETTINGS = {
     "site_brand": "Dashboard",
     
     # لوگو
-    "site_logo": "assets/logo.png",
+    "site_logo": "assets/car.png",
     "login_logo": "assets/logo-login.png",
     
     # رنگ‌بندی مدرن
@@ -178,8 +178,8 @@ JAZZMIN_SETTINGS = {
     
     # منوی سفارشی
     "topmenu_links": [
-        {"name": "داشبورد اصلی", "url": "/", "permissions": ["auth.view_user"]},
-        {"name": "گزارشات", "url": "/reports/", "permissions": ["auth.view_user"]},
+        {"name": "Main Dashbord", "url": "/accounts/dashboard/", "permissions": ["auth.view_user"]},
+        {"name": "Reports", "url": "/reports/", "permissions": ["auth.view_user"]},
     ],
     
     # ویدجت‌های داشبورد
@@ -209,7 +209,7 @@ JAZZMIN_UI_TWEAKS = {
     "sidebar_nav_compact_style": False,
     "sidebar_nav_legacy_style": True,
     "sidebar_nav_flat_style": False,
-    "theme": "cosmo",
+    "theme": "cyborg",
     "dark_mode_theme": "darkly",
     "button_classes": {
         "primary": "btn-primary",

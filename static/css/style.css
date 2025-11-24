@@ -60,7 +60,7 @@
 
 .table thead th {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
-    color: white !important;
+    color: rgb(7, 5, 5) !important;
     border: none !important;
 }
 

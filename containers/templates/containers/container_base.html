@@ -1,38 +1,88 @@
-<!doctype html>
+<!DOCTYPE html>
+{% load static %}
 <html lang="{{ LANGUAGE_CODE|default:'fa' }}">
+
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{% block title %}{{ site_name|default:"Azin Dashboard" }}{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ site_name|default:"Dashboard" }}{% endblock %}</title>
 
-  <!-- CSS (قرار بده در static و لینک بده) -->
-  <link rel="stylesheet" href="{% static 'css/vendors/bootstrap.min.css' %}">
-  <link rel="stylesheet" href="{% static 'css/containers.css' %}">
+  <!-- Bootstrap از CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+  <!-- فونت فارسی -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+
+  <!-- استایل اصلی -->
+  <link rel="stylesheet" href="{% static 'css/container_style.css' %}">
 
   {% block extra_head %}{% endblock %}
 </head>
+
 <body>
   <header class="site-header">
-    <nav class="navbar navbar-expand-md navbar-light bg-light">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
       <div class="container">
-        <a class="navbar-brand" href="{% url 'accounts:dashboard' %}">{{ site_name|default:"Azin" }}</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainNav">
+        <a class="navbar-brand" href="{% url 'accounts:dashboard' %}">
+          <i class="fas fa-ship me-2"></i>
+          {{ site_name|default:"Dashbord" }}
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
           <span class="navbar-toggler-icon"></span>
         </button>
 
         <div class="collapse navbar-collapse" id="mainNav">
-          <ul class="navbar-nav mr-auto">
-            <li class="nav-item"><a class="nav-link" href="{% url 'containers:container_list' %}">کانتینرها</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'containers:saraf_list' %}">صراف‌ها</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'containers:total_report' %}">گزارش تراکنش‌ها</a></li>
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'containers:list' %}">
+                <i class="fas fa-boxes me-1"></i>
+                کانتینرها
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'containers:saraf_list' %}">
+                <i class="fas fa-coins me-1"></i>
+                صراف‌ها
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'containers:total_container_transactions_report' %}">
+                <i class="fas fa-chart-bar me-1"></i>
+                گزارش‌ها
+              </a>
+            </li>
           </ul>
 
-          <ul class="navbar-nav ml-auto">
+          <ul class="navbar-nav ms-auto">
             {% if user.is_authenticated %}
-              <li class="nav-item"><a class="nav-link" href="#">{{ user.get_username }}</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'accounts:logout' %}">خروج</a></li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                <i class="fas fa-user-circle me-1"></i>
+                {{ user.get_username }}
+              </a>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>پروفایل</a></li>
+                <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>تنظیمات</a></li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li>
+                  <a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}">
+                    <i class="fas fa-sign-out-alt me-2"></i>
+                    خروج
+                  </a>
+                </li>
+              </ul>
+            </li>
             {% else %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'accounts:login' %}">ورود</a></li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'accounts:login' %}">
+                <i class="fas fa-sign-in-alt me-1"></i>
+                ورود
+              </a>
+            </li>
             {% endif %}
           </ul>
         </div>
@@ -42,19 +92,56 @@
 
   <main class="py-4">
     <div class="container">
-      {% include 'containers/includes/_messages.html' %}
+      <!-- سیستم پیام‌های Django -->
+      {% if messages %}
+      <div class="messages-container mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+          <div class="d-flex align-items-center">
+            <i class="fas 
+              {% if message.tags == 'success' %}fa-check-circle
+              {% elif message.tags == 'error' %}fa-exclamation-circle
+              {% elif message.tags == 'warning' %}fa-exclamation-triangle
+              {% else %}fa-info-circle{% endif %}
+              me-2"></i>
+            <span>{{ message }}</span>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- محتوای اصلی -->
       {% block content %}{% endblock %}
     </div>
   </main>
 
-  <footer class="footer py-3 bg-light">
-    <div class="container text-center small">
-      © {{ now.year }} {{ site_name|default:"Azin" }} — همه حقوق محفوظ است.
+  <footer class="footer py-4 bg-light mt-5">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <h6 class="text-gradient mb-2">{{ site_name|default:"Azin" }}</h6>
+          <p class="text-muted small mb-0">
+            سیستم مدیریت کانتینر و محموله‌های دریایی
+          </p>
+        </div>
+        <div class="col-md-6 text-md-end">
+          <p class="text-muted small mb-1">
+            © {{ now.year }} {{ site_name|default:"Azin" }} — همه حقوق محفوظ است.
+          </p>
+          <p class="text-muted small mb-0">
+            نسخه ۱.۰.۰
+          </p>
+        </div>
+      </div>
     </div>
   </footer>
 
-  <script src="{% static 'js/vendors/jquery.min.js' %}"></script>
-  <script src="{% static 'js/vendors/bootstrap.bundle.min.js' %}"></script>
+  <!-- Bootstrap JavaScript از CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
   {% block extra_js %}{% endblock %}
 </body>
+
 </html>

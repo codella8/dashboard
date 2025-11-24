@@ -1,0 +1,324 @@
+{% extends "daily_sale/daily_sale_base.html" %}
+
+{% block title %}Financial Reports - Inventory System{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="report-card p-4">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h1 class="h3 mb-2">📈 Financial Reports</h1>
+                        <p class="text-muted mb-0">Comprehensive financial analysis and insights</p>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <div class="btn-group">
+                            <button class="btn btn-primary">
+                                <i class="fas fa-download me-2"></i>Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Type Selector -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="report-card p-4">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <select class="form-select" id="report-type" onchange="updateReportType()">
+                            <option value="daily" {% if report_type=='daily' %}selected{% endif %}>Daily Reports
+                            </option>
+                            <option value="monthly" {% if report_type=='monthly' %}selected{% endif %}>Monthly Reports
+                            </option>
+                            <option value="currency" {% if report_type=='currency' %}selected{% endif %}>Currency
+                                Analysis</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" class="form-control" id="start-date" value="{{ start_date|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" class="form-control" id="end-date" value="{{ end_date|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary w-100" onclick="generateReport()">
+                            <i class="fas fa-chart-bar me-2"></i>Generate Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-highlight p-4">
+                <div class="text-center">
+                    <h3>${{ performance_metrics.total_revenue|default:0|floatformat:0|intcomma }}</h3>
+                    <p class="mb-0 opacity-8">Total Revenue</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-highlight p-4">
+                <div class="text-center">
+                    <h3>{{ performance_metrics.total_items|default:0|intcomma }}</h3>
+                    <p class="mb-0 opacity-8">Items Sold</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-highlight p-4">
+                <div class="text-center">
+                    <h3>{{ performance_metrics.success_rate|default:0|floatformat:1 }}%</h3>
+                    <p class="mb-0 opacity-8">Success Rate</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-highlight p-4">
+                <div class="text-center">
+                    <h3>{{ performance_metrics.growth_rate|default:0|floatformat:1 }}%</h3>
+                    <p class="mb-0 opacity-8">Growth Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Data -->
+    <div class="row">
+        <div class="col-12">
+            <div class="report-card p-4">
+                {% if report_type == 'daily' %}
+                <h5 class="mb-4">📅 Daily Financial Report</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Total Sales</th>
+                                <th>Total Profit</th>
+                                <th>Transactions</th>
+                                <th>Net Balance</th>
+                                <th>Profit Margin</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in data %}
+                            <tr>
+                                <td>{{ item.date|date:"M d, Y" }}</td>
+                                <td><strong>${{ item.total_sales|floatformat:0|intcomma }}</strong></td>
+                                <td>
+                                    <span
+                                        class="{% if item.total_profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                                        ${{ item.total_profit|floatformat:0|intcomma }}
+                                    </span>
+                                </td>
+                                <td>{{ item.transactions_count }}</td>
+                                <td>${{ item.net_balance|floatformat:0|intcomma }}</td>
+                                <td>
+                                    {% if item.total_sales > 0 %}
+                                    {{ item.profit_margin|default:0|floatformat:1 }}%
+                                    {% else %}
+                                    0%
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <i class="fas fa-chart-line fa-2x text-muted mb-3"></i>
+                                    <p class="text-muted">No data available for the selected period</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% elif report_type == 'monthly' %}
+                <h5 class="mb-4">📊 Monthly Financial Report</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Month</th>
+                                <th>Total Sales</th>
+                                <th>Total Profit</th>
+                                <th>Transactions</th>
+                                <th>Growth</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in data %}
+                            <tr>
+                                <td>{{ item.month|date:"F Y" }}</td>
+                                <td><strong>${{ item.total_sales|floatformat:0|intcomma }}</strong></td>
+                                <td>
+                                    <span
+                                        class="{% if item.total_profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                                        ${{ item.total_profit|floatformat:0|intcomma }}
+                                    </span>
+                                </td>
+                                <td>{{ item.transaction_count }}</td>
+                                <td>
+                                    <span class="badge bg-{% if item.growth > 0 %}success{% else %}danger{% endif %}">
+                                        {{ item.growth|default:0|floatformat:1 }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4">
+                                    <i class="fas fa-chart-bar fa-2x text-muted mb-3"></i>
+                                    <p class="text-muted">No monthly data available</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% elif report_type == 'currency' %}
+                <h5 class="mb-4">💱 Currency Analysis Report</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Currency</th>
+                                <th>Total Amount</th>
+                                <th>Transaction Count</th>
+                                <th>Average Amount</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in data %}
+                            <tr>
+                                <td>
+                                    <span class="text-uppercase fw-bold">{{ item.currency }}</span>
+                                </td>
+                                <td><strong>${{ item.total_amount|floatformat:0|intcomma }}</strong></td>
+                                <td>{{ item.transaction_count }}</td>
+                                <td>${{ item.avg_amount|floatformat:0|intcomma }}</td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar" role="progressbar"
+                                            aria-valuenow="{{ item.percentage|default:0 }}" aria-valuemin="0"
+                                            aria-valuemax="100">
+                                            {{ item.percentage|default:0|floatformat:1 }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4">
+                                    <i class="fas fa-coins fa-2x text-muted mb-3"></i>
+                                    <p class="text-muted">No currency data available</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="report-card p-4">
+                <h6 class="mb-3">📋 Report Summary</h6>
+                <div class="row">
+                    <div class="col-6">
+                        <small class="text-muted">Period:</small>
+                        <p class="mb-2">{{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}</p>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Report Type:</small>
+                        <p class="mb-2 text-capitalize">{{ report_type }} Report</p>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Total Records:</small>
+                        <p class="mb-2">{{ data|length }}</p>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Generated:</small>
+                        <p class="mb-2">{% now "M d, Y H:i" %}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="report-card p-4">
+                <h6 class="mb-3">📊 Quick Insights</h6>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <i class="fas fa-chart-line text-success me-2"></i>
+                        Total Revenue: ${{ performance_metrics.total_revenue|default:0|floatformat:0|intcomma }}
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-box text-primary me-2"></i>
+                        Items Sold: {{ performance_metrics.total_items|default:0|intcomma }}
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-percentage text-info me-2"></i>
+                        Success Rate: {{ performance_metrics.success_rate|default:0|floatformat:1 }}%
+                    </li>
+                    <li class="mb-0">
+                        <i class="fas fa-trending-up text-warning me-2"></i>
+                        Growth: {{ performance_metrics.growth_rate|default:0|floatformat:1 }}%
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function updateReportType() {
+        const reportType = document.getElementById('report-type').value;
+        // You can add specific logic for different report types
+        console.log('Report type changed to:', reportType);
+    }
+
+    function generateReport() {
+        const reportType = document.getElementById('report-type').value;
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+
+        if (!startDate || !endDate) {
+            alert('Please select both start and end dates.');
+            return;
+        }
+
+        // Redirect to the same page with new parameters
+        window.location.href = `?type=${reportType}&start_date=${startDate}&end_date=${endDate}`;
+    }
+
+    // Set minimum end date based on start date
+    document.getElementById('start-date').addEventListener('change', function () {
+        document.getElementById('end-date').min = this.value;
+    });
+
+    // Initialize min date for end date
+    document.addEventListener('DOMContentLoaded', function () {
+        const startDate = document.getElementById('start-date').value;
+        if (startDate) {
+            document.getElementById('end-date').min = startDate;
+        }
+    });
+</script>
+{% endblock %}

@@ -6,6 +6,7 @@ from django.core.validators import MinValueValidator
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 from accounts.models import Company, UserProfile
+from django.db.models import Sum
 
 class Saraf(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -75,11 +76,11 @@ class Inventory_List(models.Model):
     product_name = models.CharField(max_length=255)
     make = models.CharField(max_length=120, blank=True)
     model = models.CharField(max_length=120, blank=True)
-    in_stock_qty = models.DecimalField(max_digits=18, decimal_places=3, default=0, validators=[MinValueValidator(0)])
-    unit_price = models.DecimalField(max_digits=14, decimal_places=2, default=0, validators=[MinValueValidator(0)])
-    price = models.DecimalField(max_digits=14, decimal_places=2, default=0, validators=[MinValueValidator(0)])
-    sold_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
-    total_sold_qty = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+    in_stock_qty = models.DecimalField(max_digits=18, decimal_places=0, default=0, validators=[MinValueValidator(0)])
+    unit_price = models.DecimalField(max_digits=14, decimal_places=0, default=0, validators=[MinValueValidator(0)])
+    price = models.DecimalField(max_digits=14, decimal_places=0, default=0, validators=[MinValueValidator(0)])
+    sold_price = models.DecimalField(max_digits=14, decimal_places=0, null=True, blank=True)
+    total_sold_qty = models.DecimalField(max_digits=18, decimal_places=0, default=0)
     total_sold_count = models.PositiveIntegerField(default=0)
     description = models.TextField(blank=True)
 
@@ -105,11 +106,10 @@ class SarafTransaction(models.Model):
         'Container', on_delete=models.SET_NULL, null=True, blank=True, related_name="Saraf_transactions"
     )
 
-    received_from_saraf = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
-    paid_by_company = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
-    debit_company = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
+    received_from_saraf = models.DecimalField(max_digits=18, decimal_places=0, default=Decimal('0'))
+    paid_by_company = models.DecimalField(max_digits=18, decimal_places=0, default=Decimal('0'))
 
-    balance = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    balance = models.DecimalField(max_digits=18, decimal_places=0, null=True, blank=True)
     currency = models.CharField(max_length=10, choices=[
         ("usd", "USD"), ("eur", "EUR"), ("aed", "AED"),
     ], default="usd", db_index=True)
@@ -130,36 +130,6 @@ class SarafTransaction(models.Model):
 
     def __str__(self):
         return f"{self.saraf} | {self.currency} | {self.transaction_time.date()}"
-
-    def save(self, *args, **kwargs):
-        """
-        Compute balance automatically:
-        balance = previous_balance + (received_from_saraf + debit_company) - paid_by_company
-        previous sums exclude this instance (handle create/update safely).
-        """
-        from django.db.models import Sum
-
-        # Aggregates of previous transactions for this saraf excluding self (if already exists)
-        qs = SarafTransaction.objects.filter(saraf=self.saraf)
-        if self.pk:
-            qs = qs.exclude(pk=self.pk)
-
-        agg = qs.aggregate(
-            prev_received=Sum("received_from_saraf"),
-            prev_paid=Sum("paid_by_company"),
-            prev_debit=Sum("debit_company")
-        )
-
-        prev_received = agg.get("prev_received") or Decimal("0.00")
-        prev_paid = agg.get("prev_paid") or Decimal("0.00")
-        prev_debit = agg.get("prev_debit") or Decimal("0.00")
-
-        prev_balance = (prev_received + prev_debit) - prev_paid
-
-        # current balance = prev_balance + (this_received + this_debit) - this_paid
-        self.balance = prev_balance + (self.received_from_saraf + self.debit_company) - self.paid_by_company
-
-        super().save(*args, **kwargs)
         
 class ContainerTransaction(models.Model):
     SALE_STATUS = [
@@ -196,8 +166,8 @@ class ContainerTransaction(models.Model):
     quantity = models.DecimalField(
     max_digits=18,
     decimal_places=3,
-    default=Decimal("0.000"),
-    validators=[MinValueValidator(Decimal("0.000"))],
+    default=Decimal("0"),
+    validators=[MinValueValidator(Decimal("0"))],
     help_text="Quantity of product involved in this transaction"
 )
     port_of_origin = models.CharField(max_length=255, blank=True)
