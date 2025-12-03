@@ -1,0 +1,187 @@
+{% extends 'expenses_base.html' %}
+
+{% block title %}گزارش هزینه‌ها{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        <i class="fas fa-file-invoice text-primary me-2"></i>
+        گزارش کامل هزینه‌ها
+    </h2>
+</div>
+
+<!-- فیلترها -->
+<div class="filter-section">
+    <h5 class="mb-3">فیلترها</h5>
+    <form method="get" class="row g-3">
+        <div class="col-md-3">
+            <label for="start_date" class="form-label">از تاریخ</label>
+            <input type="date" class="form-control" id="start_date" name="start_date" 
+                   value="{{ filters.start_date|date:'Y-m-d' }}">
+        </div>
+        <div class="col-md-3">
+            <label for="end_date" class="form-label">تا تاریخ</label>
+            <input type="date" class="form-control" id="end_date" name="end_date"
+                   value="{{ filters.end_date|date:'Y-m-d' }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter me-2"></i>
+                    اعمال فیلتر
+                </button>
+                <a href="{% url 'expenses:report' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times me-2"></i>
+                    حذف فیلتر
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- خلاصه گزارش -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="stat-card primary text-center">
+            <h3 class="stat-number text-primary">{{ summary.total_expenses|floatformat:0 }} تومان</h3>
+            <p class="stat-label">کل هزینه‌ها در این بازه</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card success text-center">
+            <h3 class="stat-number text-success">{{ summary.expense_records.record_count|default:0 }}</h3>
+            <p class="stat-label">تعداد رسیدهای ثبت شده</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card warning text-center">
+            <h3 class="stat-number text-warning">{{ summary.daily_expenses.expense_count|default:0 }}</h3>
+            <p class="stat-label">هزینه‌های روزانه</p>
+        </div>
+    </div>
+</div>
+
+<!-- جدول هزینه‌ها -->
+<div class="table-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="mb-0">
+            <i class="fas fa-list text-primary me-2"></i>
+            لیست هزینه‌ها
+        </h5>
+        <div class="text-muted">
+            نمایش {{ expenses.count }} رکورد
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>تاریخ</th>
+                    <th>آیتم</th>
+                    <th>دسته‌بندی</th>
+                    <th>تعداد</th>
+                    <th>قیمت واحد</th>
+                    <th>مبلغ کل</th>
+                    <th>پرداخت کننده</th>
+                    <th>روش پرداخت</th>
+                    <th>توضیحات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in expenses %}
+                <tr>
+                    <td>
+                        <span class="badge bg-light text-dark">{{ expense.date|date:"Y/m/d" }}</span>
+                    </td>
+                    <td>
+                        <strong>{{ expense.item.name }}</strong>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">{{ expense.item.category.name }}</span>
+                    </td>
+                    <td>{{ expense.quantity }}</td>
+                    <td>{{ expense.unit_price|floatformat:0 }} تومان</td>
+                    <td>
+                        <strong class="text-success">{{ expense.total_amount|floatformat:0 }} تومان</strong>
+                    </td>
+                    <td>{{ expense.paid_by }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if expense.payment_method == 'cash' %}bg-success
+                            {% elif expense.payment_method == 'bank' %}bg-primary
+                            {% else %}bg-info{% endif %}">
+                            {{ expense.get_payment_method_display }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if expense.description %}
+                            <small class="text-muted">{{ expense.description|truncatewords:5 }}</small>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-5">
+                        <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                        هیچ هزینه‌ای در این بازه زمانی یافت نشد
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- هزینه‌های روزانه -->
+<div class="table-container mt-4">
+    <h5 class="mb-4">
+        <i class="fas fa-calendar-day text-warning me-2"></i>
+        هزینه‌های روزانه
+    </h5>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>تاریخ</th>
+                    <th>دسته‌بندی</th>
+                    <th>مبلغ</th>
+                    <th>پرداخت به</th>
+                    <th>توضیحات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in daily_expenses %}
+                <tr>
+                    <td>{{ expense.date|date:"Y/m/d" }}</td>
+                    <td>
+                        <span class="badge bg-warning text-dark">{{ expense.category.name }}</span>
+                    </td>
+                    <td>
+                        <strong class="text-warning">{{ expense.amount|floatformat:0 }} تومان</strong>
+                    </td>
+                    <td>{{ expense.paid_to|default:"-" }}</td>
+                    <td>
+                        {% if expense.description %}
+                            <small class="text-muted">{{ expense.description|truncatewords:5 }}</small>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        هیچ هزینه روزانه‌ای در این بازه زمانی یافت نشد
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

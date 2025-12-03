@@ -1,188 +1,91 @@
 {% extends "daily_sale/daily_sale_base.html" %}
-{% load humanize %}
-
-{% block title %} Dashboard{% endblock %}
+{% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="dashboard-card p-4">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <h1 class="h3 mb-2">🚀 Intelligent Dashboard</h1>
-                        <p class="text-muted mb-0">Real-time insights and smart analytics</p>
-                    </div>
-                    <div class="col-md-4 text-md-end">
-                        <div class="btn-group">
-                            <select class="form-select" id="period-selector">
-                                <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
-                                <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
-                                <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
-                            </select>
-                        </div>
-                    </div>
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Today Performance ({{ today }})</h5>
+                <dl class="row">
+                    <dt class="col-sm-4">Total Sales</dt>
+                    <dd class="col-sm-8">{{ today_performance.total_sales }}</dd>
+                    <dt class="col-sm-4">Total Purchases</dt>
+                    <dd class="col-sm-8">{{ today_performance.total_purchases }}</dd>
+                    <dt class="col-sm-4">Net Income</dt>
+                    <dd class="col-sm-8">{{ today_performance.net_income }}</dd>
+                    <dt class="col-sm-4">Items Sold</dt>
+                    <dd class="col-sm-8">{{ today_performance.items_sold }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Recent Transactions</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Item</th>
+                                <th>Total</th>
+                                <th>Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in recent_transactions %}
+                            <tr>
+                                <td>{{ t.invoice_number }}</td>
+                                <td>{{ t.date }}</td>
+                                <td>
+                                    {% if t.customer %}
+                                    {{ t.customer.user.get_full_name|default:t.customer }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if t.item %}
+                                    {{ t.item.product_name }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>{{ t.total_amount }}</td>
+                                <td>{{ t.balance }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6">No transactions yet.</td>
+                            </tr>
+                            {% endfor %}
+
+                        </tbody>
+                    </table>
                 </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6>Week Summary</h6>
+                <p>Total Sales: {{ week_summary.total_sales }}</p>
+                <p>Transactions: {{ week_summary.total_transactions }}</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6>Top Outstanding</h6>
+
             </div>
         </div>
     </div>
-
-    <!-- System Alerts -->
-    {% if alerts %}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="dashboard-card p-0 overflow-hidden">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="fas fa-bell me-2 text-warning"></i>System Alerts</h5>
-                </div>
-                <div class="card-body">
-                    {% for alert in alerts %}
-                    <div class="alert-card alert alert-{{ alert.type }} alert-dismissible fade show mb-2">
-                        <div class="d-flex align-items-center">
-                            <i
-                                class="fas fa-{% if alert.type == 'danger' %}exclamation-triangle{% elif alert.type == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-3 fa-lg"></i>
-                            <div class="flex-grow-1">
-                                <strong>{{ alert.message }}</strong>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Key Metrics -->
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="metric-card p-4">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-0 opacity-8">Total Sales</h6>
-                        <h2 class="mb-0">${{ totals.total_sales|default:0|floatformat:0|intcomma }}</h2>
-                        <small class="opacity-8">Period: {{ period.days }} days</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-chart-line fa-2x opacity-7"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="metric-card p-4">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-0 opacity-8">Total Profit</h6>
-                        <h2 class="mb-0">${{ totals.total_profit|default:0|floatformat:0|intcomma }}</h2>
-                        <small class="opacity-8">
-                            {% if totals.growth_rate > 0 %}
-                            <span class="trend-positive">↑ {{ totals.growth_rate }}%</span>
-                            {% else %}
-                            <span class="trend-negative">↓ {{ totals.growth_rate }}%</span>
-                            {% endif %}
-                        </small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-dollar-sign fa-2x opacity-7"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="metric-card p-4">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-0 opacity-8">Daily Average</h6>
-                        <h2 class="mb-0">${{ totals.avg_daily_sales|default:0|floatformat:0|intcomma }}</h2>
-                        <small class="opacity-8">{{ performance_metrics.success_rate|floatformat:1 }}% Success
-                            Rate</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-calendar-day fa-2x opacity-7"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="metric-card p-4">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-0 opacity-8">Active Period</h6>
-                        <h2 class="mb-0">{{ period.days }}</h2>
-                        <small class="opacity-8">{{ period.start }} to {{ period.end }}</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-clock fa-2x opacity-7"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Performance Metrics -->
-        <div class="col-xl-8 mb-4">
-            <div class="dashboard-card p-4 h-100">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="mb-0">📈 Sales Performance</h5>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary active">Daily</button>
-                        <button class="btn btn-sm btn-outline-primary">Weekly</button>
-                        <button class="btn btn-sm btn-outline-primary">Monthly</button>
-                    </div>
-                </div>
-
-                <!-- Trend Chart Placeholder -->
-                <div class="text-center py-5" style="background: #f8f9fa; border-radius: 10px;">
-                    <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
-                    <h6 class="text-muted">Sales Trend Visualization</h6>
-                    <p class="text-muted small">Interactive chart showing sales performance over time</p>
-                </div>
-
-                <!-- Performance Stats -->
-                <div class="row mt-4">
-                    <div class="col-md-4 text-center">
-                        <h4 class="text-primary">{{ performance_metrics.avg_transaction|default:0|floatformat:0|intcomma}}</h4>
-                        <small class="text-muted">Avg. Transaction</small>
-                    </div>
-                    <div class="col-md-4 text-center">
-                        <h4 class="text-success">{{ performance_metrics.success_rate|default:0|floatformat:1 }}%</h4>
-                        <small class="text-muted">Success Rate</small>
-                    </div>
-                    <div class="col-md-4 text-center">
-                        <h4 class="text-info">{{ performance_metrics.total_items|default:0|intcomma }}</h4>
-                        <small class="text-muted">Items Sold</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Top Performing Days -->
-        <div class="col-xl-4 mb-4">
-            <div class="dashboard-card p-4 h-100">
-                <h5 class="mb-4">🏆 Top Performing Days</h5>
-                {% for day in top_days %}
-                <div class="d-flex justify-content-between align-items-center mb-3 p-3"
-                    style="background: #f8f9fa; border-radius: 10px;">
-                    <div>
-                        <h6 class="mb-1">{{ day.date|date:"M d, Y" }}</h6>
-                        <small class="text-muted">{{ day.transactions_count }} transactions</small>
-                    </div>
-                    <div class="text-end">
-                        <strong class="text-success">${{ day.total_sales|floatformat:0|intcomma }}</strong>
-                        <div class="text-muted small">Sales</div>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="text-center py-4">
-                    <i class="fas fa-chart-line fa-2x text-muted mb-3"></i>
-                    <p class="text-muted">No data available</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
+</div>
 {% endblock %}

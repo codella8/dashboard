@@ -29,7 +29,7 @@ def container_financial_report(request, container_id):
         total_sold=Sum('quantity')
     )["total_sold"] or 0
 
-    return render(request, 'containers/container_financial_report.html', {
+    return render(request, 'container/container_financial_report.html', {
         'container': container,
         'total_income': total_income,
         'total_sold_qty': total_sold_qty,
@@ -45,7 +45,7 @@ def saraf_balance_report(request):
         balance=F('total_received') + F('total_debit') - F('total_paid')
     )
 
-    return render(request, 'containers/saraf_balance_report.html', {'sarafs': sarafs})  # اصلاح typo
+    return render(request, 'container/saraf_balance_report.html', {'sarafs': sarafs})  # اصلاح typo
 
 # containers/views.py
 @login_required
@@ -80,7 +80,7 @@ def saraf_transactions_report(request, saraf_id):
         'net_balance': total_received + total_debit - total_paid,
     }
     
-    return render(request, 'containers/saraf_transactions_report.html', context)
+    return render(request, 'container/saraf_transactions_report.html', context)
 
 def total_container_transactions_report(request):
     start_date = request.GET.get('start_date')
@@ -101,7 +101,7 @@ def total_container_transactions_report(request):
         total_amount=Sum('total_price')
     )
 
-    return render(request, 'containers/total_container_transactions_report.html', {
+    return render(request, 'container/total_container_transactions_report.html', {
         'report': report
     })
 
@@ -121,7 +121,7 @@ class CompanyAccessMixin:
 
 class SarafListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
     model = Saraf
-    template_name = "containers/saraf_list.html"
+    template_name = "container/saraf_list.html"
     context_object_name = "sarafs"
     paginate_by = 25
 
@@ -142,7 +142,7 @@ class SarafListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
 
 class SarafDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
     model = Saraf
-    template_name = "containers/saraf_detail.html"
+    template_name = "container/saraf_detail.html"
     context_object_name = "saraf"
     pk_url_kwarg = "saraf_id"
 
@@ -165,7 +165,7 @@ class SarafDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
 # containers/views.py
 class ContainerListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
     model = Container
-    template_name = "containers/container_list.html"
+    template_name = "container/container_list.html"
     context_object_name = "containers"
     paginate_by = 25
     
@@ -186,7 +186,7 @@ class ContainerListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
 # اضافه کردن view های جدید
 class ContainerDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
     model = Container
-    template_name = "containers/container_detail.html"
+    template_name = "container/container_detail.html"
     context_object_name = "container"
 
     def get_queryset(self):
@@ -198,9 +198,9 @@ class ContainerDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
 
 class ContainerCreateView(LoginRequiredMixin, CompanyAccessMixin, CreateView):
     model = Container
-    template_name = "containers/container_form.html"
+    template_name = "container/container_form.html"
     fields = ['name', 'container_number', 'company', 'description']  # تنظیم فیلدهای مورد نیاز
-    success_url = reverse_lazy("containers:list")
+    success_url = reverse_lazy("container:list")
 
     def form_valid(self, form):
         # اگر کاربر متعلق به شرکت است، به صورت خودکار شرکت را تنظیم کنید
@@ -243,7 +243,7 @@ def container_financial_report_view(request, container_id):
         "financial_summary": fin,
         "transactions": transactions,
     }
-    return render(request, "containers/container_financial_report.html", context)
+    return render(request, "container/container_financial_report.html", context)
 
 
 @login_required
@@ -252,11 +252,11 @@ def total_container_transactions_report_view(request):
     start = request.GET.get("start_date")
     end = request.GET.get("end_date")
     data = report.total_container_transactions_report(company_id=(company.id if company else None), start_date=start, end_date=end)
-    return render(request, "containers/total_container_transactions_report.html", {"report": data})
+    return render(request, "container/total_container_transactions_report.html", {"report": data})
 
 # quick admin overview (dashboard widget)
 class ContainersAdminOverview(LoginRequiredMixin, TemplateView, CompanyAccessMixin):
-    template_name = "containers/admin_overview.html"
+    template_name = "container/admin_overview.html"
 
     def dispatch(self, request, *args, **kwargs):
         if not (request.user.is_staff or request.user.is_superuser):
@@ -277,7 +277,7 @@ class InventoryCreateForm(forms.ModelForm):
 class InventoryCreateView(LoginRequiredMixin, CreateView):
     model = Inventory_List
     form_class = InventoryCreateForm
-    template_name = "containers/inventory_add.html"
+    template_name = "container/inventory_add.html"
     success_url = reverse_lazy("containers:list")
 
     def get_form(self, *args, **kwargs):

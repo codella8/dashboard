@@ -1,0 +1,71 @@
+<nav class="navbar navbar-expand-lg navbar-custom">
+    <div class="container-fluid">
+        <!-- Sidebar Toggle -->
+        <button class="btn sidebar-toggle d-lg-none" type="button">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Brand -->
+        <a class="navbar-brand" href="#">
+            <i class="fas fa-chart-pie me-2"></i>
+            <strong>ExpenseManager</strong>
+        </a>
+
+        <!-- Right Side -->
+        <div class="navbar-nav ms-auto">
+            <!-- Notifications -->
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-bell"></i>
+                    <span class="badge bg-danger">3</span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <h6 class="dropdown-header">اعلان‌ها</h6>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-exclamation-circle text-warning me-2"></i>
+                        هزینه جدید ثبت شد
+                    </a>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        پرداخت تأیید شد
+                    </a>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-info-circle text-info me-2"></i>
+                        گزارش ماهانه آماده است
+                    </a>
+                </div>
+            </div>
+
+            <!-- User Menu -->
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-2"></i>
+                    مدیر سیستم
+                </a>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <h6 class="dropdown-header">حساب کاربری</h6>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-user me-2"></i>
+                        پروفایل
+                    </a>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-cog me-2"></i>
+                        تنظیمات
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-sign-out-alt me-2"></i>
+                        خروج
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<script>
+// Sidebar toggle for mobile
+document.querySelector('.sidebar-toggle').addEventListener('click', function() {
+    document.querySelector('.sidebar').classList.toggle('show');
+});
+</script>

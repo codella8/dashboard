@@ -1,28 +1,183 @@
 {% extends "accounts_base.html" %}
 {% load static %}
 {% load i18n %}
+
 {% block title %}{% trans 'ویرایش پروفایل' %}{% endblock title %}
 
 {% block content %}
-<section class="auth-section">
-    <div class="auth-container">
-        <div class="auth-form">
-            <h2>{% trans 'ویرایش پروفایل' %}</h2>
-            <p class="subtitle">{% trans 'اطلاعات شخصی خودرا بروز کنید' %}</p>
+<link rel="stylesheet" href="{% static 'css/update_profile.css' %}">
 
-            <form method="POST" action="{% url 'accounts:update_user' %}">
-                {% csrf_token %}
-                {{ user_form.as_p }}
-                <div class="form-actions">
-                    <button class="btn btn-success" type="submit">
-                        <i class="bi bi-check-circle"></i> {% trans 'ذخیره تغییرات' %}
-                    </button>
-                    <a class="btn btn-info" href="{% url 'accounts:update_password' %}">
-                        <i class="bi bi-shield-lock"></i> {% trans 'تغییر رمز عبور' %}
-                    </a>
-                </div>
-            </form>
+<div class="update-profile-container">
+    <div class="update-profile-card">
+        <!-- Header -->
+        <div class="update-profile-header">
+            <h1 class="update-profile-title">Edit Profile</h1>
+            <p class="update-profile-subtitle">Update your personal information</p>
         </div>
+
+        <!-- Profile Picture -->
+        <div class="update-profile-picture">
+            <div class="update-profile-avatar">
+                <i class="bi bi-person-fill"></i>
+                <div class="update-profile-avatar-upload">
+                    <button class="update-profile-avatar-btn">
+                        <i class="bi bi-camera"></i>
+                        Change Photo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Messages -->
+        {% if messages %}
+        {% for message in messages %}
+        <div class="update-profile-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Error Messages -->
+        {% if user_form.errors %}
+        <div class="update-profile-error">
+            Please correct the errors below to update your profile.
+        </div>
+        {% endif %}
+
+        <!-- Update Profile Form -->
+        <form method="POST" action="{% url 'accounts:update_user' %}" class="update-profile-form"
+            id="updateProfileForm">
+            {% csrf_token %}
+
+            <div class="update-profile-form-row">
+                <div class="update-profile-form-group first_name">
+                    {{ user_form.first_name }}
+                    {% if user_form.first_name.errors %}
+                    <div class="update-profile-field-error">
+                        {{ user_form.first_name.errors.0 }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="update-profile-form-group last_name">
+                    {{ user_form.last_name }}
+                    {% if user_form.last_name.errors %}
+                    <div class="update-profile-field-error">
+                        {{ user_form.last_name.errors.0 }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="update-profile-form-group username">
+                {{ user_form.username }}
+                {% if user_form.username.errors %}
+                <div class="update-profile-field-error">
+                    {{ user_form.username.errors.0 }}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="update-profile-form-group email">
+                {{ user_form.email }}
+                {% if user_form.email.errors %}
+                <div class="update-profile-field-error">
+                    {{ user_form.email.errors.0 }}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Form Actions -->
+            <div class="update-profile-actions">
+                <button class="update-profile-btn update-profile-btn-success" type="submit" id="saveButton">
+                    <i class="bi bi-check-circle"></i>
+                    {% trans 'Save Changes' %}
+                </button>
+                <a class="update-profile-btn update-profile-btn-info" href="{% url 'accounts:update_password' %}">
+                    <i class="bi bi-shield-lock"></i>
+                    {% trans 'Change Password' %}
+                </a>
+            </div>
+        </form>
     </div>
-</section>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const saveButton = document.getElementById('saveButton');
+        const updateForm = document.getElementById('updateProfileForm');
+
+        // Form submission
+        updateForm.addEventListener('submit', function () {
+            saveButton.classList.add('loading');
+            saveButton.disabled = true;
+            saveButton.innerHTML = '<i class="bi bi-arrow-repeat"></i> Saving...';
+        });
+
+        // Add classes and styling to form fields
+        const formGroups = document.querySelectorAll('.update-profile-form-group');
+        formGroups.forEach(group => {
+            const input = group.querySelector('input');
+            if (input) {
+                // Add placeholder if empty
+                if (!input.getAttribute('placeholder')) {
+                    const fieldName = input.name.replace(/_/g, ' ');
+                    const placeholder = fieldName.replace(/\b\w/g, l => l.toUpperCase());
+                    input.setAttribute('placeholder', placeholder);
+                }
+
+                // Add styling class
+                input.classList.add('update-profile-form-control');
+
+                // Add error class if field has errors
+                if (group.querySelector('.update-profile-field-error')) {
+                    input.classList.add('error');
+                }
+
+                // Add focus effects
+                input.addEventListener('focus', function () {
+                    this.parentElement.classList.add('focused');
+                });
+
+                input.addEventListener('blur', function () {
+                    this.parentElement.classList.remove('focused');
+                });
+
+                // Real-time validation for email
+                if (input.name === 'email') {
+                    input.addEventListener('blur', function () {
+                        const email = this.value;
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        if (email && !emailRegex.test(email)) {
+                            this.classList.add('error');
+                        } else {
+                            this.classList.remove('error');
+                        }
+                    });
+                }
+
+                // Real-time validation for username
+                if (input.name === 'username') {
+                    input.addEventListener('input', function () {
+                        const username = this.value;
+                        if (username.length < 3) {
+                            this.classList.add('error');
+                        } else {
+                            this.classList.remove('error');
+                        }
+                    });
+                }
+            }
+        });
+
+        // Avatar upload simulation
+        const avatarBtn = document.querySelector('.update-profile-avatar-btn');
+        if (avatarBtn) {
+            avatarBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                alert('Profile picture upload feature would be implemented here!');
+            });
+        }
+    });
+</script>
 {% endblock content %}

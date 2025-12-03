@@ -1,32 +1,168 @@
 {% extends "accounts_base.html" %}
 {% load static %}
 {% load i18n %}
+
 {% block title %}{% trans 'update personal information' %}{% endblock %}
+
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <h2 class="text-center mb-4">{{ _('Update Your Information') }}</h2>
-            <form method="POST" class="form">
-                {% csrf_token %}
-                <div class="form-group">
-                    {{ form.phone }}
+
+<div class="update-info-container">
+    <div class="update-info-card">
+        <!-- Header -->
+        <div class="update-info-header">
+            <h1 class="update-info-title">Update Your Profile</h1>
+            <p class="update-info-subtitle">Keep your contact information up to date</p>
+        </div>
+
+        <!-- Success Messages -->
+        {% if messages %}
+        {% for message in messages %}
+        <div class="update-info-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Error Messages -->
+        {% if form.errors %}
+        <div class="update-info-error">
+            Please correct the errors below to update your information.
+        </div>
+        {% endif %}
+
+        <!-- Update Form -->
+        <form method="POST" class="update-info-form" id="updateInfoForm">
+            {% csrf_token %}
+
+            <div class="update-info-form-group phone">
+                {{ form.phone }}
+                {% if form.phone.errors %}
+                <div class="update-info-field-error">
+                    {{ form.phone.errors.0 }}
                 </div>
-                <div class="form-group">
-                    {{ form.address1 }}
+                {% endif %}
+            </div>
+
+            <div class="update-info-form-group address1">
+                {{ form.address1 }}
+                {% if form.address1.errors %}
+                <div class="update-info-field-error">
+                    {{ form.address1.errors.0 }}
                 </div>
-                <div class="form-group">
-                    {{ form.address2 }}
+                {% endif %}
+            </div>
+
+            <div class="update-info-form-group address2">
+                {{ form.address2 }}
+                {% if form.address2.errors %}
+                <div class="update-info-field-error">
+                    {{ form.address2.errors.0 }}
                 </div>
-                <div class="form-group">
+                {% endif %}
+            </div>
+
+            <div class="update-info-form-row">
+                <div class="update-info-form-group city">
                     {{ form.city }}
+                    {% if form.city.errors %}
+                    <div class="update-info-field-error">
+                        {{ form.city.errors.0 }}
+                    </div>
+                    {% endif %}
                 </div>
-                <div class="form-group">
+
+                <div class="update-info-form-group country">
                     {{ form.country }}
+                    {% if form.country.errors %}
+                    <div class="update-info-field-error">
+                        {{ form.country.errors.0 }}
+                    </div>
+                    {% endif %}
                 </div>
-                <button type="submit" class="btn btn-primary w-100">{{ _('Update Information') }}</button>
-            </form>
+            </div>
+
+            <button type="submit" class="update-info-btn" id="updateInfoButton">
+                {% trans 'Save Changes' %}
+            </button>
+        </form>
+
+        <!-- Back to Profile Link -->
+        <div class="update-info-back">
+            <a href="{% url 'accounts:user_profile' %}" class="update-info-back-link">
+                Back to Profile
+            </a>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const updateButton = document.getElementById('updateInfoButton');
+        const updateForm = document.getElementById('updateInfoForm');
+
+        // Form submission
+        updateForm.addEventListener('submit', function () {
+            updateButton.classList.add('loading');
+            updateButton.disabled = true;
+            updateButton.innerHTML = 'Saving...';
+        });
+
+        // Add classes and styling to form fields
+        const formGroups = document.querySelectorAll('.update-info-form-group');
+        formGroups.forEach(group => {
+            const input = group.querySelector('input, select');
+            if (input) {
+                // Add placeholder if empty
+                if (!input.getAttribute('placeholder') && input.tagName === 'INPUT') {
+                    const fieldName = input.name;
+                    const placeholder = fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    input.setAttribute('placeholder', placeholder);
+                }
+
+                // Add styling class
+                input.classList.add('update-info-form-control');
+
+                // Add error class if field has errors
+                if (group.querySelector('.update-info-field-error')) {
+                    input.classList.add('error');
+                }
+
+                // Add focus effects
+                input.addEventListener('focus', function () {
+                    this.parentElement.classList.add('focused');
+                });
+
+                input.addEventListener('blur', function () {
+                    this.parentElement.classList.remove('focused');
+                });
+
+                // Real-time validation for phone number
+                if (input.name === 'phone') {
+                    input.addEventListener('input', function () {
+                        const phoneValue = this.value.replace(/\D/g, '');
+                        if (phoneValue.length > 0 && phoneValue.length < 10) {
+                            this.classList.add('error');
+                        } else {
+                            this.classList.remove('error');
+                        }
+                    });
+                }
+            }
+        });
+
+        // Auto-format phone number
+        const phoneInput = document.querySelector('input[name="phone"]');
+        if (phoneInput) {
+            phoneInput.addEventListener('input', function (e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length > 3 && value.length <= 6) {
+                    value = value.replace(/(\d{3})(\d{0,3})/, '$1-$2');
+                } else if (value.length > 6) {
+                    value = value.replace(/(\d{3})(\d{3})(\d{0,4})/, '$1-$2-$3');
+                }
+                e.target.value = value;
+            });
+        }
+    });
+</script>
 {% endblock %}

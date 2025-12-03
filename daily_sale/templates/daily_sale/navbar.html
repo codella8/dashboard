@@ -1,0 +1,94 @@
+<nav class="navbar navbar-expand-lg navbar-custom">
+    <div class="container-fluid">
+        <!-- Sidebar Toggle -->
+        <button class="btn sidebar-toggle d-lg-none" type="button">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Brand -->
+        <a class="navbar-brand" href="{% url 'daily_sale:dashboard' %}">
+            <i class="fas fa-chart-line me-2"></i>
+            <strong>فروش روزانه</strong>
+        </a>
+
+        <!-- Right Side -->
+        <div class="navbar-nav ms-auto">
+            <!-- Quick Stats -->
+            <div class="nav-item quick-stats">
+                <span class="badge bg-success me-3">
+                    <i class="fas fa-sync-alt me-1"></i>
+                    آنلاین
+                </span>
+            </div>
+
+            <!-- Notifications -->
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-bell"></i>
+                    <span class="badge bg-danger">۵</span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <h6 class="dropdown-header">آخرین اعلان‌ها</h6>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-shopping-cart text-primary me-2"></i>
+                        فروش جدید ثبت شد
+                    </a>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                        موجودی در حال اتمام
+                    </a>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        پرداخت تأیید شد
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item text-center" href="#">
+                        مشاهده همه اعلان‌ها
+                    </a>
+                </div>
+            </div>
+
+            <!-- User Menu -->
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-2"></i>
+                    مدیر فروش
+                </a>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <h6 class="dropdown-header">حساب کاربری</h6>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-user me-2"></i>
+                        پروفایل من
+                    </a>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-cog me-2"></i>
+                        تنظیمات
+                    </a>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-bell me-2"></i>
+                        تنظیمات اعلان‌ها
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-sign-out-alt me-2"></i>
+                        خروج از سیستم
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<script>
+    // Sidebar toggle for mobile
+    document.addEventListener('DOMContentLoaded', function () {
+        const sidebarToggle = document.querySelector('.sidebar-toggle');
+        const sidebar = document.querySelector('.sidebar');
+
+        if (sidebarToggle && sidebar) {
+            sidebarToggle.addEventListener('click', function () {
+                sidebar.classList.toggle('show');
+            });
+        }
+    });
+</script>

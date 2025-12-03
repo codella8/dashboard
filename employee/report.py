@@ -1,174 +1,201 @@
-# employee/report.py
-from decimal import Decimal
-from datetime import date, datetime, timedelta
-from django.db.models import Sum, Count, Q, F, Value, DecimalField
-from django.db.models.functions import Coalesce
+from django.db.models import Sum, Count, Avg, Q
 from django.utils import timezone
-
-from .models import Employee, SalaryPayment, EmployeeExpense
-
-DEC_ZERO = Decimal("0.00")
-
-
-def _parse_date(val, default=None):
-    if not val:
-        return default
-    if hasattr(val, "year"):
-        return val
-    try:
-        return datetime.fromisoformat(val).date()
-    except Exception:
-        try:
-            return datetime.strptime(val, "%Y-%m-%d").date()
-        except Exception:
-            return default
+from datetime import datetime, timedelta
+from decimal import Decimal
+from .models import Employee, SalaryPayment, EmployeeExpense, Department
 
 
-def employee_financial_summary(employee_id, start_date=None, end_date=None):
-    """
-    Returns a dict summary for a single employee containing:
-      - total_salary_due (sum of salary_amount scheduled in period)
-      - total_salary_paid (sum of salary_amount where is_paid=True)
-      - total_salary_unpaid (scheduled - paid)
-      - total_expenses (sum of EmployeeExpense.price)
-      - net_payable (total_salary_unpaid + total_expenses - debt_to_company)
-      - payment_count, expense_count
-    start_date/end_date can be date objects or 'YYYY-MM-DD' strings. If None -> whole history.
-    """
-    start = _parse_date(start_date, None)
-    end = _parse_date(end_date, None)
-
-    # base queryset filters
-    payment_qs = SalaryPayment.objects.filter(employee_id=employee_id)
-    expense_qs = EmployeeExpense.objects.filter(employee_id=employee_id)
-
-    if start:
-        payment_qs = payment_qs.filter(date__gte=start)
-        expense_qs = expense_qs.filter(date__gte=start)
-    if end:
-        payment_qs = payment_qs.filter(date__lte=end)
-        expense_qs = expense_qs.filter(date__lte=end)
-
-    agg_payments = payment_qs.aggregate(
-        total_scheduled=Coalesce(Sum('salary_amount'), Value(DEC_ZERO), output_field=DecimalField()),
-        total_paid=Coalesce(Sum('salary_amount', filter=Q(is_paid=True)), Value(DEC_ZERO), output_field=DecimalField()),
-        payment_count=Coalesce(Count('id'), Value(0)),
-    )
-
-    agg_expenses = expense_qs.aggregate(
-        total_expenses=Coalesce(Sum('price'), Value(DEC_ZERO), output_field=DecimalField()),
-        expense_count=Coalesce(Count('id'), Value(0)),
-    )
-
-    # try to get employee-level debt field (if present)
-    try:
-        emp = Employee.objects.only('debt_to_company').get(pk=employee_id)
-        debt_to_company = emp.debt_to_company or DEC_ZERO
-    except Employee.DoesNotExist:
-        debt_to_company = DEC_ZERO
-
-    total_scheduled = agg_payments['total_scheduled'] or DEC_ZERO
-    total_paid = agg_payments['total_paid'] or DEC_ZERO
-    total_unpaid = (total_scheduled - total_paid) if (total_scheduled and total_paid) else (total_scheduled - total_paid)
-    total_expenses = agg_expenses['total_expenses'] or DEC_ZERO
-
-    net_payable = (total_unpaid + total_expenses) - debt_to_company
-
+def calculate_employee_financials(employee):
+    """محاسبات مالی برای یک کارمند"""
+    total_paid = employee.salary_payments.filter(is_paid=True).aggregate(
+        total=Sum('salary_amount')
+    )['total'] or Decimal('0')
+    
+    total_expenses = employee.expenses.aggregate(
+        total=Sum('price')
+    )['total'] or Decimal('0')
+    
+    net_balance = employee.salary_due - total_paid - total_expenses - employee.debt_to_company
+    
     return {
-        'employee_id': employee_id,
-        'total_scheduled': total_scheduled,
         'total_paid': total_paid,
-        'total_unpaid': total_unpaid,
         'total_expenses': total_expenses,
-        'debt_to_company': debt_to_company,
-        'net_payable': net_payable,
-        'payment_count': int(agg_payments['payment_count'] or 0),
-        'expense_count': int(agg_expenses['expense_count'] or 0),
-        'period_start': start,
-        'period_end': end,
+        'net_balance': net_balance,
+        'is_fully_paid': net_balance <= 0,
+        'remaining_balance': max(net_balance, Decimal('0'))
     }
 
 
-def employees_overview(company_id=None, start_date=None, end_date=None, limit=200):
-    """
-    Returns a list of employees with aggregated financials.
-    If company_id provided, filters employees by their related UserProfile.company.
-    """
-    start = _parse_date(start_date, None)
-    end = _parse_date(end_date, None)
+def get_payroll_summary(start_date=None, end_date=None):
+    """خلاصه حقوق و دستمزد"""
+    qs = SalaryPayment.objects.all()
 
-    # Employee queryset, join to userprofile.employee__employee? Our Employee.employee -> UserProfile
-    qs = Employee.objects.select_related('employee')
+    if start_date:
+        qs = qs.filter(date__gte=start_date)
+    if end_date:
+        qs = qs.filter(date__lte=end_date)
 
-    if company_id:
-        qs = qs.filter(employee__company_id=company_id)
+    summary = qs.aggregate(
+        total_paid=Sum('salary_amount', filter=Q(is_paid=True)),
+        total_pending=Sum('salary_amount', filter=Q(is_paid=False)),
+        payment_count=Count('id'),
+        paid_count=Count('id', filter=Q(is_paid=True)),
+        pending_count=Count('id', filter=Q(is_paid=False)),
+        avg_salary=Avg('salary_amount')
+    )
+    
+    return summary
 
-    # Annotate using sub-aggregations on related models
-    # Note: Django cannot easily annotate across filtered related sets with different filters,
-    # so we'll aggregate global then narrow via filters on SalaryPayment/Expense in python as fallback for date ranges.
-    if not start and not end:
-        # simple annotate when no date filter: do in DB
-        qs = qs.annotate(
-            total_scheduled=Coalesce(Sum('salary_payments__salary_amount'), Value(DEC_ZERO), output_field=DecimalField()),
-            total_paid=Coalesce(Sum('salary_payments__salary_amount', filter=Q(salary_payments__is_paid=True)), Value(DEC_ZERO), output_field=DecimalField()),
-            total_expenses=Coalesce(Sum('expenses__price'), Value(DEC_ZERO), output_field=DecimalField()),
-            payment_count=Coalesce(Count('salary_payments'), Value(0)),
-            expense_count=Coalesce(Count('expenses'), Value(0)),
-        ).order_by('-total_scheduled')[:limit]
 
-        # convert to list of dicts
-        out = []
-        for e in qs:
-            total_scheduled = e.total_scheduled or DEC_ZERO
-            total_paid = e.total_paid or DEC_ZERO
-            total_unpaid = total_scheduled - total_paid
-            total_expenses = e.total_expenses or DEC_ZERO
-            debt = e.debt_to_company or DEC_ZERO
-            out.append({
-                'employee_obj': e,
-                'employee_id': e.pk,
-                'name': str(e.employee) if e.employee else '—',
-                'total_scheduled': total_scheduled,
-                'total_paid': total_paid,
-                'total_unpaid': total_unpaid,
-                'total_expenses': total_expenses,
-                'debt_to_company': debt,
-                'net_payable': (total_unpaid + total_expenses) - debt,
-                'payment_count': int(e.payment_count or 0),
-                'expense_count': int(e.expense_count or 0),
-            })
-        return out
+def get_department_stats():
+    """آمار دپارتمان‌ها"""
+    return Department.objects.annotate(
+        employee_count=Count('employee', filter=Q(employee__is_active=True)),
+        total_salary=Sum('employee__salary_due'),
+        avg_salary=Avg('employee__salary_due')
+    ).order_by('-employee_count')
 
-    # If date filters exist, compute per-employee by querying related sets (safer & accurate)
-    employees = list(qs[:limit])
-    out = []
-    for e in employees:
-        summary = employee_financial_summary(e.pk, start_date=start, end_date=end)
-        emp_label = str(e.employee) if e.employee else '—'
-        out.append({
-            'employee_obj': e,
-            'employee_id': e.pk,
-            'name': emp_label,
-            **summary
+
+def get_employee_performance(start_date=None, end_date=None):
+    """عملکرد کارمندان"""
+    employees = Employee.objects.filter(is_active=True)
+    
+    performance_data = []
+    for employee in employees:
+        financials = calculate_employee_financials(employee)
+        
+        # پرداخت‌های در بازه زمانی
+        payments_in_period = employee.salary_payments.all()
+        expenses_in_period = employee.expenses.all()
+        
+        if start_date:
+            payments_in_period = payments_in_period.filter(date__gte=start_date)
+            expenses_in_period = expenses_in_period.filter(date__gte=start_date)
+        if end_date:
+            payments_in_period = payments_in_period.filter(date__lte=end_date)
+            expenses_in_period = expenses_in_period.filter(date__lte=end_date)
+        
+        period_payments = payments_in_period.aggregate(
+            total=Sum('salary_amount', filter=Q(is_paid=True))
+        )['total'] or Decimal('0')
+        
+        period_expenses = expenses_in_period.aggregate(
+            total=Sum('price')
+        )['total'] or Decimal('0')
+        
+        performance_data.append({
+            'employee': employee,
+            'financials': financials,
+            'period_payments': period_payments,
+            'period_expenses': period_expenses,
+            'efficiency_score': (period_payments / employee.salary_due * 100) if employee.salary_due > 0 else 0
         })
-    return out
+    
+    return sorted(performance_data, key=lambda x: x['efficiency_score'], reverse=True)
 
 
-def salary_payments_timeseries(employee_id=None, days=30):
-    """
-    Return timeseries (list of dict) of salary payments (paid/unpaid) for last `days` days.
-    If employee_id is None, aggregate for all employees.
-    """
-    end = timezone.now().date()
-    start = end - timedelta(days=days - 1)
-    qs = SalaryPayment.objects.filter(date__range=[start, end])
-    if employee_id:
-        qs = qs.filter(employee_id=employee_id)
+def get_expense_analysis(start_date=None, end_date=None):
+    """تحلیل هزینه‌ها"""
+    qs = EmployeeExpense.objects.all()
 
-    series_qs = qs.values('date').annotate(
-        scheduled=Coalesce(Sum('salary_amount'), Value(DEC_ZERO), output_field=DecimalField()),
-        paid=Coalesce(Sum('salary_amount', filter=Q(is_paid=True)), Value(DEC_ZERO), output_field=DecimalField()),
-        count=Coalesce(Count('id'), Value(0)),
-    ).order_by('date')
+    if start_date:
+        qs = qs.filter(date__gte=start_date)
+    if end_date:
+        qs = qs.filter(date__lte=end_date)
 
-    return [{'date': r['date'], 'scheduled': r['scheduled'], 'paid': r['paid'], 'count': int(r['count'])} for r in series_qs]
+    # تحلیل بر اساس دسته‌بندی
+    by_category = qs.values('category').annotate(
+        total_amount=Sum('price'),
+        expense_count=Count('id'),
+        avg_amount=Avg('price')
+    ).order_by('-total_amount')
+    
+    # تحلیل بر اساس کارمند
+    by_employee = qs.values(
+        'employee__employee__user__first_name',
+        'employee__employee__user__last_name',
+        'employee__department__name'
+    ).annotate(
+        total_amount=Sum('price'),
+        expense_count=Count('id')
+    ).order_by('-total_amount')
+    
+    # تحلیل ماهانه
+    monthly_expenses = qs.extra(
+        select={'year': 'EXTRACT(year FROM date)', 'month': 'EXTRACT(month FROM date)'}
+    ).values('year', 'month').annotate(
+        total_amount=Sum('price'),
+        expense_count=Count('id')
+    ).order_by('year', 'month')
+    
+    return {
+        'by_category': by_category,
+        'by_employee': by_employee,
+        'monthly_expenses': monthly_expenses,
+        'total_expenses': qs.aggregate(total=Sum('price'))['total'] or Decimal('0')
+    }
+
+
+def get_salary_trends(group_by='month'):
+    """روند حقوق‌ها"""
+    qs = SalaryPayment.objects.filter(is_paid=True)
+    
+    if group_by == 'month':
+        return qs.extra(
+            select={'year': 'EXTRACT(year FROM date)', 'month': 'EXTRACT(month FROM date)'}
+        ).values('year', 'month').annotate(
+            total_paid=Sum('salary_amount'),
+            payment_count=Count('id'),
+            avg_salary=Avg('salary_amount')
+        ).order_by('year', 'month')
+    
+    else:  # روزانه
+        return qs.values('date').annotate(
+            total_paid=Sum('salary_amount'),
+            payment_count=Count('id')
+        ).order_by('date')
+
+
+def get_employee_financial_status():
+    """وضعیت مالی کارمندان"""
+    employees = Employee.objects.filter(is_active=True)
+    
+    status_data = []
+    for employee in employees:
+        financials = calculate_employee_financials(employee)
+        
+        status_data.append({
+            'employee': employee,
+            'salary_due': employee.salary_due,
+            'total_paid': financials['total_paid'],
+            'total_expenses': financials['total_expenses'],
+            'debt_to_company': employee.debt_to_company,
+            'net_balance': financials['net_balance'],
+            'status': 'Fully Paid' if financials['is_fully_paid'] else 'Pending',
+            'payment_progress': (financials['total_paid'] / employee.salary_due * 100) if employee.salary_due > 0 else 0
+        })
+    
+    return sorted(status_data, key=lambda x: x['net_balance'], reverse=True)
+
+
+def get_upcoming_salary_payments(days=30):
+    """پرداخت‌های حقوق آینده"""
+    today = timezone.now().date()
+    future_date = today + timedelta(days=days)
+    
+    employees = Employee.objects.filter(
+        is_active=True,
+        salary_due__gt=0
+    )
+    
+    upcoming_payments = []
+    for employee in employees:
+        financials = calculate_employee_financials(employee)
+        if financials['remaining_balance'] > 0:
+            upcoming_payments.append({
+                'employee': employee,
+                'amount_due': financials['remaining_balance'],
+                'due_status': 'Overdue' if today > employee.date else 'Upcoming'
+            })
+    
+    return sorted(upcoming_payments, key=lambda x: x['amount_due'], reverse=True)

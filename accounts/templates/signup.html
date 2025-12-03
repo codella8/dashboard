@@ -2,38 +2,175 @@
 {% load i18n %}
 {% load static %}
 
-{% block title %} {% trans 'signup' %}{% endblock %}
+{% block title %}{% trans 'signup' %}{% endblock %}
+
 {% block content %}
-<div class="container">
-  <div class="row justify-content-center">
-    <div class="col-md-6">
-      <h2 class="text-center mb-4">{{ _('Create a new account') }}</h2>
-      <form method="POST" class="form">
-        {% csrf_token %}
-        <div class="form-group">
+
+<div class="signup-container">
+  <div class="signup-card">
+    <!-- Header -->
+    <div class="signup-header">
+      <h1 class="signup-title">Join Us Today</h1>
+      <p class="signup-subtitle">Create your account and start your journey with us</p>
+    </div>
+
+    <!-- Error Messages -->
+    {% if form.errors %}
+    <div class="signup-error">
+      Please correct the errors below to create your account.
+    </div>
+    {% endif %}
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="signup-{{ message.tags }}">
+      {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Signup Form -->
+    <form method="POST" class="signup-form" id="signupForm">
+      {% csrf_token %}
+
+      <div class="signup-form-row">
+        <div class="signup-form-group first_name">
           {{ form.first_name }}
+          {% if form.first_name.errors %}
+          <div class="signup-field-error">
+            {{ form.first_name.errors.0 }}
+          </div>
+          {% endif %}
         </div>
-        <div class="form-group">
+
+        <div class="signup-form-group last_name">
           {{ form.last_name }}
+          {% if form.last_name.errors %}
+          <div class="signup-field-error">
+            {{ form.last_name.errors.0 }}
+          </div>
+          {% endif %}
         </div>
-        <div class="form-group">
-          {{ form.email }}
-        </div>
-        <div class="form-group">
-          {{ form.username }}
-        </div>
-        <div class="form-group">
-          {{ form.password1 }}
-        </div>
-        <div class="form-group">
-          {{ form.password2 }}
-        </div>
-        <button type="submit" class="btn btn-primary w-100">{{ _('Sign Up') }}</button>
-      </form>
-      <div class="mt-3 text-center">
-        <a href="{% url 'accounts:login' %}">{{ _('Already have an account? Login') }}</a>
       </div>
+
+      <div class="signup-form-group email">
+        {{ form.email }}
+        {% if form.email.errors %}
+        <div class="signup-field-error">
+          {{ form.email.errors.0 }}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="signup-form-group username">
+        {{ form.username }}
+        {% if form.username.errors %}
+        <div class="signup-field-error">
+          {{ form.username.errors.0 }}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="signup-form-group password1">
+        {{ form.password1 }}
+        <div class="signup-password-strength">
+          <div class="signup-password-strength-bar"></div>
+        </div>
+        <div class="signup-password-hint">
+          Use 8+ characters with mix of letters, numbers & symbols
+        </div>
+        {% if form.password1.errors %}
+        <div class="signup-field-error">
+          {{ form.password1.errors.0 }}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="signup-form-group password2">
+        {{ form.password2 }}
+        {% if form.password2.errors %}
+        <div class="signup-field-error">
+          {{ form.password2.errors.0 }}
+        </div>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="signup-btn" id="signupButton">
+        {% trans 'Create Account' %}
+      </button>
+    </form>
+
+    <!-- Login Link -->
+    <div class="signup-login">
+      <p class="signup-login-text">Already have an account?</p>
+      <a href="{% url 'accounts:login' %}" class="signup-login-link">
+        Sign in to your account
+      </a>
     </div>
   </div>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const signupButton = document.getElementById('signupButton');
+    const signupForm = document.getElementById('signupForm');
+    const password1 = document.querySelector('input[name="password1"]');
+    const passwordStrength = document.querySelector('.signup-password-strength');
+    const passwordStrengthBar = document.querySelector('.signup-password-strength-bar');
+
+    // Form submission
+    signupForm.addEventListener('submit', function () {
+      signupButton.classList.add('loading');
+      signupButton.disabled = true;
+    });
+
+    // Password strength indicator
+    if (password1) {
+      password1.addEventListener('input', function () {
+        const password = this.value;
+        let strength = 'weak';
+
+        if (password.length >= 8) {
+          strength = 'medium';
+          if (password.match(/[a-z]/) && password.match(/[A-Z]/) && password.match(/[0-9]/) && password.match(/[^a-zA-Z0-9]/)) {
+            strength = 'strong';
+          }
+        }
+
+        passwordStrength.className = 'signup-password-strength ' + strength;
+      });
+    }
+
+    // Add classes to form fields for styling
+    const formGroups = document.querySelectorAll('.signup-form-group');
+    formGroups.forEach(group => {
+      const input = group.querySelector('input');
+      if (input) {
+        // Add placeholder if empty
+        if (!input.getAttribute('placeholder')) {
+          const fieldName = input.name;
+          const placeholder = fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          input.setAttribute('placeholder', placeholder);
+        }
+
+        // Add styling class
+        input.classList.add('signup-form-control');
+
+        // Add error class if field has errors
+        if (group.querySelector('.signup-field-error')) {
+          input.classList.add('error');
+        }
+
+        // Add focus effects
+        input.addEventListener('focus', function () {
+          this.parentElement.classList.add('focused');
+        });
+
+        input.addEventListener('blur', function () {
+          this.parentElement.classList.remove('focused');
+        });
+      }
+    });
+  });
+</script>
 {% endblock %}

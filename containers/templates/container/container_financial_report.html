@@ -1,0 +1,111 @@
+{% extends 'container/container_base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/container_financial_report.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="financial-report">
+    <div class="container">
+        <div class="content-wrapper">
+            <!-- Header Section -->
+            <div class="page-header">
+                <div class="title-section">
+                    <h4>گزارش مالی کانتینر — {{ container.container_number }}</h4>
+                    <p class="text-muted">{{ container.name }}</p>
+                </div>
+                <div class="text-right">
+                    <a class="btn-back" href="{% url 'containers:list' %}">
+                        ← بازگشت به لیست کانتینرها
+                    </a>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="row stats-grid">
+                <div class="col-md-4">
+                    <div class="stat-card income-card">
+                        <h6>کل درآمد</h6>
+                        <div class="display-4">{{ financial_summary.total_income|default:0|floatformat:0 }}</div>
+                        <small>از تراکنش‌های فروش</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card sales-card">
+                        <h6>کل تعداد فروخته‌شده</h6>
+                        <div class="display-4">{{ financial_summary.total_sold_qty|default:0|floatformat:0 }}</div>
+                        <small>به تفکیک واحد</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card inventory-card">
+                        <h6>تعداد محصولات</h6>
+                        <div class="display-4">{{ container.Inventory_container.count|default:0 }}</div>
+                        <small>محصولات در کانتینر</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Section -->
+            <div class="transactions-section">
+                <h5 class="section-title">تراکنش‌ها</h5>
+                
+                <div class="transactions-table">
+                    <table class="table">
+                        <thead class="table-header">
+                            <tr>
+                                <th>تاریخ</th>
+                                <th>محصول</th>
+                                <th>تعداد</th>
+                                <th>قیمت کل</th>
+                                <th>وضعیت فروش</th>
+                                <th>وضعیت پرداخت</th>
+                            </tr>
+                        </thead>
+                        <tbody class="table-body">
+                            {% for tx in transactions %}
+                            <tr>
+                                <td>{{ tx.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>{{ tx.product|default:"-" }}</td>
+                                <td>
+                                    <span class="quantity-normal">{{ tx.quantity|default:0 }}</span>
+                                </td>
+                                <td>
+                                    <span class="price-positive">{{ tx.total_price|floatformat:0 }}</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge 
+                                        {% if 'sold' in tx.sale_status %}status-sold
+                                        {% elif 'pending' in tx.sale_status %}status-pending
+                                        {% else %}status-cancelled{% endif %}">
+                                        {{ tx.get_sale_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-badge 
+                                        {% if 'paid' in tx.payment_status %}status-paid
+                                        {% elif 'partial' in tx.payment_status %}status-partial
+                                        {% else %}status-unpaid{% endif %}">
+                                        {{ tx.get_payment_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6">
+                                    <div class="empty-state">
+                                        <i>📊</i>
+                                        <p>تراکنشی ثبت نشده است</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

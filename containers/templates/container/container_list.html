@@ -1,0 +1,116 @@
+{% extends 'container/container_base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-list-page">
+  <div class="container">
+    <div class="content-wrapper">
+      <!-- Header Section -->
+      <div class="page-header">
+        <h1>Containers Management</h1>
+      </div>
+
+      <!-- Table Section -->
+      <div class="table-container">
+        <table class="table table-hover">
+          <thead class="table-header">
+            <tr>
+              <th>Container Number</th>
+              <th>Name</th>
+              <th>Company</th>
+              <th>Products</th>
+              <th>Stock Qty</th>
+              <th>Inventory Value</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody class="table-body">
+            {% for container in containers %}
+            <tr>
+              <td>
+                <a href="{% url 'containers:total_container_transactions_report' %}" class="container-number-link">
+                  {{ container.container_number|default:container.id }}
+                </a>
+              </td>
+              <td>
+                <strong>{{ container.name }}</strong>
+              </td>
+              <td>
+                <span>{{ container.company.name|default:"-" }}</span>
+              </td>
+              <td>
+                <span class="value-badge products-count">
+                  {{ container.products_count|default:0 }}
+                </span>
+              </td>
+              <td>
+                <span class="value-badge stock-qty">
+                  {{ container.total_in_stock_qty|default:0 }}
+                </span>
+              </td>
+              <td>
+                <span class="value-badge inventory-value">
+                  ${{ container.total_inventory_value|default:0 }}
+                </span>
+              </td>
+              <td>
+                <div class="action-buttons-cell">
+                  <a class="btn btn-sm btn-outline-secondary"
+                    href="{% url 'containers:container_financial_report' container_id=container.id %}">
+                    💰 Financial
+                  </a>
+                  <a class="btn btn-sm btn-outline-info" href="{% url 'containers:detail' container.id %}">
+                    👁️ Details
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7">
+                <div class="empty-state">
+                  <span class="empty-state-icon">📭</span>
+                  <p>No containers found</p>
+                  <small class="text-muted">Start by adding your first container</small>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      {% if is_paginated %}
+      <div class="pagination-container">
+        <nav aria-label="Page navigation">
+          <ul class="pagination">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                ← Previous
+              </a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+              <span class="page-link">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+              </span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                Next →
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

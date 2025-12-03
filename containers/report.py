@@ -53,8 +53,7 @@ def saraf_balance_summary(company_id=None):
     qs = qs.annotate(
         total_received=Sum('transactions__received_from_saraf'),
         total_paid=Sum('transactions__paid_by_company'),
-        total_debit=Sum('transactions__debit_company'),
-    ).annotate(balance=F('total_received') + F('total_debit') - F('total_paid'))
+    ).annotate(balance=F('total_received') - F('total_paid'))
     return qs
 
 def total_container_transactions_report(company_id=None, start_date=None, end_date=None):

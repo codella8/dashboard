@@ -1,0 +1,210 @@
+{% extends 'expenses_base.html' %}
+
+{% block title %}داشبورد هزینه‌ها{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        <i class="fas fa-tachometer-alt text-primary me-2"></i>
+        داشبورد هزینه‌ها
+    </h2>
+    <div class="text-muted">
+        امروز: {{ today|date:"Y/m/d" }}
+    </div>
+</div>
+
+<!-- کارت‌های آمار -->
+<div class="row">
+    <div class="col-md-3">
+        <div class="stat-card primary">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="stat-number text-primary">{{ summary.total_expenses|floatformat:0 }} تومان</h3>
+                    <p class="stat-label">کل هزینه‌ها</p>
+                </div>
+                <i class="fas fa-money-bill-wave fa-2x text-primary"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="stat-number text-success">{{ summary.expense_records.record_count|default:0 }}</h3>
+                    <p class="stat-label">تعداد رسیدها</p>
+                </div>
+                <i class="fas fa-receipt fa-2x text-success"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="stat-number text-warning">{{ summary.daily_expenses.expense_count|default:0 }}</h3>
+                    <p class="stat-label">هزینه‌های روزانه</p>
+                </div>
+                <i class="fas fa-calendar-day fa-2x text-warning"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card danger">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="stat-number text-danger">{{ summary.expense_records.avg_expense|floatformat:0|default:0 }} تومان</h3>
+                    <p class="stat-label">میانگین هر رسید</p>
+                </div>
+                <i class="fas fa-chart-line fa-2x text-danger"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- نمودار هزینه‌ها بر اساس دسته‌بندی -->
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h5 class="mb-4">
+                <i class="fas fa-chart-pie text-primary me-2"></i>
+                هزینه‌ها بر اساس دسته‌بندی
+            </h5>
+            <canvas id="categoryChart" height="250"></canvas>
+        </div>
+    </div>
+    
+    <!-- روند ماهانه -->
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h5 class="mb-4">
+                <i class="fas fa-chart-line text-success me-2"></i>
+                روند هزینه‌های ۶ ماه گذشته
+            </h5>
+            <canvas id="monthlyChart" height="250"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- آخرین هزینه‌ها -->
+    <div class="col-12">
+        <div class="table-container">
+            <h5 class="mb-4">
+                <i class="fas fa-history text-info me-2"></i>
+                آخرین هزینه‌های ثبت شده
+            </h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>تاریخ</th>
+                            <th>آیتم</th>
+                            <th>دسته‌بندی</th>
+                            <th>مبلغ</th>
+                            <th>پرداخت کننده</th>
+                            <th>وضعیت</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expense in recent_expenses %}
+                        <tr>
+                            <td>{{ expense.date|date:"Y/m/d" }}</td>
+                            <td>{{ expense.item.name }}</td>
+                            <td>
+                                <span class="badge bg-light text-dark">{{ expense.item.category.name }}</span>
+                            </td>
+                            <td>
+                                <strong class="text-success">{{ expense.total_amount|floatformat:0 }} تومان</strong>
+                            </td>
+                            <td>{{ expense.paid_by }}</td>
+                            <td>
+                                <span class="badge badge-custom bg-success">پرداخت شده</span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                هیچ هزینه‌ای ثبت نشده است
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// نمودار دایره‌ای دسته‌بندی‌ها
+const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+const categoryChart = new Chart(categoryCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['خوراکی', 'بنزین', 'اداری', 'تجهیزات', 'سایر'],
+        datasets: [{
+            data: [35, 25, 20, 15, 5],
+            backgroundColor: [
+                '#3498db',
+                '#e74c3c',
+                '#2ecc71',
+                '#f39c12',
+                '#95a5a6'
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                rtl: true
+            }
+        }
+    }
+});
+
+// نمودار خطی ماهانه
+const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+const monthlyChart = new Chart(monthlyCtx, {
+    type: 'line',
+    data: {
+        labels: ['مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
+        datasets: [{
+            label: 'هزینه‌های ماهانه',
+            data: [12000000, 15000000, 18000000, 14000000, 16000000, 19000000],
+            borderColor: '#27ae60',
+            backgroundColor: 'rgba(39, 174, 96, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value.toLocaleString() + ' تومان';
+                    }
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                rtl: true
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

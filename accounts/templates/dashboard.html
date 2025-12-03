@@ -1,248 +1,300 @@
 {% extends "accounts_base.html" %}
 {% load static %}
-{% block title %}Main Dashboard - Inventory System{% endblock %}
 
 {% block content %}
-<div class="dashboard-container-fluid vh-100">
-    <!-- Professional Header -->
-    <div class="dashboard-header-professional py-4 mb-5">
-        <div class="container-fluid">
-            <div class="row align-items-center">
-                <div class="col-lg-8">
-                    <div class="fade-in-up">
-                        <h1 class="display-4 fw-bold text-dark mb-2">
-                            🚀 Main Dashboard
-                        </h1>
-                        <p class="lead text-muted mb-0">
-                            Central Management System - All Modules in One Place
-                        </p>
-                    </div>
-                </div>
-                <div class="col-lg-4 text-lg-end">
-                    <div class="fade-in-up">
-                        <div class="user-badge-pro d-inline-flex align-items-center">
-                            <i class="fas fa-user-circle me-2"></i>
-                            <span>User: {{ request.user.get_full_name|default:request.user.username }}</span>
-                            <div class="ms-3 pulse-dot"></div>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-clock me-1"></i>
-                                <span id="current-time">--:--:--</span>
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="dashboard-layout">
+    <!-- Mobile Toggle -->
+    <button class="mobile-toggle" onclick="toggleNav()">
+        <i class="fas fa-bars"></i>
+    </button>
 
-    <div class="container-fluid">
-        <!-- Quick Stats -->
-        <div class="row mb-5">
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="stat-card-pro success fade-in-up" style="animation-delay: 0.1s;">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 class="display-6 fw-bold mb-1 text-dark">{{ quick_stats.total_sales|default:"1,247"}}</h2>
-                                <p class="mb-0 opacity-90 text-dark">Sales Transactions</p>
-                                <small class="opacity-75 text-dark">
-                                    <i class="fas fa-arrow-up me-1 text-success"></i>
-                                    12% growth this month
-                                </small>
-                            </div>
-                            <div class="stat-icon">
-                                <i class="fas fa-shopping-cart fa-2x opacity-50 text-success"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="stat-card-pro primary fade-in-up" style="animation-delay: 0.2s;">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 class="display-6 fw-bold mb-1 text-dark">{{quick_stats.total_inventory|default:"856" }}</h2>
-                                <p class="mb-0 opacity-90 text-dark">Inventory Items</p>
-                                <small class="opacity-75 text-dark">
-                                    <i class="fas fa-boxes me-1 text-primary"></i>
-                                    Across 8 warehouses
-                                </small>
-                            </div>
-                            <div class="stat-icon">
-                                <i class="fas fa-warehouse fa-2x opacity-50 text-primary"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="stat-card-pro info fade-in-up" style="animation-delay: 0.3s;">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 class="display-6 fw-bold mb-1 text-dark">{{quick_stats.active_containers|default:"23" }}</h2>
-                                <p class="mb-0 opacity-90 text-dark">Active Containers</p>
-                                <small class="opacity-75 text-dark">
-                                    <i class="fas fa-ship me-1 text-info"></i>
-                                    5 containers in transit
-                                </small>
-                            </div>
-                            <div class="stat-icon">
-                                <i class="fas fa-shipping-fast fa-2x opacity-50 text-info"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="stat-card-pro warning fade-in-up" style="animation-delay: 0.4s;">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 class="display-6 fw-bold mb-1 text-dark">{{quick_stats.pending_expenses|default:"45" }}</h2>
-                                <p class="mb-0 opacity-90 text-dark">Pending Expenses</p>
-                                <small class="opacity-75 text-dark">
-                                    <i class="fas fa-clock me-1 text-warning"></i>
-                                    Awaiting approval
-                                </small>
-                            </div>
-                            <div class="stat-icon">
-                                <i class="fas fa-file-invoice-dollar fa-2x opacity-50 text-warning"></i>
-                            </div>
-                        </div>
-                    </div>
+    <!-- Navigation -->
+    <nav class="nav-container" id="navContainer">
+        <!-- Logo -->
+        <div class="logo-section">
+            <div class="brand">
+                <div class="brand-icon">E</div>
+                <div class="brand-text">
+                    <h1>Enterprise</h1>
                 </div>
             </div>
         </div>
 
-        <!-- System Apps Grid -->
-        <div class="row g-4">
-            {% for app in apps %}
-            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
-                <div class="app-card-pro {% if app.active %}active floating{% else %}inactive{% endif %} fade-in-up">
-                    <div class="card-body text-center p-4 position-relative">
-                        <span class="status-badge-pro {% if app.active %}bg-success{% else %}bg-secondary{% endif %}">
-                            {% if app.active %}Active{% else %}Coming Soon{% endif %}
-                        </span>
+        <!-- Menu -->
+        <div class="nav-menu">
+            <div class="nav-section">
+                <div class="nav-label">Applications</div>
+                <ul class="nav-items">
+                    <li class="nav-item">
+                        <a href="{% url 'daily_sale:dashboard' %}" class="nav-link active" onclick="setActiveNav(this)">
+                            <i class="fas fa-shopping-cart nav-icon"></i>
+                            <span>Daily Sales</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'containers:list' %}" class="nav-link" onclick="setActiveNav(this)">
+                            <i class="fas fa-shipping-fast nav-icon"></i>
+                            <span>Containers</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'expenses:expense_dashboard' %}" class="nav-link" onclick="setActiveNav(this)">
+                            <i class="fas fa-money-bill-wave nav-icon"></i>
+                            <span>Expenses</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'employees:dashboard' %}" class="nav-link" onclick="setActiveNav(this)">
+                            <i class="fas fa-users nav-icon"></i>
+                            <span>Employees</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
+                            <i class="fas fa-chart-line nav-icon"></i>
+                            <span>Finance</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
+                            <i class="fas fa-file-alt nav-icon"></i>
+                            <span>Reports</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
 
-                        <div class="app-icon-pro">
-                            {{ app.icon }}
+            <div class="nav-section">
+                <div class="nav-label">System</div>
+                <ul class="nav-items">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
+                            <i class="fas fa-cog nav-icon"></i>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
+                            <i class="fas fa-shield-alt nav-icon"></i>
+                            <span>Security</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
+                            <i class="fas fa-life-ring nav-icon"></i>
+                            <span>Support</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="page-title">
+                <h1>Daily Sales</h1>
+                <div class="page-subtitle">Monitor transactions and sales performance</div>
+            </div>
+
+            <div class="top-actions">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Search transactions...">
+                </div>
+
+                <button class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    New Sale
+                </button>
+            </div>
+        </header>
+
+        <!-- Content -->
+        <div class="content-area">
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon">
+                            <i class="fas fa-dollar-sign"></i>
                         </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Today's Sales</div>
+                            <div class="stat-value">$12,450</div>
+                            <div class="stat-trend trend-positive">
+                                <i class="fas fa-arrow-up"></i>
+                                12.5%
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                        <h5 class="card-title fw-bold mb-2 text-dark">{{ app.name }}</h5>
-                        <p class="card-text text-muted small mb-3">{{ app.description }}</p>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon">
+                            <i class="fas fa-receipt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Transactions</div>
+                            <div class="stat-value">87</div>
+                            <div class="stat-trend trend-positive">
+                                <i class="fas fa-arrow-up"></i>
+                                3.2%
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                        {% if app.active %}
-                        <a href="{{ app.url }}" class="btn btn-primary btn-sm">
-                            <i class="fas fa-arrow-right me-1"></i> Open App
-                        </a>
-                        {% else %}
-                        <span class="btn btn-outline-secondary btn-sm" disabled>
-                            <i class="fas fa-clock me-1"></i> Coming Soon
-                        </span>
-                        {% endif %}
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon">
+                            <i class="fas fa-cube"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Items Sold</div>
+                            <div class="stat-value">345</div>
+                            <div class="stat-trend trend-negative">
+                                <i class="fas fa-arrow-down"></i>
+                                2.1%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Avg Invoice</div>
+                            <div class="stat-value">$143.10</div>
+                            <div class="stat-trend trend-positive">
+                                <i class="fas fa-arrow-up"></i>
+                                7.3%
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            {% empty %}
-            <!-- Default Apps if none provided -->
-            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
-                <div class="app-card-pro active floating fade-in-up" style="animation-delay: 0.6s;">
-                    <div class="card-body text-center p-4 position-relative">
-                        <span class="status-badge-pro bg-success">Active</span>
-                        <div class="app-icon-pro">📊</div>
-                        <h5 class="card-title fw-bold mb-2 text-dark">Daily Sales</h5>
-                        <p class="card-text text-muted small mb-3">Daily transactions and sales management</p>
-                        <a href="#" class="btn btn-primary btn-sm">
-                            <i class="fas fa-arrow-right me-1"></i> Open App
-                        </a>
+
+            <!-- Table -->
+            <div class="data-table-container">
+                <div class="table-header">
+                    <div class="table-filters">
+                        <select>
+                            <option>All Status</option>
+                            <option>Completed</option>
+                            <option>Pending</option>
+                        </select>
+                    </div>
+                    <div class="table-info">
+                        <span style="font-size: 11px; color: var(--text-secondary);">87 transactions</span>
                     </div>
                 </div>
-            </div>
-            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
-                <div class="app-card-pro active floating fade-in-up" style="animation-delay: 0.7s;">
-                    <div class="card-body text-center p-4 position-relative">
-                        <span class="status-badge-pro bg-success">Active</span>
-                        <div class="app-icon-pro">🚢</div>
-                        <h5 class="card-title fw-bold mb-2 text-dark">Containers</h5>
-                        <p class="card-text text-muted small mb-3">Container and shipping management</p>
-                        <a href="{% url 'containers:list' %}" class="btn btn-primary btn-sm">
-                            <i class="fas fa-arrow-right me-1"></i> Open App
-                        </a>
-                    </div>
+
+                <div class="table-content">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>Customer</th>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>INV-2023-00125</td>
+                                <td>Kimia Trading LLC</td>
+                                <td>2023-12-06</td>
+                                <td>$2,540.00</td>
+                                <td><span class="status status-success"><span class="status-dot"></span>Completed</span>
+                                </td>
+                                <td>
+                                    <div class="action-menu">
+                                        <button class="action-btn" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="action-btn" title="Print">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>INV-2023-00124</td>
+                                <td>Tehran Steel Co.</td>
+                                <td>2023-12-06</td>
+                                <td>$1,850.00</td>
+                                <td><span class="status status-pending"><span class="status-dot"></span>Pending</span>
+                                </td>
+                                <td>
+                                    <div class="action-menu">
+                                        <button class="action-btn" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>INV-2023-00123</td>
+                                <td>Persian Carpets</td>
+                                <td>2023-12-05</td>
+                                <td>$3,250.00</td>
+                                <td><span class="status status-success"><span class="status-dot"></span>Completed</span>
+                                </td>
+                                <td>
+                                    <div class="action-menu">
+                                        <button class="action-btn" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
-                <div class="app-card-pro active floating fade-in-up" style="animation-delay: 0.8s;">
-                    <div class="card-body text-center p-4 position-relative">
-                        <span class="status-badge-pro bg-success">Active</span>
-                        <div class="app-icon-pro">💰</div>
-                        <h5 class="card-title fw-bold mb-2 text-dark">Expenses</h5>
-                        <p class="card-text text-muted small mb-3">Expense tracking and management</p>
-                        <a href="#" class="btn btn-primary btn-sm">
-                            <i class="fas fa-arrow-right me-1"></i> Open App
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xxl-2 col-xl-3 col-lg-4 col-md-6">
-                <div class="app-card-pro active floating fade-in-up" style="animation-delay: 0.9s;">
-                    <div class="card-body text-center p-4 position-relative">
-                        <span class="status-badge-pro bg-success">Active</span>
-                        <div class="app-icon-pro">👥</div>
-                        <h5 class="card-title fw-bold mb-2 text-dark">Employees</h5>
-                        <p class="card-text text-muted small mb-3">Employee and staff management</p>
-                        <a href="#" class="btn btn-primary btn-sm">
-                            <i class="fas fa-arrow-right me-1"></i> Open App
-                        </a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
         </div>
-
-        <!-- Footer -->
-        <div class="row mt-5">
-            <div class="col-12 text-center">
-                <div class="glass-card p-3">
-                    <small class="text-white opacity-75">
-                        <i class="fas fa-sync-alt me-1"></i> Last Update:
-                        <span id="live-update-time">Just Now</span>
-                    </small>
-                </div>
-            </div>
-        </div>
-    </div>
+    </main>
 </div>
 
 <script>
-    // Update current time
-    function updateTime() {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('fa-IR');
-        document.getElementById('current-time').textContent = timeString;
+    function setActiveNav(element) {
+        document.querySelectorAll('.nav-link').forEach(item => {
+            item.classList.remove('active');
+        });
+        element.classList.add('active');
+
+        if (window.innerWidth <= 768) {
+            document.getElementById('navContainer').classList.remove('active');
+        }
+
+        return false;
     }
 
-    setInterval(updateTime, 1000);
-    updateTime();
+    function toggleNav() {
+        const nav = document.getElementById('navContainer');
+        nav.classList.toggle('active');
+    }
 
-    // Add click effects to app cards
-    document.addEventListener('DOMContentLoaded', function () {
-        const appCards = document.querySelectorAll('.app-card-pro.active');
+    // Close nav on outside click
+    document.addEventListener('click', function (event) {
+        const nav = document.getElementById('navContainer');
+        const toggle = document.querySelector('.mobile-toggle');
 
-        appCards.forEach(card => {
-            card.addEventListener('click', function (e) {
-                if (e.target.tagName !== 'A' && !e.target.closest('a')) {
-                    const link = this.querySelector('a');
-                    if (link) {
-                        link.click();
-                    }
-                }
-            });
-        });
+        if (window.innerWidth <= 768 &&
+            nav.classList.contains('active') &&
+            !nav.contains(event.target) &&
+            !toggle.contains(event.target)) {
+            nav.classList.remove('active');
+        }
     });
 </script>
-{% endblock %}
+{% endblock content %}

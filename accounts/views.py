@@ -36,9 +36,6 @@ def home(request):
     }
     return render(request, 'home.html', context)
 
-def about(request):
-    return render(request, 'about.html')
-
 
 def login_user(request):
     """Login view that handles user login with appropriate messages"""
@@ -78,6 +75,19 @@ def signup_user(request):
 
     form = SignUpForm()
     return render(request, 'signup.html', {'form': form})
+
+@login_required
+def dashboard(request):
+    """User Dashboard with role-based access"""
+    
+    # اگر کاربر ادمین باشد، به داشبورد مدیریتی هدایت شود
+    if request.user.is_staff: 
+        return redirect('admin:index')
+    
+    # اگر کاربر عادی باشد، به صفحه هوم هدایت شود
+    messages.info(request, _("Welcome to your account!"))
+    return redirect('accounts:home')
+
 @login_required
 def dashboard(request):
     """User Dashboard with quick stats and app navigation"""
@@ -89,12 +99,13 @@ def dashboard(request):
         'active_containers': 23,
         'pending_expenses': 45,
     }
+    
 
     # App navigation setup - with direct URLs
     apps = [
         {
             'name': 'Daily Sales', 
-            'url': '/daily_sale/dashboard/',  # URL مستقیم
+            'url': '/daily_sale/',  # URL مستقیم
             'icon': '💰', 
             'active': True,
             'description': 'Daily transactions and sales management'
@@ -108,28 +119,28 @@ def dashboard(request):
         },
         {
             'name': 'Expenses', 
-            'url': '/expenses/home_expenses/',  # URL مستقیم
+            'url': '/expenses/',  # URL مستقیم
             'icon': '💸', 
             'active': True,
             'description': 'Expense tracking and management'
         },
         {
             'name': 'Employees', 
-            'url': '/employee/overview/',  # URL مستقیم
-            'icon': '👥', 
+            'url': '/employee/',  # URL مستقیم
+            'icon': '👥',  
             'active': True,
             'description': 'Employee and staff management'
         },
         {
             'name': 'Finance', 
-            'url': '/finance/home_finance/',  # URL مستقیم
+            'url': '/finance/',  # URL مستقیم
             'icon': '📊', 
             'active': True,
             'description': 'Financial reports and analysis'
         },
         {
             'name': 'Reports', 
-            'url': '/reports/home_reports/',  # URL مستقیم
+            'url': '/reports/',  # URL مستقیم
             'icon': '📋', 
             'active': True,
             'description': 'Comprehensive reporting system'

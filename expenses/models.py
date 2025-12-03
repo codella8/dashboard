@@ -1,31 +1,64 @@
 from django.db import models
+from django.core.validators import MinValueValidator
 
-class ExpenseItem(models.Model):
-    name = models.CharField(max_length=100)
-    category = models.CharField(max_length=50)  # مثل: قطعه، خوراکی، خدمات
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
-    is_machine_related = models.BooleanField(default=False)
-
+class ExpenseCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name="نام دسته‌بندی")
+    description = models.TextField(blank=True, verbose_name="توضیحات")
+    
     def __str__(self):
         return self.name
+    
+    class Meta:
+        verbose_name = "دسته‌بندی هزینه"
+        verbose_name_plural = "دسته‌بندی هزینه‌ها"
+
+class ExpenseItem(models.Model):
+    name = models.CharField(max_length=100, verbose_name="نام آیتم")
+    category = models.ForeignKey(ExpenseCategory, on_delete=models.CASCADE, verbose_name="دسته‌بندی")
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="قیمت واحد")
+    
+    def __str__(self):
+        return f"{self.name} - {self.category.name}"
+    
+    class Meta:
+        verbose_name = "آیتم هزینه"
+        verbose_name_plural = "آیتم‌های هزینه"
 
 class ExpenseRecord(models.Model):
-    date = models.DateField()
-    item = models.ForeignKey(ExpenseItem, on_delete=models.CASCADE)
-    qty = models.PositiveIntegerField()
-    total = models.DecimalField(max_digits=12, decimal_places=2)
-    paid_by = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
-
-    def __str__(self):
-        return f"{self.item.name} – {self.total}"
+    PAYMENT_METHODS = [
+        ('cash', 'نقدی'),
+        ('bank', 'حواله بانکی'),
+        ('card', 'کارتخوان'),
+    ]
     
+    date = models.DateField(verbose_name="تاریخ")
+    item = models.ForeignKey(ExpenseItem, on_delete=models.CASCADE, verbose_name="آیتم")
+    quantity = models.PositiveIntegerField(default=1, verbose_name="تعداد")
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="قیمت واحد")
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="مبلغ کل")
+    paid_by = models.CharField(max_length=100, verbose_name="پرداخت کننده")
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='cash', verbose_name="روش پرداخت")
+    description = models.TextField(blank=True, verbose_name="توضیحات")
+    
+    def __str__(self):
+        return f"{self.item.name} - {self.total_amount}"
+    
+    class Meta:
+        verbose_name = "سابقه هزینه"
+        verbose_name_plural = "سوابق هزینه‌ها"
+        ordering = ['-date']
+
 class DailyExpense(models.Model):
-    date = models.DateField()
-    category = models.CharField(max_length=50)
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    description = models.TextField(blank=True, null=True)
+    date = models.DateField(verbose_name="تاریخ")
+    category = models.ForeignKey(ExpenseCategory, on_delete=models.CASCADE, verbose_name="دسته‌بندی")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="مبلغ")
+    description = models.TextField(blank=True, verbose_name="توضیحات")
+    paid_to = models.CharField(max_length=200, blank=True, verbose_name="پرداخت به")
     
     def __str__(self):
-        return f"{self.category} – {self.amount} on {self.date}"
-
+        return f"{self.category.name} - {self.amount}"
+    
+    class Meta:
+        verbose_name = "هزینه روزانه"
+        verbose_name_plural = "هزینه‌های روزانه"
+        ordering = ['-date']

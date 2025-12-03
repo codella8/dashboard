@@ -1,9 +1,19 @@
-from django.db.models.signals import post_save
+# Minimal signals file. We don't create DailySummary/OldTransaction
+# but we keep pre_save to store old values (useful if admin edits transaction)
+from django.db.models.signals import pre_save
 from django.dispatch import receiver
-from . models import DailySaleTransaction
+from .models import DailySaleTransaction
 
-@receiver(post_save, sender=DailySaleTransaction)
-def update_daily_summary(sender, instance, created, **kwargs):
-    if created:
-        # اگر تراکنش جدید است، خلاصه روزانه را به‌روز می‌کنیم
-        instance.update_daily_summary()
+@receiver(pre_save, sender=DailySaleTransaction)
+def dst_pre_save(sender, instance, **kwargs):
+    if not instance._state.adding:
+        try:
+            old = sender.objects.get(pk=instance.pk)
+            instance._old_date = old.date
+            instance._old_customer = getattr(old, 'customer_id', None)
+        except sender.DoesNotExist:
+            instance._old_date = None
+            instance._old_customer = None
+    else:
+        instance._old_date = None
+        instance._old_customer = None

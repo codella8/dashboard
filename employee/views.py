@@ -1,143 +1,196 @@
-# employee/views.py
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.shortcuts import render
 from django.utils import timezone
-from django.http import JsonResponse, HttpResponseForbidden
 from datetime import datetime, timedelta
-
-from .models import Employee, SalaryPayment, EmployeeExpense
-from . import report
 from decimal import Decimal
-
-DEC_ZERO = Decimal("0.00")
-
-
-def _parse_date_param(val, default=None):
-    if not val:
-        return default
-    if hasattr(val, 'year'):
-        return val
-    try:
-        return datetime.fromisoformat(val).date()
-    except Exception:
-        try:
-            return datetime.strptime(val, "%Y-%m-%d").date()
-        except Exception:
-            return default
+from .models import Employee, SalaryPayment, EmployeeExpense, Department
+from .report import (
+    calculate_employee_financials,
+    get_payroll_summary,
+    get_department_stats,
+    get_employee_performance,
+    get_expense_analysis,
+    get_salary_trends,
+    get_employee_financial_status,
+    get_upcoming_salary_payments
+)
 
 
-def is_admin_user(user):
-    return user.is_active and (user.is_staff or user.is_superuser)
+def employee_dashboard(request):
+    """داشبورد مدیریت کارمندان"""
+    today = timezone.now().date()
+    
+    # آمار کلی
+    total_employees = Employee.objects.filter(is_active=True).count()
+    total_departments = Department.objects.count()
+    
+    # خلاصه حقوق‌ها
+    payroll_summary = get_payroll_summary()
+    
+    # پرداخت‌های آینده
+    upcoming_payments = get_upcoming_salary_payments(30)
+    
+    # کارمندان اخیر
+    recent_employees = Employee.objects.select_related(
+        'employee', 'employee__user', 'department'
+    ).order_by('-created_at')[:10]
+    
+    context = {
+        'total_employees': total_employees,
+        'total_departments': total_departments,
+        'payroll_summary': payroll_summary,
+        'upcoming_payments': upcoming_payments[:5],
+        'recent_employees': recent_employees,
+        'today': today,
+    }
+    return render(request, 'employee/dashboard.html', context)
 
 
-@login_required
-def employee_list_view(request):
-    """
-    List employees. If user has company on profile, only show that company's employees.
-    Shows quick aggregates per employee (DB-annotated when possible).
-    """
-    company = getattr(getattr(request.user, "profile", None), "company", None)
-    start = _parse_date_param(request.GET.get('start_date'), None)
-    end = _parse_date_param(request.GET.get('end_date'), None)
-
-    # use report.employees_overview which handles date filtering & company
-    company_id = company.id if company else None
-    employees = report.employees_overview(company_id=company_id, start_date=start, end_date=end, limit=500)
-
+def employee_list(request):
+    """لیست کارمندان"""
+    employees = Employee.objects.select_related(
+        'employee', 'employee__user', 'department'
+    ).filter(is_active=True)
+    
+    # فیلترها
+    department_id = request.GET.get('department')
+    employment_type = request.GET.get('employment_type')
+    
+    if department_id:
+        employees = employees.filter(department_id=department_id)
+    if employment_type:
+        employees = employees.filter(employment_type=employment_type)
+    
+    # محاسبات مالی برای هر کارمند
+    for employee in employees:
+        employee.financials = calculate_employee_financials(employee)
+    
+    departments = Department.objects.all()
+    
     context = {
         'employees': employees,
-        'start_date': start,
-        'end_date': end,
+        'departments': departments,
+        'filters': {
+            'department': department_id,
+            'employment_type': employment_type,
+        }
     }
-    return render(request, "employee/employee_list.html", context)
+    return render(request, 'employee/employee_list.html', context)
 
 
-@login_required
-def employee_detail_view(request, pk):
-    """
-    Detail page with full financial summary, recent payments and expenses.
-    """
-    company = getattr(getattr(request.user, "profile", None), "company", None)
-    emp = get_object_or_404(Employee.objects.select_related('employee'), pk=pk)
-    # if company-scoped user, enforce
-    if company and getattr(emp.employee, "company_id", None) != company.id:
-        return HttpResponseForbidden("Not allowed")
-
-    start = _parse_date_param(request.GET.get('start_date'), None)
-    end = _parse_date_param(request.GET.get('end_date'), None)
-
-    summary = report.employee_financial_summary(emp.pk, start_date=start, end_date=end)
-
-    payments = SalaryPayment.objects.filter(employee=emp)
-    expenses = EmployeeExpense.objects.filter(employee=emp)
-    if start:
-        payments = payments.filter(date__gte=start)
-        expenses = expenses.filter(date__gte=start)
-    if end:
-        payments = payments.filter(date__lte=end)
-        expenses = expenses.filter(date__lte=end)
-
-    payments = payments.order_by('-date')[:200]
-    expenses = expenses.order_by('-date')[:200]
-
+def payroll_report(request):
+    """گزارش حقوق و دستمزد"""
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    if not start_date:
+        start_date = timezone.now().date() - timedelta(days=30)
+    if not end_date:
+        end_date = timezone.now().date()
+    
+    # خلاصه حقوق
+    payroll_summary = get_payroll_summary(start_date, end_date)
+    
+    # پرداخت‌ها
+    salary_payments = SalaryPayment.objects.select_related(
+        'employee', 'employee__employee', 'employee__employee__user'
+    ).filter(date__range=[start_date, end_date])
+    
+    # روند حقوق
+    salary_trends = get_salary_trends('month')
+    
     context = {
-        'employee': emp,
-        'summary': summary,
-        'payments': payments,
+        'payroll_summary': payroll_summary,
+        'salary_payments': salary_payments,
+        'salary_trends': salary_trends,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'employee/payroll_report.html', context)
+
+
+def expense_report(request):
+    """گزارش هزینه‌ها"""
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    if not start_date:
+        start_date = timezone.now().date() - timedelta(days=30)
+    if not end_date:
+        end_date = timezone.now().date()
+    
+    # تحلیل هزینه‌ها
+    expense_analysis = get_expense_analysis(start_date, end_date)
+    
+    # هزینه‌های جزئی
+    expenses = EmployeeExpense.objects.select_related(
+        'employee', 'employee__employee', 'employee__employee__user'
+    ).filter(date__range=[start_date, end_date])
+    
+    context = {
+        'expense_analysis': expense_analysis,
         'expenses': expenses,
-        'start_date': start,
-        'end_date': end,
+        'start_date': start_date,
+        'end_date': end_date,
     }
-    return render(request, "employee/employee_detail.html", context)
+    return render(request, 'employee/expense_report.html', context)
 
 
-@login_required
-@user_passes_test(is_admin_user)
-def employees_financial_overview(request):
-    """
-    Admin-only overview across company (or all).
-    Returns overall totals and top owed employees.
-    """
-    company = getattr(getattr(request.user, "profile", None), "company", None)
-    start = _parse_date_param(request.GET.get('start_date'), None)
-    end = _parse_date_param(request.GET.get('end_date'), None)
-
-    company_id = company.id if company else None
-    employees = report.employees_overview(company_id=company_id, start_date=start, end_date=end, limit=1000)
-
-    # Compute global sums
-    total_scheduled = sum(e['total_scheduled'] for e in employees) or DEC_ZERO
-    total_paid = sum(e['total_paid'] for e in employees) or DEC_ZERO
-    total_unpaid = sum(e['total_unpaid'] for e in employees) or DEC_ZERO
-    total_expenses = sum(e['total_expenses'] for e in employees) or DEC_ZERO
-    total_net = sum(e['net_payable'] for e in employees) or DEC_ZERO
-
-    # top owed (sorted by net_payable desc)
-    top_owed = sorted(employees, key=lambda x: x['net_payable'], reverse=True)[:20]
-
+def financial_status(request):
+    """وضعیت مالی کارمندان"""
+    financial_status_data = get_employee_financial_status()
+    
+    # آمار کلی
+    total_salary_due = sum(item['salary_due'] for item in financial_status_data)
+    total_paid = sum(item['total_paid'] for item in financial_status_data)
+    total_balance = sum(item['net_balance'] for item in financial_status_data)
+    
     context = {
-        'employees': employees,
-        'total_scheduled': total_scheduled,
+        'financial_status_data': financial_status_data,
+        'total_salary_due': total_salary_due,
         'total_paid': total_paid,
-        'total_unpaid': total_unpaid,
-        'total_expenses': total_expenses,
-        'total_net': total_net,
-        'top_owed': top_owed,
-        'start_date': start,
-        'end_date': end,
+        'total_balance': total_balance,
     }
-    return render(request, "employee/employees_financial_overview.html", context)
+    return render(request, 'employee/financial_status.html', context)
 
 
-# JSON endpoints for dashboards / charts
-@login_required
-def employee_timeseries_api(request, pk=None):
-    """
-    Return salary payments timeseries as JSON. If pk provided returns for single employee.
-    ?days=N
-    """
-    days = int(request.GET.get('days', 30))
-    if days <= 0 or days > 3650:
-        days = 30
-    data = report.salary_payments_timeseries(employee_id=pk, days=days)
-    return JsonResponse({'status': 'success', 'series': data})
+def department_analysis(request):
+    """تحلیل دپارتمان‌ها"""
+    department_stats = get_department_stats()
+    
+    # عملکرد کارمندان
+    employee_performance = get_employee_performance()
+    
+    context = {
+        'department_stats': department_stats,
+        'employee_performance': employee_performance[:10],  # 10 کارمند برتر
+    }
+    return render(request, 'employee/department_analysis.html', context)
+
+
+def employee_detail(request, employee_id):
+    """جزئیات کارمند"""
+    from django.shortcuts import get_object_or_404
+    
+    employee = get_object_or_404(
+        Employee.objects.select_related(
+            'employee', 'employee__user', 'department'
+        ), 
+        id=employee_id
+    )
+    
+    # محاسبات مالی
+    financials = calculate_employee_financials(employee)
+    
+    # پرداخت‌های حقوق
+    salary_payments = employee.salary_payments.all().order_by('-date')
+    
+    # هزینه‌ها
+    expenses = employee.expenses.all().order_by('-date')
+    
+    context = {
+        'employee': employee,
+        'financials': financials,
+        'salary_payments': salary_payments,
+        'expenses': expenses,
+    }
+    return render(request, 'employee/employee_detail.html', context)

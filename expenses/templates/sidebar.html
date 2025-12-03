@@ -1,0 +1,69 @@
+<div class="sidebar">
+    <div class="sidebar-brand">
+        <h4>
+            <i class="fas fa-chart-pie me-2"></i>
+            سیستم هزینه‌ها
+        </h4>
+        <small class="text-muted">مدیریت مالی شرکت</small>
+    </div>
+
+    <ul class="nav nav-pills flex-column mb-auto">
+        <li class="nav-item">
+            <a href="{% url 'expenses:dashboard' %}" 
+               class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-tachometer-alt"></i>
+                داشبورد
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a href="{% url 'expenses:report' %}" 
+               class="nav-link {% if request.resolver_match.url_name == 'report' %}active{% endif %}">
+                <i class="fas fa-file-invoice"></i>
+                گزارش هزینه‌ها
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a href="{% url 'expenses:category_analysis' %}" 
+               class="nav-link {% if request.resolver_match.url_name == 'category_analysis' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i>
+                تحلیل دسته‌بندی
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a href="{% url 'expenses:financial_analysis' %}" 
+               class="nav-link {% if request.resolver_match.url_name == 'financial_analysis' %}active{% endif %}">
+                <i class="fas fa-chart-line"></i>
+                تحلیل مالی
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a href="{% url 'expenses:budget_monitoring' %}" 
+               class="nav-link {% if request.resolver_match.url_name == 'budget_monitoring' %}active{% endif %}">
+                <i class="fas fa-wallet"></i>
+                پایش بودجه
+            </a>
+        </li>
+    </ul>
+
+    <div class="mt-auto p-3">
+        <div class="card bg-dark text-white">
+            <div class="card-body text-center">
+                <small>وضعیت سیستم</small>
+                <div class="mt-2">
+                    <span class="badge bg-success">
+                        <i class="fas fa-circle me-1"></i>
+                        آنلاین
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-3">
+            <small class="text-muted">نسخه ۲.۱.۰</small>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,32 @@
+{% extends "base_generic.html" %}
+{% block content %}
+<h1>Payroll Overview</h1>
+<form method="get" class="form-inline mb-3">
+  <input type="date" name="start_date" value="{{ start_date }}" />
+  <input type="date" name="end_date" value="{{ end_date|default:today }}" />
+  <button class="btn btn-primary" type="submit">Filter</button>
+  <a href="{% url 'employee:payroll_export_csv' %}?start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-outline-secondary">Export CSV</a>
+</form>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Employee</th><th>Salary Due</th><th>Total Paid</th><th>Expenses</th><th>Outstanding</th><th>Net Liability</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><a href="{% url 'employee:employee_detail_report' r.employee.id %}">{{ r.employee.employee.user.get_full_name }}</a></td>
+        <td>{{ r.salary_due }}</td>
+        <td>{{ r.total_paid }}</td>
+        <td>{{ r.total_expenses }}</td>
+        <td>{{ r.outstanding_salary }}</td>
+        <td>{{ r.net_liability }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6">No employees found.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

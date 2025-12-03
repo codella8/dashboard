@@ -1,0 +1,26 @@
+{% extends "daily_sale/daily_sale_base.html" %}
+{% block title %}Daily Summary Report{% endblock %}
+
+{% block content %}
+<h3>Daily Summary ({{ start_date }} — {{ end_date }})</h3>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Date</th><th>Total Sales</th><th>Total Purchases</th><th>Profit</th><th>Avg Transaction</th></tr>
+  </thead>
+  <tbody>
+    {% for d in daily_data %}
+      <tr>
+        <td>{{ d.date }}</td>
+        <td>{{ d.total_sales }}</td>
+        <td>{{ d.total_purchases }}</td>
+        <td>{{ d.profit }}</td>
+        <td>{{ d.avg_transaction }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h5 class="mt-4">Period Stats</h5>
+<pre>{{ period_stats }}</pre>
+{% endblock %}

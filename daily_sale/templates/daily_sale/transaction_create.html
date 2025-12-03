@@ -1,0 +1,102 @@
+{% extends "daily_sale/daily_sale_base.html" %}
+{% block title %}Create Transaction{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h4>Create Transaction</h4>
+    <form method="post" id="tx-form">{% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-3">{{ form.date.label_tag }} {{ form.date }}</div>
+        <div class="col-md-3">{{ form.transaction_type.label_tag }} {{ form.transaction_type }}</div>
+        <div class="col-md-6">{{ form.company.label_tag }} <select id="id_company" name="company" class="form-select select2-ajax" data-ajax-url="{% url 'daily_sale:ajax_companies' %}"></select></div>
+
+        <div class="col-md-6">{{ form.customer.label_tag }} <select id="id_customer" name="customer" class="form-select select2-ajax" data-ajax-url="{% url 'daily_sale:ajax_customers' %}"></select></div>
+        <div class="col-md-6">{{ form.container.label_tag }} <select id="id_container" name="container" class="form-select select2-ajax" data-ajax-url="{% url 'daily_sale:ajax_containers' %}"></select></div>
+
+        <div class="col-md-6">{{ form.item.label_tag }} <select id="id_item" name="item" class="form-select select2-ajax" data-ajax-url="{% url 'daily_sale:ajax_items' %}"></select></div>
+
+        <div class="col-md-2">{{ form.quantity.label_tag }} {{ form.quantity }}</div>
+        <div class="col-md-2">{{ form.unit_price.label_tag }} {{ form.unit_price }}</div>
+        <div class="col-md-2">{{ form.discount.label_tag }} {{ form.discount }}</div>
+        <div class="col-md-2">{{ form.tax.label_tag }} {{ form.tax }}</div>
+        <div class="col-md-2">{{ form.advance.label_tag }} {{ form.advance }}</div>
+
+        <div class="col-12">
+          <div class="alert alert-light">
+            Preview — Subtotal: <span id="preview-subtotal">0.00</span>
+            &nbsp; Total: <span id="preview-total">0.00</span>
+            &nbsp; Balance: <span id="preview-balance">0.00</span>
+          </div>
+        </div>
+
+        <div class="col-md-12">{{ form.description.label_tag }} {{ form.description }}</div>
+        <div class="col-md-12">{{ form.note.label_tag }} {{ form.note }}</div>
+
+        <div class="col-12">
+          <button class="btn btn-primary" type="submit">Save</button>
+          <a class="btn btn-secondary" href="{% url 'daily_sale:dashboard' %}">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function initSelect2Ajax(selector) {
+  $(selector).select2({
+    theme: 'bootstrap-5',
+    ajax: {
+      url: function () { return $(this).data('ajax-url'); },
+      dataType: 'json',
+      delay: 250,
+      data: function (params) {
+        return { q: params.term, limit: 50 };
+      },
+      processResults: function (data) {
+        return { results: data.results };
+      },
+      cache: true
+    },
+    minimumInputLength: 0,
+    placeholder: 'Select or search',
+    allowClear: true,
+  });
+
+  // load initial if a value exists in hidden input (server-side initial)
+}
+
+$(function(){
+  initSelect2Ajax('#id_company');
+  initSelect2Ajax('#id_customer');
+  initSelect2Ajax('#id_container');
+  initSelect2Ajax('#id_item');
+
+  function parseVal(el){
+    var v = parseFloat($(el).val());
+    return isNaN(v) ? 0 : v;
+  }
+
+  function recompute(){
+    var q = parseVal('#id_quantity');
+    var u = parseVal('#id_unit_price');
+    var d = parseVal('#id_discount');
+    var t = parseVal('#id_tax');
+    var a = parseVal('#id_advance');
+
+    var subtotal = q * u;
+    var total = subtotal - d + t;
+    var balance = total - a;
+
+    $('#preview-subtotal').text(subtotal.toFixed(2));
+    $('#preview-total').text(total.toFixed(2));
+    $('#preview-balance').text(balance.toFixed(2));
+  }
+
+  $('#id_quantity,#id_unit_price,#id_discount,#id_tax,#id_advance').on('input', recompute);
+  recompute();
+});
+</script>
+{% endblock %}

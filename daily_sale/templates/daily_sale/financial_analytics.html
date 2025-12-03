@@ -1,0 +1,22 @@
+{% extends "daily_sale/daily_sale_base.html" %}
+{% block title %}Financial Analytics{% endblock %}
+
+{% block content %}
+<h3>Financial Analytics</h3>
+
+<h5>Monthly Series</h5>
+<pre>{{ monthly_data }}</pre>
+
+<h5 class="mt-3">Currency Breakdown</h5>
+<pre>{{ currency_analysis }}</pre>
+
+<h5 class="mt-3">Product Analysis (Top)</h5>
+<ul>
+  {% for p in product_analysis|slice:":10" %}
+    <li>{{ p.item__product_name }} — {{ p.total_amount }}</li>
+  {% empty %}
+    <li>No product data.</li>
+  {% endfor %}
+</ul>
+
+{% endblock %}

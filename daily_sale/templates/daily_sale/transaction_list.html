@@ -1,331 +1,71 @@
 {% extends "daily_sale/daily_sale_base.html" %}
-
-{% block title %} Transactions{% endblock %}
+{% block title %}Transactions Report{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Header Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="transaction-card text-white p-4">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <h1 class="h3 mb-2">📊 Smart Transactions</h1>
-                        <p class="mb-0 opacity-8">Manage and monitor all financial transactions</p>
-                    </div>
-                    <div class="col-md-4 text-md-end">
-                        <a href="{% url 'daily_sale:create_transaction' %}" class="btn btn-light btn-sm">
-                            <i class="fas fa-plus me-2"></i>New Transaction
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<h3>Transactions</h3>
 
-    <!-- Quick Stats -->
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="quick-stats-card p-3">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-0 text-muted">Total Transactions</h6>
-                        <h4 class="mb-0 text-dark">{{ quick_stats.total_count|default:0 }}</h4>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-receipt fa-2x text-primary"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="quick-stats-card p-3">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-0 text-muted">Total Amount</h6>
-                        <h4 class="mb-0 text-dark">${{ quick_stats.total_amount|default:0|floatformat:0|intcomma }}</h4>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-dollar-sign fa-2x text-success"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="quick-stats-card p-3">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-0 text-muted">Average Amount</h6>
-                        <h4 class="mb-0 text-dark">${{ quick_stats.avg_amount|default:0|floatformat:0|intcomma }}</h4>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-chart-line fa-2x text-info"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="quick-stats-card p-3">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-0 text-muted">Pending</h6>
-                        <h4 class="mb-0 text-warning">{{ quick_stats.pending_count|default:0 }}</h4>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-clock fa-2x text-warning"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<form class="row g-2 mb-3">
+  <div class="col-auto"><input type="date" name="start_date" value="{{ filters.start_date }}" class="form-control">
+  </div>
+  <div class="col-auto"><input type="date" name="end_date" value="{{ filters.end_date }}" class="form-control"></div>
+  <div class="col-auto">
+    <select name="status" class="form-select">
+      <option value="">Any status</option>
+      <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
+      <option value="paid" {% if filters.status == 'paid' %}selected{% endif %}>Paid</option>
+    </select>
+  </div>
+  <div class="col-auto"><button class="btn btn-primary">Filter</button></div>
+</form>
 
-    <!-- Filters Card -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <form method="get" class="row g-3">
-                <div class="col-md-3">
-                    <input type="text" name="q" class="form-control" placeholder="Search invoices, items..." 
-                           value="{{ filters.q }}">
-                </div>
-                <div class="col-md-2">
-                    <select name="type" class="form-select">
-                        <option value="">All Types</option>
-                        <option value="sale" {% if filters.type == 'sale' %}selected{% endif %}>Sale</option>
-                        <option value="purchase" {% if filters.type == 'purchase' %}selected{% endif %}>Purchase</option>
-                        <option value="return" {% if filters.type == 'return' %}selected{% endif %}>Return</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select name="status" class="form-select">
-                        <option value="">All Status</option>
-                        <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
-                        <option value="paid" {% if filters.status == 'paid' %}selected{% endif %}>Paid</option>
-                        <option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <input type="date" name="start_date" class="form-control" value="{{ filters.start_date }}">
-                </div>
-                <div class="col-md-2">
-                    <input type="date" name="end_date" class="form-control" value="{{ filters.end_date }}">
-                </div>
-                <div class="col-md-1">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter"></i>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+<div class="table-responsive">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Invoice</th>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Customer</th>
+        <th>Item</th>
+        <th>Total</th>
+        <th>Balance</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in transactions %}
+      <tr>
+        <td>{{ t.invoice_number }}</td>
+        <td>{{ t.date }}</td>
+        <td>{{ t.get_transaction_type_display }}</td>
+        <td>
+          {% if t.customer %}
+          {{ t.customer.user.get_full_name|default:t.customer }}
+          {% else %}
+          -
+          {% endif %}
+        </td>
+        <td>
+          {% if t.item %}
+          {{ t.item.product_name }}
+          {% else %}
+          -
+          {% endif %}
+        </td>
+        <td>{{ t.total_amount }}</td>
+        <td>{{ t.balance }}</td>
+        <td>{{ t.status }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8">No transactions found.</td>
+      </tr>
+      {% endfor %}
 
-    <!-- Alerts Section -->
-    {% if alerts %}
-    <div class="row mb-4">
-        <div class="col-12">
-            {% for alert in alerts %}
-            <div class="alert alert-{{ alert.type }} alert-dismissible fade show">
-                <i class="fas fa-{% if alert.type == 'danger' %}exclamation-triangle{% elif alert.type == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
-                {{ alert.message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Transactions Table -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white py-3">
-            <div class="row align-items-center">
-                <div class="col">
-                    <h5 class="mb-0">Transaction Records</h5>
-                </div>
-                <div class="col-auto">
-                    <form method="get" class="d-inline">
-                        <select name="page_size" class="form-select form-select-sm" onchange="this.form.submit()">
-                            <option value="25" {% if filters.page_size == 25 %}selected{% endif %}>25 per page</option>
-                            <option value="50" {% if filters.page_size == 50 %}selected{% endif %}>50 per page</option>
-                            <option value="100" {% if filters.page_size == 100 %}selected{% endif %}>100 per page</option>
-                        </select>
-                    </form>
-                </div>
-            </div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th width="50">
-                                <input type="checkbox" id="select-all">
-                            </th>
-                            <th>Invoice #</th>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Customer</th>
-                            <th>Item</th>
-                            <th>Qty</th>
-                            <th>Total Amount</th>
-                            <th>Balance</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for transaction in transactions %}
-                        <tr>
-                            <td>
-                                <input type="checkbox" name="transaction_ids" value="{{ transaction.id }}" class="transaction-checkbox">
-                            </td>
-                            <td>
-                                <strong>{{ transaction.invoice_number }}</strong>
-                            </td>
-                            <td>{{ transaction.date|date:"M d, Y" }}</td>
-                            <td>
-                                {% if transaction.transaction_type == 'sale' %}
-                                <span class="type-badge bg-success text-white">Sale</span>
-                                {% elif transaction.transaction_type == 'purchase' %}
-                                <span class="type-badge bg-primary text-white">Purchase</span>
-                                {% else %}
-                                <span class="type-badge bg-warning text-dark">Return</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if transaction.customer %}
-                                {{ transaction.customer.full_name|default:transaction.customer.user.username }}
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if transaction.item %}
-                                {{ transaction.item.product_name }}
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ transaction.quantity }}</td>
-                            <td>
-                                <strong>${{ transaction.total_amount|floatformat:0|intcomma }}</strong>
-                                <small class="currency-badge badge ms-1">{{ transaction.currency|upper }}</small>
-                            </td>
-                            <td>
-                                {% if transaction.balance > 0 %}
-                                <span class="text-danger">${{ transaction.balance|floatformat:0|intcomma }}</span>
-                                {% else %}
-                                <span class="text-success">$0</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if transaction.status == 'paid' %}
-                                <span class="status-badge bg-success text-white">Paid</span>
-                                {% elif transaction.status == 'pending' %}
-                                <span class="status-badge bg-warning text-dark">Pending</span>
-                                {% else %}
-                                <span class="status-badge bg-danger text-white">Cancelled</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'daily_sale:edit_transaction' transaction.id %}" 
-                                       class="btn btn-outline-primary">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <a href="{% url 'daily_sale:delete_transaction' transaction.id %}" 
-                                       class="btn btn-outline-danger">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="11" class="text-center py-4">
-                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                <h5 class="text-muted">No transactions found</h5>
-                                <p class="text-muted">Create your first transaction to get started</p>
-                                <a href="{% url 'daily_sale:create_transaction' %}" class="btn btn-primary">
-                                    <i class="fas fa-plus me-2"></i>Create Transaction
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        
-        <!-- Bulk Actions & Pagination -->
-        <div class="card-footer bg-white">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <form method="post" action="{% url 'daily_sale:bulk_action' %}" id="bulk-action-form">
-                        {% csrf_token %}
-                        <div class="btn-group">
-                            <select name="action" class="form-select form-select-sm" style="width: auto;">
-                                <option value="">Bulk Actions</option>
-                                <option value="mark_paid">Mark as Paid</option>
-                                <option value="recalculate">Recalculate</option>
-                                <option value="delete">Delete Selected</option>
-                            </select>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply</button>
-                        </div>
-                    </form>
-                </div>
-                <div class="col-md-6">
-                    {% if transactions.has_other_pages %}
-                    <nav aria-label="Transaction pagination">
-                        <ul class="pagination justify-content-end mb-0">
-                            {% if transactions.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ transactions.previous_page_number }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Previous</a>
-                            </li>
-                            {% endif %}
-                            
-                            {% for i in transactions.paginator.page_range %}
-                            {% if transactions.number == i %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ i }}</span>
-                            </li>
-                            {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ i }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ i }}</a>
-                            </li>
-                            {% endif %}
-                            {% endfor %}
-                            
-                            {% if transactions.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ transactions.next_page_number }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Next</a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
+    </tbody>
+  </table>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-// Select All Checkbox
-document.getElementById('select-all').addEventListener('change', function() {
-    const checkboxes = document.querySelectorAll('.transaction-checkbox');
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = this.checked;
-    });
-});
-
-// Bulk Action Form
-document.getElementById('bulk-action-form').addEventListener('submit', function(e) {
-    const selected = document.querySelectorAll('.transaction-checkbox:checked');
-    if (selected.length === 0) {
-        e.preventDefault();
-        alert('Please select at least one transaction.');
-    }
-});
-</script>
+<h5 class="mt-4">Summary</h5>
+<pre>{{ summary }}</pre>
 {% endblock %}

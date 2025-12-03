@@ -1,19 +1,26 @@
+# financial/admin.py
 from django.contrib import admin
+from .models import Account, Category, CashTransaction
 
-from django.contrib import admin
-from .models import ExchangeOffice, ExchangeTransaction
+@admin.register(Account)
+class AccountAdmin(admin.ModelAdmin):
+    list_display = ("name", "code", "is_active", "created_at")
+    search_fields = ("name", "code")
+    list_filter = ("is_active",)
+    ordering = ("name",)
 
-@admin.register(ExchangeOffice)
-class ExchangeOfficeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'location']
-    search_fields = ['name', 'location']
-    ordering = ['name']
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_income")
+    search_fields = ("name",)
+    list_filter = ("is_income",)
 
-@admin.register(ExchangeTransaction)
-class ExchangeTransactionAdmin(admin.ModelAdmin):
-    list_display = ['date', 'direction', 'amount', 'exchange_office', 'container_no']
-    list_filter = ['date', 'direction', 'exchange_office']
-    search_fields = ['container_no', 'exchange_office__name']
-    date_hierarchy = 'date'
-    ordering = ['-date']
-
+@admin.register(CashTransaction)
+class CashTransactionAdmin(admin.ModelAdmin):
+    list_display = ("date", "account", "direction", "amount", "currency", "category", "company", "profile", "reference")
+    list_filter = ("direction", "account", "category", "currency", "date")
+    search_fields = ("reference", "note", "company__name", "profile__user__username")
+    date_hierarchy = "date"
+    ordering = ("-date", "-created_at")
+    readonly_fields = ("created_at",)
+    list_per_page = 50
