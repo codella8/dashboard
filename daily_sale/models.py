@@ -1,82 +1,46 @@
-# daily_sale/models.py
 from uuid import uuid4
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
 from django.core.validators import MinValueValidator
 
-# روابط به اپ‌های دیگر — مسیرها را در صورت نیاز تنظیم کن
+# external models (adjust import paths if your project differs)
 from accounts.models import UserProfile, Company
 from containers.models import Inventory_List, Container
 
 
 class DailySaleTransaction(models.Model):
-    """Single sale/purchase transaction — core."""
-    TRANSACTION_TYPES = [
-        ("sale", "Sale"),
-        ("purchase", "Purchase"),
-    ]
-
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('paid', 'Paid'),
-        ('cancelled', 'Cancelled'),
-    ]
-
-    CURRENCY_CHOICES = [
-        ('usd', 'USD'),
-        ('eur', 'EUR'),
-        ('aed', 'AED'),
-    ]
+    """Core transaction record."""
+    TRANSACTION_TYPES = [("sale", "Sale"), ("purchase", "Purchase")]
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     invoice_number = models.CharField(max_length=64, unique=True, blank=True, db_index=True)
     date = models.DateField(default=timezone.now, db_index=True)
-    transaction_type = models.CharField(max_length=16, choices=TRANSACTION_TYPES, default='sale')
+    due_date = models.DateField(null=True, blank=True)
+    transaction_type = models.CharField(max_length=16, choices=TRANSACTION_TYPES, default="sale")
 
-    # related_name های اختصاصی تا با مدل‌های دیگر clash نکنند
-    item = models.ForeignKey(
-        Inventory_List,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='daily_transactions_for_item'
-    )
-    container = models.ForeignKey(
-        Container,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='daily_transactions_for_container'
-    )
-    customer = models.ForeignKey(
-        UserProfile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='daily_transactions_for_customer'
-    )
-    company = models.ForeignKey(
-        Company,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='daily_transactions_for_company'
-    )
+    item = models.ForeignKey(Inventory_List, on_delete=models.SET_NULL, null=True, blank=True, related_name="daily_transactions")
+    container = models.ForeignKey(Container, on_delete=models.SET_NULL, null=True, blank=True, related_name="daily_transactions")
+    customer = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name="daily_transactions")
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="daily_transactions")
 
     quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
-    unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
-    discount = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
-    tax = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
-    advance = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('0.00'))
+    unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
+    discount = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
+    tax = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0"))
+    advance = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
+    paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # فیلد پرداخت شده
+    payment_status = models.CharField(
+        max_length=20,
+        choices=[('unpaid', 'Unpaid'), ('partial', 'Partial'), ('paid', 'Paid')],
+        default='unpaid'
+    )
 
-    subtotal = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal('0.00'))
-    total_amount = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal('0.00'))
-    balance = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal('0.00'))
-
-    currency = models.CharField(max_length=8, choices=CURRENCY_CHOICES, default='usd')
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    subtotal = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    tax_amount = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    total_amount = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    balance = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
 
     description = models.CharField(max_length=255, blank=True)
     note = models.TextField(blank=True)
@@ -88,54 +52,105 @@ class DailySaleTransaction(models.Model):
     class Meta:
         verbose_name = "Daily Sale Transaction"
         verbose_name_plural = "Daily Sale Transactions"
-        ordering = ['-date', '-created_at']
+        ordering = ["-date", "-created_at"]
         indexes = [
-            models.Index(fields=['date']),
-            models.Index(fields=['status']),
-            models.Index(fields=['transaction_type']),
-            models.Index(fields=['customer']),
+            models.Index(fields=["date"]),
+            models.Index(fields=["transaction_type"]),
+            models.Index(fields=["customer"]),
         ]
 
     def __str__(self):
-        return f"{self.invoice_number or 'INV'} - {self.transaction_type} - {self.total_amount}"
-
-    def recalc_financials(self):
-        qty = Decimal(self.quantity or 0)
-        unit = Decimal(self.unit_price or Decimal('0.00'))
-        discount = Decimal(self.discount or Decimal('0.00'))
-        tax = Decimal(self.tax or Decimal('0.00'))
-        advance = Decimal(self.advance or Decimal('0.00'))
-
-        subtotal = qty * unit
-        total = subtotal - discount + tax
-        balance = total - advance
-
-        return {
-            'subtotal': subtotal.quantize(Decimal('0.01')),
-            'total_amount': total.quantize(Decimal('0.01')),
-            'balance': balance.quantize(Decimal('0.01')),
-        }
+        return f"{self.invoice_number or 'INV'} | {self.date} | {self.total_amount}"
 
     def save(self, *args, **kwargs):
-        # compute financials before save
-        fin = self.recalc_financials()
-        self.subtotal = fin['subtotal']
-        self.total_amount = fin['total_amount']
-        self.balance = fin['balance']
+        """Override save to calculate with HIGH PRECISION"""
+        # 1. محاسبه Subtotal
+        self.subtotal = (Decimal(self.quantity) * Decimal(self.unit_price)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        
+        # 2. محاسبه مبلغ قابل مالیات (بعد از تخفیف)
+        taxable_amount = (self.subtotal - Decimal(self.discount)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        if taxable_amount < Decimal("0"):
+            taxable_amount = Decimal("0")
+        
+        # 3. محاسبه دقیق مالیات - روی مبلغ قابل مالیات
+        tax_rate = Decimal(self.tax) / Decimal("100")
+        self.tax_amount = (taxable_amount * tax_rate).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        
+        # 4. محاسبه مبلغ کل
+        self.total_amount = (taxable_amount + self.tax_amount).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        
+        # 5. محاسبه باقیمانده
+        self.balance = (
+            self.total_amount - Decimal(self.advance) - Decimal(self.paid)
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-        # generate invoice number if missing: INV-YYYYMMDD-0001
-        if not self.invoice_number:
-            date_str = (self.date or timezone.now().date()).strftime('%Y%m%d')
-            prefix = f"INV-{date_str}"
-            last = DailySaleTransaction.objects.filter(invoice_number__startswith=prefix).order_by('-invoice_number').first()
-            if last and last.invoice_number:
-                try:
-                    last_num = int(last.invoice_number.split('-')[-1])
-                    new_num = last_num + 1
-                except Exception:
-                    new_num = 1
-            else:
-                new_num = 1
-            self.invoice_number = f"{prefix}-{new_num:04d}"
+        # وضعیت پرداخت
+        if self.balance <= Decimal("0"):
+            self.payment_status = "paid"
+        elif Decimal(self.advance) > Decimal("0") or Decimal(self.paid) > Decimal("0"):
+            self.payment_status = "partial"
+        else:
+            self.payment_status = "unpaid"
 
         super().save(*args, **kwargs)
+
+class Payment(models.Model):
+    """Payments for a transaction (partial allowed)."""
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    transaction = models.ForeignKey(DailySaleTransaction, on_delete=models.CASCADE, related_name="payments")
+    amount = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    date = models.DateField(default=timezone.now)
+    method = models.CharField(max_length=64, blank=True)
+    note = models.TextField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.transaction.invoice_number} - {self.amount}"
+
+
+class DailySummary(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    date = models.DateField(unique=True, db_index=True)
+    total_sales = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    total_purchases = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    total_profit = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    net_balance = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    transactions_count = models.PositiveIntegerField(default=0)
+    items_sold = models.PositiveIntegerField(default=0)
+    customers_count = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_final = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"Daily Summary {self.date}"
+
+
+class OutstandingCustomer(models.Model):
+    customer = models.OneToOneField(UserProfile, on_delete=models.CASCADE, related_name="outstanding")
+    total_debt = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    transactions_count = models.PositiveIntegerField(default=0)
+    last_transaction = models.DateField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-total_debt"]
+
+    def __str__(self):
+        return f"{getattr(self.customer, 'user', self.customer)} - {self.total_debt}"
+
+

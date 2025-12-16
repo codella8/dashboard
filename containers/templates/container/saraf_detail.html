@@ -1,56 +1,212 @@
 {% extends 'container/container_base.html' %}
-{% block title %}صراف — {{ saraf.user.get_full_name|default:saraf.user }}{% endblock %}
-{% block content %}
-<div class="mb-3 d-flex justify-content-between align-items-center">
-  <div>
-    <h4>{{ saraf.user.get_full_name|default:saraf.user }}</h4>
-    <p class="text-muted small">شناسه: {{ saraf.id }}</p>
-  </div>
-  <div class="text-right">
-    <a href="{% url 'containers:saraf_transactions' saraf.id %}" class="btn btn-outline-primary">مشاهده تراکنش‌ها</a>
-  </div>
-</div>
+{% block title %}Saraf — {{ saraf.user.get_full_name|default:saraf.user }}{% endblock %}
 
-<div class="row">
-  <div class="col-md-4">
-    <div class="card mb-3">
-      <div class="card-body">
-        <h6 class="card-title">خلاصه</h6>
-        <p><strong>مجموع دریافت:</strong> {{ saraf.transactions.aggregate_sum.received|default: saraf.transactions.aggregate(received=Sum('received_from_saraf')).received|default:0 }}</p>
-        <p><strong>مجموع پرداخت:</strong> {{ saraf.transactions.aggregate_sum.paid|default: saraf.transactions.aggregate(paid=Sum('paid_by_company')).paid|default:0 }}</p>
-        <p><strong>مانده:</strong> {{ saraf.transactions.aggregate(received=Sum('received_from_saraf'))|default:0 }}</p>
+{% block content %}
+<div class="saraf-detail-page">
+  <div class="container">
+    <div class="content-wrapper">
+      <!-- Header Section -->
+      <div class="page-header">
+        <div class="header-content">
+          <div class="header-left">
+            <h1>{{ saraf.user.get_full_name|default:saraf.user }}</h1>
+            <p class="text-muted">ID: {{ saraf.id }}</p>
+          </div>
+          <div class="header-right">
+            <a href="{% url 'containers:saraf_transactions' saraf.id %}" class="btn btn-primary">
+              View Transactions
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="cards-grid">
+        <div class="summary-card">
+          <div class="card-content">
+            <h3>Summary</h3>
+            <div class="summary-items">
+              <div class="summary-item">
+                <span class="label">Total Received:</span>
+                <span class="value value-positive">
+                  {{ saraf.transactions.aggregate_sum.received|default:
+                  saraf.transactions.aggregate(received=Sum('received_from_saraf')).received|default:0 }}
+                </span>
+              </div>
+              <div class="summary-item">
+                <span class="label">Total Paid:</span>
+                <span class="value value-negative">
+                  {{ saraf.transactions.aggregate_sum.paid|default:
+                  saraf.transactions.aggregate(paid=Sum('paid_by_company')).paid|default:0 }}
+                </span>
+              </div>
+              <div class="summary-item">
+                <span class="label">Balance:</span>
+                <span class="value value-balance">
+                  {{ saraf.transactions.aggregate(received=Sum('received_from_saraf'))|default:0 }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="table-section">
+        <div class="section-header">
+          <h2>Recent Transactions</h2>
+        </div>
+
+        <div class="table-container">
+          <table class="table">
+            <thead class="table-header">
+              <tr>
+                <th>Date</th>
+                <th>Container</th>
+                <th>Received</th>
+                <th>Paid</th>
+                <th>Balance</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody class="table-body">
+              {% for tx in transactions %}
+              <tr>
+                <td>{{ tx.transaction_time|date:"Y-m-d H:i" }}</td>
+                <td>
+                  {% if tx.container %}
+                  <span class="container-link">{{ tx.container.container_number }}</span>
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="value-badge positive">
+                    {{ tx.received_from_saraf|floatformat:2 }}
+                  </span>
+                </td>
+                <td>
+                  <span class="value-badge negative">
+                    {{ tx.paid_by_company|floatformat:2 }}
+                  </span>
+                </td>
+                <td>
+                  <span class="value-badge neutral">
+                    {{ tx.balance|floatformat:2 }}
+                  </span>
+                </td>
+                <td>
+                  <a href="{% url 'containers:saraf_transaction_detail' tx.id %}" class="btn btn-sm btn-outline">
+                    Details
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6">
+                  <div class="empty-state">
+                    <span class="empty-state-icon">📭</span>
+                    <p>No transactions found</p>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
-
-  <div class="col-md-8">
-    <h5>آخرین تراکنش‌ها</h5>
-    <table class="table table-sm">
-      <thead>
-        <tr>
-          <th>تاریخ</th>
-          <th>کانتینر</th>
-          <th>دریافت</th>
-          <th>پرداخت</th>
-          <th>باقی‌مانده</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for tx in transactions %}
-        <tr>
-          <td>{{ tx.transaction_time|date:"Y-m-d H:i" }}</td>
-          <td>{{ tx.container.container_number if tx.container else "-" }}</td>
-          <td>{{ tx.received_from_saraf|floatformat:2 }}</td>
-          <td>{{ tx.paid_by_company|floatformat:2 }}</td>
-          <td>{{ tx.balance|floatformat:2 }}</td>
-          <td><a href="{% url 'containers:saraf_transaction_detail' tx.id %}" class="btn btn-sm btn-outline-secondary">جزئیات</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="6" class="text-center">تراکنشی یافت نشد</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
 </div>
+
+<!-- JavaScript -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Hover effects for table rows
+    const tableRows = document.querySelectorAll('.table-body tr');
+
+    tableRows.forEach(row => {
+      row.addEventListener('mouseenter', function () {
+        requestAnimationFrame(() => {
+          this.style.backgroundColor = '#f8fafc';
+        });
+      });
+
+      row.addEventListener('mouseleave', function () {
+        requestAnimationFrame(() => {
+          this.style.backgroundColor = '';
+        });
+      });
+    });
+
+    // Button loading states
+    document.querySelectorAll('.btn').forEach(btn => {
+      btn.addEventListener('click', function (e) {
+        if (this.getAttribute('href') === '#') {
+          e.preventDefault();
+          // Add loading state
+          const originalHTML = this.innerHTML;
+          this.innerHTML = '<span class="loading-spinner"></span> Loading...';
+          this.style.opacity = '0.7';
+          this.style.pointerEvents = 'none';
+
+          // Reset after 2 seconds (for demo)
+          setTimeout(() => {
+            this.innerHTML = originalHTML;
+            this.style.opacity = '';
+            this.style.pointerEvents = '';
+          }, 2000);
+        }
+      });
+    });
+
+    // Format currency values
+    document.querySelectorAll('.value').forEach(value => {
+      const text = value.textContent.trim();
+      if (text && !isNaN(parseFloat(text))) {
+        const num = parseFloat(text);
+        value.textContent = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(num);
+      }
+    });
+
+    // Add click effect to container links
+    document.querySelectorAll('.container-link').forEach(link => {
+      link.style.cursor = 'pointer';
+      link.addEventListener('click', function () {
+        alert('Container details would open here');
+      });
+    });
+  });
+
+  // Quick filter functionality
+  function filterTransactions(type) {
+    const rows = document.querySelectorAll('.table-body tr');
+    rows.forEach(row => {
+      if (row.querySelector('.empty-state')) return;
+
+      const received = parseFloat(row.cells[2].textContent) || 0;
+      const paid = parseFloat(row.cells[3].textContent) || 0;
+
+      let show = true;
+      switch (type) {
+        case 'received':
+          show = received > 0;
+          break;
+        case 'paid':
+          show = paid > 0;
+          break;
+        case 'both':
+          show = received > 0 && paid > 0;
+          break;
+      }
+
+      row.style.display = show ? '' : 'none';
+    });
+  }
+</script>
 {% endblock %}

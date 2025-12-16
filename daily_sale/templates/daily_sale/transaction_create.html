@@ -1,102 +1,342 @@
 {% extends "daily_sale/daily_sale_base.html" %}
-{% block title %}Create Transaction{% endblock %}
+{% load static %}
+
+{% block title %}Create New Transaction{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div class="card-body">
-    <h4>Create Transaction</h4>
-    <form method="post" id="tx-form">{% csrf_token %}
-      <div class="row g-3">
-        <div class="col-md-3">{{ form.date.label_tag }} {{ form.date }}</div>
-        <div class="col-md-3">{{ form.transaction_type.label_tag }} {{ form.transaction_type }}</div>
-        <div class="col-md-6">{{ form.company.label_tag }} <select id="id_company" name="company" class="form-select select2-ajax" data-ajax-url="{% url 'daily_sale:ajax_companies' %}"></select></div>
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="bi bi-plus-circle me-2"></i>Create New Transaction
+        </h1>
+        <a href="{% url 'daily_sale:transaction_list' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
 
-        <div class="col-md-6">{{ form.customer.label_tag }} <select id="id_customer" name="customer" class="form-select select2-ajax" data-ajax-url="{% url 'daily_sale:ajax_customers' %}"></select></div>
-        <div class="col-md-6">{{ form.container.label_tag }} <select id="id_container" name="container" class="form-select select2-ajax" data-ajax-url="{% url 'daily_sale:ajax_containers' %}"></select></div>
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
 
-        <div class="col-md-6">{{ form.item.label_tag }} <select id="id_item" name="item" class="form-select select2-ajax" data-ajax-url="{% url 'daily_sale:ajax_items' %}"></select></div>
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-primary text-white">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="bi bi-receipt me-2"></i>Transaction Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="tx-form">
+                        {% csrf_token %}
 
-        <div class="col-md-2">{{ form.quantity.label_tag }} {{ form.quantity }}</div>
-        <div class="col-md-2">{{ form.unit_price.label_tag }} {{ form.unit_price }}</div>
-        <div class="col-md-2">{{ form.discount.label_tag }} {{ form.discount }}</div>
-        <div class="col-md-2">{{ form.tax.label_tag }} {{ form.tax }}</div>
-        <div class="col-md-2">{{ form.advance.label_tag }} {{ form.advance }}</div>
+                        <div class="row g-3">
+                            <!-- Basic Fields -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Invoice Number</label>
+                                {{ form.invoice_number }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Date</label>
+                                {{ form.date }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Due Date</label>
+                                {{ form.due_date }}
+                            </div>
 
-        <div class="col-12">
-          <div class="alert alert-light">
-            Preview — Subtotal: <span id="preview-subtotal">0.00</span>
-            &nbsp; Total: <span id="preview-total">0.00</span>
-            &nbsp; Balance: <span id="preview-balance">0.00</span>
-          </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Transaction Type</label>
+                                {{ form.transaction_type }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Company</label>
+                                {{ form.company }}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Customer</label>
+                                {{ form.customer }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Container</label>
+                                {{ form.container }}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Item</label>
+                                {{ form.item }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Description</label>
+                                {{ form.description }}
+                            </div>
+
+                            <!-- Numerical Values -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Quantity</label>
+                                {{ form.quantity }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Unit Price</label>
+                                {{ form.unit_price }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Advance Payment</label>
+                                {{ form.advance }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Discount</label>
+                                {{ form.discount }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Tax %</label>
+                                {{ form.tax }}
+                                <small class="text-muted"></small>
+                                {% if form.tax.errors %}
+                                <div class="text-danger">{{ form.tax.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label fw-bold">Notes</label>
+                                {{ form.note }}
+                            </div>
+
+
+                            <!-- Action Buttons -->
+                            <div class="col-12 mt-4">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-save me-2"></i>Save Transaction
+                                </button>
+                                <button type="button" class="btn btn-info ms-2" onclick="calculate()">
+                                    <i class="bi bi-calculator me-1"></i> Calculate
+                                </button>
+                                <a href="{% url 'daily_sale:transaction_list' %}"
+                                    class="btn btn-secondary ms-2">Cancel</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
-        <div class="col-md-12">{{ form.description.label_tag }} {{ form.description }}</div>
-        <div class="col-md-12">{{ form.note.label_tag }} {{ form.note }}</div>
-
-        <div class="col-12">
-          <button class="btn btn-primary" type="submit">Save</button>
-          <a class="btn btn-secondary" href="{% url 'daily_sale:dashboard' %}">Cancel</a>
+        <!-- Right Column - Preview -->
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-success text-white">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="bi bi-calculator me-2"></i>Amounts Preview
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="p-3 border rounded bg-light">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Subtotal:</span>
+                            <span id="preview-subtotal" class="fw-bold">0 AED</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Discount:</span>
+                            <span id="preview-discount" class="text-danger">0 AED</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Tax:</span>
+                            <span id="preview-tax" class="text-info">0 AED</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="fw-bold">Total Amount:</span>
+                            <span id="preview-total" class="fw-bold text-success fs-5">0 AED</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Advance:</span>
+                            <span id="preview-advance" class="text-warning">0 AED</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">Balance:</span>
+                            <span id="preview-balance" class="fw-bold fs-5">0 AED</span>
+                        </div>
+                        <div class="mt-2 text-center">
+                            <span id="payment-status" class="badge bg-danger">Unpaid</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </form>
-  </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-function initSelect2Ajax(selector) {
-  $(selector).select2({
-    theme: 'bootstrap-5',
-    ajax: {
-      url: function () { return $(this).data('ajax-url'); },
-      dataType: 'json',
-      delay: 250,
-      data: function (params) {
-        return { q: params.term, limit: 50 };
-      },
-      processResults: function (data) {
-        return { results: data.results };
-      },
-      cache: true
-    },
-    minimumInputLength: 0,
-    placeholder: 'Select or search',
-    allowClear: true,
-  });
+    $(document).ready(function () {
+        // AJAX URLs - Matching Your Views
+        const ajaxUrls = {
+            containers: "{% url 'daily_sale:ajax_containers' %}",
+            items: "{% url 'daily_sale:ajax_items' %}",
+            companies: "{% url 'daily_sale:ajax_companies' %}",
+            customers: "{% url 'daily_sale:ajax_customers' %}",
+        };
 
-  // load initial if a value exists in hidden input (server-side initial)
-}
+        // Main Select2 AJAX Function - Exactly Like Your Code
+        function initSelect2(fieldId, url, placeholder) {
+            $(fieldId).select2({
+                theme: 'bootstrap-5',
+                placeholder: placeholder || 'Search...',
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: url,
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return {
+                            q: params.term || '',
+                            page: params.page || 1
+                        };
+                    },
+                    processResults: function (data, params) {
+                        return {
+                            results: data.results || [],
+                            pagination: {
+                                more: (params.page * 30) < (data.count || 0)
+                            }
+                        };
+                    },
+                    cache: true
+                },
+                minimumInputLength: 0
+            });
 
-$(function(){
-  initSelect2Ajax('#id_company');
-  initSelect2Ajax('#id_customer');
-  initSelect2Ajax('#id_container');
-  initSelect2Ajax('#id_item');
+            // Show All Items When Select2 Opens with No Input
+            $(fieldId).on('select2:open', function () {
+                var $search = $('.select2-search__field');
+                if ($search.val() === '') {
+                    setTimeout(function () {
+                        $search.trigger('input');
+                    }, 100);
+                }
+            });
+        }
 
-  function parseVal(el){
-    var v = parseFloat($(el).val());
-    return isNaN(v) ? 0 : v;
-  }
+        // Initialize Select2 for All Fields
+        initSelect2('#id_company', ajaxUrls.companies, 'Search Company...');
+        initSelect2('#id_customer', ajaxUrls.customers, 'Search Customer...');
+        initSelect2('#id_container', ajaxUrls.containers, 'Search Container...');
+        initSelect2('#id_item', ajaxUrls.items, 'Search Item...');
 
-  function recompute(){
-    var q = parseVal('#id_quantity');
-    var u = parseVal('#id_unit_price');
-    var d = parseVal('#id_discount');
-    var t = parseVal('#id_tax');
-    var a = parseVal('#id_advance');
+        // Calculate Amounts
+        // در فایل transaction_create.html فقط تابع calculate را اصلاح کنید:
 
-    var subtotal = q * u;
-    var total = subtotal - d + t;
-    var balance = total - a;
+        // Calculate Amounts - FIXED TAX CALCULATION
+        window.calculate = function () {
+            var q = parseFloat($('#id_quantity').val()) || 1;
+            var unit = parseFloat($('#id_unit_price').val()) || 0;
+            var d = parseFloat($('#id_discount').val()) || 0;
+            var t = parseFloat($('#id_tax').val()) || 0; // درصد مالیات
+            var a = parseFloat($('#id_advance').val()) || 0;
 
-    $('#preview-subtotal').text(subtotal.toFixed(2));
-    $('#preview-total').text(total.toFixed(2));
-    $('#preview-balance').text(balance.toFixed(2));
-  }
+            // 1. محاسبه Subtotal
+            var subtotal = q * unit;
 
-  $('#id_quantity,#id_unit_price,#id_discount,#id_tax,#id_advance').on('input', recompute);
-  recompute();
-});
+            // 2. محاسبه مبلغ قابل مالیات (بعد از تخفیف)
+            var taxableAmount = subtotal - d;
+            if (taxableAmount < 0) taxableAmount = 0;
+
+            // 3. محاسبه مالیات روی مبلغ قابل مالیات - دقیق مثل ماشین حساب
+            var taxAmount = (taxableAmount * t) / 100;
+
+            // 4. محاسبه مبلغ کل
+            var total = taxableAmount + taxAmount;
+
+            // 5. محاسبه باقیمانده
+            var balance = total - a;
+
+            // نمایش با 2 رقم اعشار
+            $('#preview-subtotal').text(subtotal.toFixed(2) + ' AED');
+            $('#preview-discount').text(d.toFixed(2) + ' AED');
+            $('#preview-tax').text(taxAmount.toFixed(2) + ' AED');
+            $('#preview-total').text(total.toFixed(2) + ' AED');
+            $('#preview-advance').text(a.toFixed(2) + ' AED');
+            $('#preview-balance').text(balance.toFixed(2) + ' AED');
+
+            // لاگ برای دیباگ
+            console.log("=== TAX CALCULATION DEBUG ===");
+            console.log("Quantity:", q, "Unit Price:", unit);
+            console.log("Subtotal:", q, "×", unit, "=", subtotal);
+            console.log("After Discount:", subtotal, "-", d, "=", taxableAmount);
+            console.log("Tax (" + t + "%):", taxableAmount, "×", t + "% =", taxAmount);
+            console.log("Total:", taxableAmount, "+", taxAmount, "=", total);
+            console.log("Balance:", total, "-", a, "=", balance);
+
+            // وضعیت پرداخت
+            var status = 'Unpaid';
+            var statusClass = 'bg-danger';
+
+            if (a >= total && total > 0) {
+                status = 'Paid';
+                statusClass = 'bg-success';
+            } else if (a > 0) {
+                status = 'Partial';
+                statusClass = 'bg-warning';
+            }
+
+            $('#payment-status')
+                .removeClass('bg-danger bg-warning bg-success')
+                .addClass(statusClass)
+                .text(status);
+        };
+
+        // Auto Calculation
+        $('#id_quantity, #id_unit_price, #id_discount, #id_tax, #id_advance').on('input', calculate);
+
+        // Today's Date
+        var today = new Date().toISOString().split('T')[0];
+        if (!$('#id_date').val()) {
+            $('#id_date').val(today);
+        }
+
+        // Due Date 30 Days Later
+        var dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 30);
+        var dueDateStr = dueDate.toISOString().split('T')[0];
+        if (!$('#id_due_date').val()) {
+            $('#id_due_date').val(dueDateStr);
+        }
+
+        // Form Validation
+        $('#tx-form').on('submit', function (e) {
+            var isValid = true;
+            var errors = [];
+
+            if (!$('#id_transaction_type').val()) {
+                errors.push('Transaction type is required');
+                isValid = false;
+            }
+            if (!$('#id_company').val()) {
+                errors.push('Company is required');
+                isValid = false;
+            }
+            if (!$('#id_item').val()) {
+                errors.push('Item is required');
+                isValid = false;
+            }
+
+            if (!isValid) {
+                e.preventDefault();
+                alert('Please fill required fields:\n\n' + errors.join('\n'));
+            }
+        });
+
+        // Initial Calculation
+        calculate();
+    });
 </script>
 {% endblock %}

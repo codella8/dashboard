@@ -1,39 +1,479 @@
 {% extends 'container/container_base.html' %}
-{% block title %}لیست صراف‌ها{% endblock %}
+{% block title %}Sarafs Management{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>صراف‌ها</h3>
+
+<div class="sarafs-page">
+  <!-- Loading Skeleton -->
+  <div class="loading-skeleton" id="loadingSkeleton">
+    <div class="skeleton-header"></div>
+    <div class="skeleton-stats">
+      <div class="skeleton-stat"></div>
+      <div class="skeleton-stat"></div>
+      <div class="skeleton-stat"></div>
+      <div class="skeleton-stat"></div>
+    </div>
+    <div class="skeleton-table">
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+    </div>
+  </div>
+
+  <div class="container" id="mainContent" style="display: none;">
+    <div class="content-wrapper">
+
+      <!-- Header -->
+      <div class="page-header">
+        <div class="header-main">
+          <h1 class="page-title">Sarafs</h1>
+          <p class="page-subtitle">Financial accounts management</p>
+        </div>
+        <div class="header-actions">
+          <button class="action-btn export-btn" onclick="exportData()">
+            <svg class="icon" width="16" height="16" viewBox="0 0 24 24">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+            </svg>
+            Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats Summary -->
+      <div class="stats-summary">
+        <div class="stat-item">
+          <div class="stat-icon success">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+            </svg>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Total Sarafs</span>
+            <span class="stat-value">{{ sarafs|length }}</span>
+          </div>
+        </div>
+
+        <div class="stat-item">
+          <div class="stat-icon primary">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+            </svg>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Total Received</span>
+            <span class="stat-value success">${{ total_received|default:0|floatformat:0 }}</span>
+          </div>
+        </div>
+
+        <div class="stat-item">
+          <div class="stat-icon warning">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+            </svg>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Total Paid</span>
+            <span class="stat-value danger">${{ total_paid|default:0|floatformat:0 }}</span>
+          </div>
+        </div>
+
+        <div class="stat-item">
+          <div class="stat-icon info">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path
+                d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z" />
+            </svg>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Net Balance</span>
+            <span class="stat-value primary">${{ net_balance|default:0|floatformat:0 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filters-bar">
+        <div class="search-container">
+          <input type="text" class="search-input" placeholder="Search sarafs..." id="searchInput">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24">
+            <path
+              d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+          </svg>
+        </div>
+
+        <div class="filter-actions">
+          <select class="filter-select" id="statusFilter">
+            <option value="all">All Status</option>
+            <option value="creditor">Creditors</option>
+            <option value="debtor">Debtors</option>
+            <option value="balanced">Balanced</option>
+          </select>
+
+          <select class="filter-select" id="sortFilter">
+            <option value="name">Sort by Name</option>
+            <option value="received">Highest Received</option>
+            <option value="paid">Highest Paid</option>
+            <option value="balance">Highest Balance</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrapper">
+        <table class="data-table" id="sarafsTable">
+          <thead>
+            <tr>
+              <th class="sortable" data-sort="name">Saraf</th>
+              <th class="sortable" data-sort="received">Received</th>
+              <th class="sortable" data-sort="paid">Paid</th>
+              <th class="sortable" data-sort="balance">Balance</th>
+              <th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for saraf in sarafs %}
+            <tr class="data-row" data-id="{{ saraf.id }}" data-name="{{ saraf.user.get_full_name|default:saraf.user }}"
+              data-received="{{ saraf.total_received }}" data-paid="{{ saraf.total_paid }}"
+              data-balance="{{ saraf.balance }}" {% if saraf.balance> 0 %}data-status="creditor"{% elif saraf.balance <0 %}data-status="debtor" {% else %}data-status="balanced" {% endif %}>
+                <td>
+                  <div class="user-cell">
+                    <div class="user-avatar">
+                      {{ saraf.user.get_full_name|default:saraf.user|first|upper }}
+                    </div>
+                    <div class="user-info">
+                      <div class="user-name">{{ saraf.user.get_full_name|default:saraf.user }}</div>
+                      <div class="user-id">ID: {{ saraf.id }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="amount-cell positive">
+                    <span class="amount-value">${{ saraf.total_received|floatformat:0 }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="amount-cell negative">
+                    <span class="amount-value">${{ saraf.total_paid|floatformat:0 }}</span>
+                  </div>
+                </td>
+                <td>
+                  {% with balance=saraf.balance %}
+                  <div
+                    class="amount-cell {% if balance > 0 %}positive{% elif balance < 0 %}negative{% else %}neutral{% endif %}">
+                    <span class="amount-value">${{ saraf.balance|floatformat:0 }}</span>
+                    {% if balance != 0 %}
+                    <span class="status-indicator"></span>
+                    {% endif %}
+                  </div>
+                  {% endwith %}
+                </td>
+                <td>
+                  <div class="actions-cell">
+                    <a href="{% url 'containers:saraf_detail' saraf.id %}" class="action-link view-link"
+                      title="View Details">
+                      <svg width="16" height="16" viewBox="0 0 24 24">
+                        <path
+                          d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                      </svg>
+                    </a>
+                    <a href="{% url 'containers:saraf_transactions_report' saraf.id %}" class="action-link report-link"
+                      title="Transactions">
+                      <svg width="16" height="16" viewBox="0 0 24 24">
+                        <path
+                          d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+                      </svg>
+                    </a>
+                  </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-row">
+              <td colspan="5">
+                <div class="empty-state">
+                  <svg class="empty-icon" width="48" height="48" viewBox="0 0 24 24">
+                    <path
+                      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                  </svg>
+                  <h3>No Sarafs Found</h3>
+                  <p>Get started by adding your first saraf account</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
-<table class="table table-striped table-hover table-sm">
-  <thead>
-    <tr>
-      <th>نام</th>
-      <th>کل دریافت</th>
-      <th>کل پرداخت</th>
-      <th>کل بدهی</th>
-      <th class="text-right">عملیات</th>
-    </tr>
-  </thead>
-  <tbody>
+<!-- JavaScript -->
+<script>
+  // Performance Optimizations
+  let isProcessing = false;
+  let hoverTimeout = null;
+  let sortDirection = {};
 
-    {% for saraf in sarafs %}
-    <tr>
-      <td>{{ saraf.user.get_full_name|default:saraf.user }}</td>
-      <td>{{ saraf.total_received|floatformat:0 }}</td>
-      <td>{{ saraf.total_paid|floatformat:0 }}</td>
-      <td>{{ saraf.balance|floatformat:0 }}</td>
-      <td class="text-right">
-        <a class="btn btn-sm btn-outline-info" href="{% url 'containers:saraf_detail' saraf.id %}">نمایش</a>
-        <a class="btn btn-sm btn-outline-secondary"
-          href="{% url 'containers:saraf_transactions_report' saraf.id %}">تراکنش‌ها</a>
-      </td>
-    </tr>
-    {% empty %}
-    <tr>
-      <td colspan="5" class="text-center">هیچ صرافیی یافت نشد.</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Hide skeleton, show content
+    setTimeout(() => {
+      document.getElementById('loadingSkeleton').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      initPage();
+    }, 300);
+  });
+
+  function initPage() {
+    // Debounced search
+    const searchInput = document.getElementById('searchInput');
+    let searchTimeout;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(filterTable, 150);
+    });
+
+    // Filter change
+    document.getElementById('statusFilter').addEventListener('change', filterTable);
+    document.getElementById('sortFilter').addEventListener('change', () => {
+      const sortBy = document.getElementById('sortFilter').value;
+      sortTable(sortBy);
+    });
+
+    // Initialize sortable headers
+    initSortableHeaders();
+
+    // Optimized hover effects
+    initOptimizedHover();
+
+    // Initial formatting
+    formatNumbers();
+  }
+
+  // Optimized hover with requestAnimationFrame and throttling
+  function initOptimizedHover() {
+    const rows = document.querySelectorAll('.data-row');
+    rows.forEach(row => {
+      // Use passive event listeners for better performance
+      row.addEventListener('mouseenter', handleMouseEnter, { passive: true });
+      row.addEventListener('mouseleave', handleMouseLeave, { passive: true });
+
+      // Optimized click handler
+      row.addEventListener('click', (e) => {
+        if (!e.target.closest('.actions-cell')) {
+          const viewLink = row.querySelector('.view-link');
+          if (viewLink) window.location = viewLink.href;
+        }
+      }, { passive: true });
+    });
+  }
+
+  // Throttled hover handlers
+  function handleMouseEnter(e) {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    requestAnimationFrame(() => {
+      e.currentTarget.classList.add('row-hover');
+      isProcessing = false;
+    });
+  }
+
+  function handleMouseLeave(e) {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    requestAnimationFrame(() => {
+      e.currentTarget.classList.remove('row-hover');
+      isProcessing = false;
+    });
+  }
+
+  // Initialize sortable headers
+  function initSortableHeaders() {
+    const headers = document.querySelectorAll('.sortable');
+    headers.forEach(header => {
+      header.addEventListener('click', () => {
+        const sortBy = header.dataset.sort;
+        sortTable(sortBy);
+
+        // Update sort indicator
+        headers.forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
+        if (!sortDirection[sortBy] || sortDirection[sortBy] === 'desc') {
+          header.classList.add('sorted-asc');
+          sortDirection[sortBy] = 'asc';
+        } else {
+          header.classList.add('sorted-desc');
+          sortDirection[sortBy] = 'desc';
+        }
+      });
+    });
+  }
+
+  // Optimized table sorting
+  function sortTable(sortBy) {
+    const table = document.getElementById('sarafsTable');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('.data-row'));
+
+    if (rows.length === 0) return;
+
+    // Cache sort direction
+    const direction = sortDirection[sortBy] === 'asc' ? -1 : 1;
+    sortDirection[sortBy] = sortDirection[sortBy] === 'asc' ? 'desc' : 'asc';
+
+    // Use Web Worker for large datasets (simulated with setTimeout)
+    if (rows.length > 50) {
+      setTimeout(() => {
+        performSort(rows, sortBy, direction);
+        updateTable(tbody, rows);
+      }, 0);
+    } else {
+      performSort(rows, sortBy, direction);
+      updateTable(tbody, rows);
+    }
+  }
+
+  function performSort(rows, sortBy, direction) {
+    rows.sort((a, b) => {
+      let aVal, bVal;
+
+      switch (sortBy) {
+        case 'name':
+          aVal = a.dataset.name.toLowerCase();
+          bVal = b.dataset.name.toLowerCase();
+          return direction * aVal.localeCompare(bVal);
+
+        case 'received':
+          aVal = parseFloat(a.dataset.received) || 0;
+          bVal = parseFloat(b.dataset.received) || 0;
+          return direction * (bVal - aVal);
+
+        case 'paid':
+          aVal = parseFloat(a.dataset.paid) || 0;
+          bVal = parseFloat(b.dataset.paid) || 0;
+          return direction * (bVal - aVal);
+
+        case 'balance':
+          aVal = parseFloat(a.dataset.balance) || 0;
+          bVal = parseFloat(b.dataset.balance) || 0;
+          return direction * (bVal - aVal);
+
+        default:
+          return 0;
+      }
+    });
+  }
+
+  function updateTable(tbody, rows) {
+    // Use DocumentFragment for batch DOM updates
+    const fragment = document.createDocumentFragment();
+    rows.forEach(row => fragment.appendChild(row));
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
+  }
+
+  // Optimized filtering
+  function filterTable() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const rows = document.querySelectorAll('.data-row');
+
+    requestAnimationFrame(() => {
+      rows.forEach(row => {
+        const name = row.dataset.name.toLowerCase();
+        const status = row.dataset.status;
+        const matchesSearch = name.includes(searchTerm);
+        const matchesStatus = statusFilter === 'all' || status === statusFilter;
+
+        row.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+      });
+    });
+  }
+
+  // Format numbers with Intl API for performance
+  function formatNumbers() {
+    document.querySelectorAll('.amount-value').forEach(el => {
+      const text = el.textContent.trim();
+      const num = parseFloat(text.replace(/[^0-9.-]+/g, "")) || 0;
+      el.textContent = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(num);
+    });
+  }
+
+  // Export data
+  function exportData() {
+    const rows = document.querySelectorAll('.data-row:not([style*="display: none"])');
+    const data = [];
+
+    rows.forEach(row => {
+      data.push({
+        name: row.dataset.name,
+        received: row.dataset.received,
+        paid: row.dataset.paid,
+        balance: row.dataset.balance
+      });
+    });
+
+    // Create and trigger download
+    const csv = convertToCSV(data);
+    downloadCSV(csv, 'sarafs_report.csv');
+  }
+
+  function convertToCSV(data) {
+    const headers = ['Name', 'Total Received', 'Total Paid', 'Balance'];
+    const rows = data.map(item => [
+      `"${item.name}"`,
+      item.received,
+      item.paid,
+      item.balance
+    ]);
+
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+  }
+
+  function downloadCSV(csv, filename) {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Virtual scrolling for large datasets (optional)
+  function initVirtualScroll() {
+    const tableWrapper = document.querySelector('.table-wrapper');
+    const tbody = document.querySelector('#sarafsTable tbody');
+    const rows = Array.from(tbody.querySelectorAll('.data-row'));
+
+    if (rows.length > 100) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.style.opacity = '1';
+            entry.target.style.transform = 'translateY(0)';
+          }
+        });
+      }, { threshold: 0.1 });
+
+      rows.forEach((row, index) => {
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(20px)';
+        row.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        observer.observe(row);
+      });
+    }
+  }
+
+  // Initialize after page load
+  setTimeout(initVirtualScroll, 1000);
+</script>
 {% endblock %}

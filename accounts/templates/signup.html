@@ -2,16 +2,19 @@
 {% load i18n %}
 {% load static %}
 
-{% block title %}{% trans 'signup' %}{% endblock %}
+{% block title %}{% trans 'Create Account' %}{% endblock %}
 
 {% block content %}
-
-<div class="signup-container">
+<div class="signup-page">
   <div class="signup-card">
     <!-- Header -->
     <div class="signup-header">
-      <h1 class="signup-title">Join Us Today</h1>
-      <p class="signup-subtitle">Create your account and start your journey with us</p>
+      <div class="company-logo">
+        <div class="logo-icon">C</div>
+        <span class="logo-text">COBRA</span>
+      </div>
+      <h1 class="signup-title">Create Account</h1>
+      <p class="signup-subtitle">Join our professional community and unlock exclusive features</p>
     </div>
 
     <!-- Error Messages -->
@@ -33,70 +36,85 @@
     <form method="POST" class="signup-form" id="signupForm">
       {% csrf_token %}
 
-      <div class="signup-form-row">
-        <div class="signup-form-group first_name">
-          {{ form.first_name }}
+      <!-- Name Fields -->
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">First Name</label>
+          <input type="text" name="first_name" class="form-control {% if form.first_name.errors %}error{% endif %}"
+            placeholder="John" value="{{ form.first_name.value|default:'' }}" required>
           {% if form.first_name.errors %}
-          <div class="signup-field-error">
-            {{ form.first_name.errors.0 }}
-          </div>
+          <span class="field-error">{{ form.first_name.errors.0 }}</span>
           {% endif %}
         </div>
 
-        <div class="signup-form-group last_name">
-          {{ form.last_name }}
+        <div class="form-group">
+          <label class="form-label">Last Name</label>
+          <input type="text" name="last_name" class="form-control {% if form.last_name.errors %}error{% endif %}"
+            placeholder="Doe" value="{{ form.last_name.value|default:'' }}" required>
           {% if form.last_name.errors %}
-          <div class="signup-field-error">
-            {{ form.last_name.errors.0 }}
-          </div>
+          <span class="field-error">{{ form.last_name.errors.0 }}</span>
           {% endif %}
         </div>
       </div>
 
-      <div class="signup-form-group email">
-        {{ form.email }}
+      <!-- Email -->
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" name="email" class="form-control {% if form.email.errors %}error{% endif %}"
+          placeholder="john.doe@company.com" value="{{ form.email.value|default:'' }}" required>
         {% if form.email.errors %}
-        <div class="signup-field-error">
-          {{ form.email.errors.0 }}
-        </div>
+        <span class="field-error">{{ form.email.errors.0 }}</span>
         {% endif %}
       </div>
 
-      <div class="signup-form-group username">
-        {{ form.username }}
+      <!-- Username -->
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-control {% if form.username.errors %}error{% endif %}"
+          placeholder="johndoe" value="{{ form.username.value|default:'' }}" required>
         {% if form.username.errors %}
-        <div class="signup-field-error">
-          {{ form.username.errors.0 }}
-        </div>
+        <span class="field-error">{{ form.username.errors.0 }}</span>
         {% endif %}
       </div>
 
-      <div class="signup-form-group password1">
-        {{ form.password1 }}
-        <div class="signup-password-strength">
-          <div class="signup-password-strength-bar"></div>
+      <!-- Password -->
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" name="password1" class="form-control {% if form.password1.errors %}error{% endif %}"
+          placeholder="Create a strong password" required id="password1">
+
+        <div class="password-strength">
+          <div class="strength-meter">
+            <div class="strength-bar" id="strengthBar1"></div>
+            <div class="strength-bar" id="strengthBar2"></div>
+            <div class="strength-bar" id="strengthBar3"></div>
+            <div class="strength-bar" id="strengthBar4"></div>
+          </div>
+          <span class="strength-text" id="strengthText">Enter a password</span>
         </div>
-        <div class="signup-password-hint">
-          Use 8+ characters with mix of letters, numbers & symbols
+
+        <div class="password-hint">
+          Use at least 8 characters with a mix of letters, numbers & symbols
         </div>
+
         {% if form.password1.errors %}
-        <div class="signup-field-error">
-          {{ form.password1.errors.0 }}
-        </div>
+        <span class="field-error">{{ form.password1.errors.0 }}</span>
         {% endif %}
       </div>
 
-      <div class="signup-form-group password2">
-        {{ form.password2 }}
+      <!-- Confirm Password -->
+      <div class="form-group">
+        <label class="form-label">Confirm Password</label>
+        <input type="password" name="password2" class="form-control {% if form.password2.errors %}error{% endif %}"
+          placeholder="Re-enter your password" required id="password2">
         {% if form.password2.errors %}
-        <div class="signup-field-error">
-          {{ form.password2.errors.0 }}
-        </div>
+        <span class="field-error">{{ form.password2.errors.0 }}</span>
         {% endif %}
       </div>
 
+      <!-- Submit Button -->
       <button type="submit" class="signup-btn" id="signupButton">
-        {% trans 'Create Account' %}
+        Create Account
       </button>
     </form>
 
@@ -114,9 +132,15 @@
   document.addEventListener('DOMContentLoaded', function () {
     const signupButton = document.getElementById('signupButton');
     const signupForm = document.getElementById('signupForm');
-    const password1 = document.querySelector('input[name="password1"]');
-    const passwordStrength = document.querySelector('.signup-password-strength');
-    const passwordStrengthBar = document.querySelector('.signup-password-strength-bar');
+    const password1 = document.getElementById('password1');
+    const password2 = document.getElementById('password2');
+    const strengthBars = [
+      document.getElementById('strengthBar1'),
+      document.getElementById('strengthBar2'),
+      document.getElementById('strengthBar3'),
+      document.getElementById('strengthBar4')
+    ];
+    const strengthText = document.getElementById('strengthText');
 
     // Form submission
     signupForm.addEventListener('submit', function () {
@@ -128,48 +152,76 @@
     if (password1) {
       password1.addEventListener('input', function () {
         const password = this.value;
-        let strength = 'weak';
+        let score = 0;
 
-        if (password.length >= 8) {
-          strength = 'medium';
-          if (password.match(/[a-z]/) && password.match(/[A-Z]/) && password.match(/[0-9]/) && password.match(/[^a-zA-Z0-9]/)) {
-            strength = 'strong';
+        // Length check
+        if (password.length >= 8) score++;
+        if (password.length >= 12) score++;
+
+        // Complexity checks
+        if (/[a-z]/.test(password)) score++;
+        if (/[A-Z]/.test(password)) score++;
+        if (/[0-9]/.test(password)) score++;
+        if (/[^a-zA-Z0-9]/.test(password)) score++;
+
+        // Cap score at 4
+        score = Math.min(score, 4);
+
+        // Update strength bars
+        strengthBars.forEach((bar, index) => {
+          bar.className = 'strength-bar';
+          if (index < score) {
+            if (score <= 2) bar.classList.add('weak');
+            else if (score === 3) bar.classList.add('medium');
+            else bar.classList.add('strong');
           }
-        }
+        });
 
-        passwordStrength.className = 'signup-password-strength ' + strength;
+        // Update strength text
+        const texts = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+        strengthText.textContent = texts[score];
+        strengthText.style.color =
+          score <= 1 ? '#ef4444' :
+            score <= 2 ? '#f59e0b' :
+              score <= 3 ? '#3b82f6' :
+                '#10b981';
       });
     }
 
-    // Add classes to form fields for styling
-    const formGroups = document.querySelectorAll('.signup-form-group');
-    formGroups.forEach(group => {
-      const input = group.querySelector('input');
-      if (input) {
-        // Add placeholder if empty
-        if (!input.getAttribute('placeholder')) {
-          const fieldName = input.name;
-          const placeholder = fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          input.setAttribute('placeholder', placeholder);
+    // Password confirmation check
+    if (password1 && password2) {
+      password2.addEventListener('input', function () {
+        if (password1.value !== password2.value) {
+          password2.classList.add('error');
+        } else {
+          password2.classList.remove('error');
         }
+      });
 
-        // Add styling class
-        input.classList.add('signup-form-control');
-
-        // Add error class if field has errors
-        if (group.querySelector('.signup-field-error')) {
-          input.classList.add('error');
+      password1.addEventListener('input', function () {
+        if (password1.value !== password2.value) {
+          password2.classList.add('error');
+        } else {
+          password2.classList.remove('error');
         }
+      });
+    }
 
-        // Add focus effects
-        input.addEventListener('focus', function () {
-          this.parentElement.classList.add('focused');
-        });
+    // Add focus effects to all inputs
+    const inputs = document.querySelectorAll('.form-control');
+    inputs.forEach(input => {
+      input.addEventListener('focus', function () {
+        this.parentElement.classList.add('focused');
+      });
 
-        input.addEventListener('blur', function () {
-          this.parentElement.classList.remove('focused');
-        });
-      }
+      input.addEventListener('blur', function () {
+        this.parentElement.classList.remove('focused');
+        if (this.value.trim() !== '' && !this.classList.contains('error')) {
+          this.parentElement.classList.add('valid');
+        } else {
+          this.parentElement.classList.remove('valid');
+        }
+      });
     });
   });
 </script>

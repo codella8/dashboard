@@ -1,26 +1,841 @@
 {% extends "daily_sale/daily_sale_base.html" %}
-{% block title %}Daily Summary Report{% endblock %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Daily Summary - Admin Dashboard{% endblock %}
 
 {% block content %}
-<h3>Daily Summary ({{ start_date }} — {{ end_date }})</h3>
+<div class="container-fluid px-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0 text-gray-800">
+        <i class="bi bi-bar-chart-line me-2"></i>Daily Summary Dashboard
+      </h1>
+      <p class="text-muted mb-0">Real-time sales analytics and financial overview</p>
+    </div>
+    <div>
+      <button class="btn btn-outline-primary" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i> Print Report
+      </button>
+      <button class="btn btn-primary ms-2" id="refreshBtn">
+        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+      </button>
+    </div>
+  </div>
 
-<table class="table table-bordered">
-  <thead>
-    <tr><th>Date</th><th>Total Sales</th><th>Total Purchases</th><th>Profit</th><th>Avg Transaction</th></tr>
-  </thead>
-  <tbody>
-    {% for d in daily_data %}
-      <tr>
-        <td>{{ d.date }}</td>
-        <td>{{ d.total_sales }}</td>
-        <td>{{ d.total_purchases }}</td>
-        <td>{{ d.profit }}</td>
-        <td>{{ d.avg_transaction }}</td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+  <!-- Date Range Selector -->
+  <div class="card date-picker-card border-0 shadow mb-4">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h5 class="card-title text-white mb-3">
+            <i class="bi bi-calendar-range me-2"></i>Select Date Range
+          </h5>
+          <form method="get" class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label text-white">Start Date</label>
+              <input type="date" class="form-control" name="start_date" value="{{ start_date|date:'Y-m-d' }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-white">End Date</label>
+              <input type="date" class="form-control" name="end_date" value="{{ end_date|date:'Y-m-d' }}" required>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button type="submit" class="btn btn-light w-100">
+                <i class="bi bi-filter me-1"></i> Apply Range
+              </button>
+            </div>
+          </form>
+        </div>
+        <div class="col-md-4">
+          <div class="text-center">
+            <h2 class="text-white mb-1">{{ daily_series|length }}</h2>
+            <p class="text-white-50 mb-0">Days Analyzed</p>
+          </div>
+        </div>
+      </div>
 
-<h5 class="mt-4">Period Stats</h5>
-<pre>{{ period_stats }}</pre>
-{% endblock %}
+      <!-- Quick Date Filters -->
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="d-flex flex-wrap gap-2">
+            <a href="?start_date={% now 'Y-m-d' %}&end_date={% now 'Y-m-d' %}"
+              class="btn btn-sm btn-outline-light">Today</a>
+            <a href="?start_date={{ yesterday|date:'Y-m-d' }}&end_date={{ yesterday|date:'Y-m-d' }}"
+              class="btn btn-sm btn-outline-light">Yesterday</a>
+            <a href="?start_date={{ week_start|date:'Y-m-d' }}&end_date={% now 'Y-m-d' %}"
+              class="btn btn-sm btn-outline-light">This Week</a>
+            <a href="?start_date={{ month_start|date:'Y-m-d' }}&end_date={% now 'Y-m-d' %}"
+              class="btn btn-sm btn-outline-light">This Month</a>
+            <a href="?start_date={{ last_month_start|date:'Y-m-d' }}&end_date={{ last_month_end|date:'Y-m-d' }}"
+              class="btn btn-sm btn-outline-light">Last Month</a>
+            <a href="?start_date={{ year_start|date:'Y-m-d' }}&end_date={% now 'Y-m-d' %}"
+              class="btn btn-sm btn-outline-light">This Year</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card summary-card border-left-primary h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-primary text-uppercase mb-1">Total Sales</h6>
+              <h2 class="mb-0" style="font-size: small;">AED {{ period_summary.total_sales|floatformat:0|intcomma }}
+              </h2>
+              <div class="mt-2">
+                <span class="text-muted small">
+                  <i class="bi bi-cart-check me-1"></i>
+                  {{ period_summary.transactions_count }} transactions
+                </span>
+              </div>
+            </div>
+            <div class="card-icon text-primary">
+              <i class="bi bi-cash-stack"></i>
+            </div>
+          </div>
+          <div class="progress progress-thin mt-3">
+            <div class="progress-bar bg-primary"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card summary-card border-left-success h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-success text-uppercase mb-1">Cash In</h6>
+              <h2 class="mb-0" style="font-size: small;">AED {{ cash_in_total|floatformat:0|intcomma }}</h2>
+              <div class="mt-2">
+                <span class="text-muted small">
+                  <i class="bi bi-arrow-down-circle me-1"></i>
+                  {{ cash_in_count }} payments
+                </span>
+              </div>
+            </div>
+            <div class="card-icon text-success">
+              <i class="bi bi-arrow-down-circle"></i>
+            </div>
+          </div>
+          <div class="progress progress-thin mt-3">
+            <div class="progress-bar bg-success"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card summary-card border-left-warning h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-warning text-uppercase mb-1">Cash Out</h6>
+              <h2 class="mb-0" style="font-size: small;">AED {{ cash_out_total|floatformat:0|intcomma }}</h2>
+              <div class="mt-2">
+                <span class="text-muted small">
+                  <i class="bi bi-arrow-up-circle me-1"></i>
+                  {{ cash_out_count }} expenses
+                </span>
+              </div>
+            </div>
+            <div class="card-icon text-warning">
+              <i class="bi bi-arrow-up-circle"></i>
+            </div>
+          </div>
+          <div class="progress progress-thin mt-3">
+            <div class="progress-bar bg-warning"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card summary-card border-left-info h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-info text-uppercase mb-1">Net Profit</h6>
+              <h2
+                class="mb-0  {% if period_summary.net_revenue >= 0 %}profit-positive{% else %}profit-negative{% endif %}"
+                style="font-size: small;">
+                AED {{ period_summary.net_revenue|floatformat:0|intcomma }}
+              </h2>
+              <div class="mt-2">
+                <span class="text-muted small">
+                  <i class="bi bi-graph-up{% if period_summary.net_revenue < 0 %}-arrow-down{% endif %} me-1"></i>
+                  {{ profit_margin|floatformat:1 }}% margin
+                </span>
+              </div>
+            </div>
+            <div class="card-icon text-info">
+              <i class="bi bi-graph-up"></i>
+            </div>
+          </div>
+          <div class="progress progress-thin mt-3">
+            <div class="progress-bar {% if period_summary.net_revenue >= 0 %}bg-info{% else %}bg-danger{% endif %}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Breakdown -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card shadow">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="bi bi-calendar-day me-2"></i>Daily Breakdown
+          </h5>
+          <div class="d-flex align-items-center">
+            <span class="badge bg-primary me-2">{{ daily_series|length }} days</span>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-filter me-1"></i> Sort By
+              </button>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}&sort=date">Date (Newest)</a></li>
+                <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}&sort=date_asc">Date (Oldest)</a></li>
+                <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}&sort=sales">Sales (High to Low)</a></li>
+                <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}&sort=transactions">Transactions</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>Day</th>
+                  <th>Date</th>
+                  <th class="text-end">Total Sales</th>
+                  <th class="text-end">Cash In</th>
+                  <th class="text-end">Cash Out</th>
+                  <th class="text-end">Transactions</th>
+                  <th class="text-end">Items Sold</th>
+                  <th class="text-end">Avg. Sale</th>
+                  <th class="text-end">Profit</th>
+                  <th class="text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for day in daily_series %}
+                <tr
+                  class="{% if day.is_today %}today-row{% elif day.date|date:'Y-m-d' == yesterday|date:'Y-m-d' %}day-highlight{% endif %}">
+                  <td class="fw-bold">{{ forloop.counter }}</td>
+                  <td>
+                    <span class="badge {% if day.is_today %}bg-success{% else %}bg-secondary{% endif %}">
+                      {{ day.date|date:'D' }}
+                    </span>
+                  </td>
+                  <td>
+                    {{ day.date|date:"M d, Y" }}
+                    {% if day.is_today %}
+                    <span class="badge bg-success ms-2">TODAY</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end fw-bold">AED{{ day.total_sales|floatformat:0|intcomma }}</td>
+                  <td class="text-end text-success">AED{{ day.cash_in|floatformat:0|intcomma }}</td>
+                  <td class="text-end text-warning">AED{{ day.cash_out|floatformat:0|intcomma }}</td>
+                  <td class="text-end">
+                    <span class="badge bg-info">{{ day.transaction_count }}</span>
+                  </td>
+                  <td class="text-end">{{ day.items_sold|intcomma }}</td>
+                  <td class="text-end">AED{{ day.avg_sale|floatformat:0|intcomma }}</td>
+                  <td class="text-end {% if day.profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    AED{{ day.profit|floatformat:0|intcomma }}
+                    {% if day.profit_trend %}
+                    <small class="d-block {{ day.profit_trend_class }}">
+                      {{ day.profit_trend }}%
+                    </small>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <a href="{% url 'daily_sale:transaction_list' %}?start_date={{ day.date|date:'Y-m-d' }}&end_date={{ day.date|date:'Y-m-d' }}"
+                      class="btn btn-sm btn-outline-primary" title="View Day Transactions">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="11" class="text-center py-5">
+                    <div class="text-muted">
+                      <i class="bi bi-calendar-x display-6 d-block mb-3"></i>
+                      <h5>No data available</h5>
+                      <p class="mb-0">Select a different date range</p>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light">
+                <tr>
+                  <th colspan="3">TOTAL</th>
+                  <th class="text-end">AED{{ period_summary.total_sales|floatformat:0|intcomma }}</th>
+                  <th class="text-end">AED{{ cash_in_total|floatformat:0|intcomma }}</th>
+                  <th class="text-end">AED{{ cash_out_total|floatformat:0|intcomma }}</th>
+                  <th class="text-end">{{ period_summary.transactions_count|intcomma }}</th>
+                  <th class="text-end">{{ period_summary.items_sold|intcomma }}</th>
+                  <th class="text-end">AED{{ avg_sale_per_day|floatformat:0|intcomma }}</th>
+                  <th
+                    class="text-end {% if period_summary.net_revenue >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    AED{{ period_summary.net_revenue|floatformat:0|intcomma }}
+                  </th>
+                  <th></th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts and Additional Stats -->
+  <div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow h-100">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Revenue Distribution</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-container">
+            <canvas id="revenueChart"></canvas>
+          </div>
+          <div class="row mt-3 text-center">
+            <div class="col-6">
+              <h6 class="text-success">Cash In</h6>
+              <h4>AED{{ cash_in_total|floatformat:0|intcomma }}</h4>
+              <small class="text-muted">{{ cash_in_percentage|floatformat:0 }}% of total</small>
+            </div>
+            <div class="col-6">
+              <h6 class="text-warning">Cash Out</h6>
+              <h4>AED{{ cash_out_total|floatformat:0|intcomma }}</h4>
+              <small class="text-muted">{{ cash_out_percentage|floatformat:0 }}% of total</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow h-100">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Daily Trends</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+          </div>
+          <div class="row mt-3 quick-stats">
+            <div class="col-4 text-center">
+              <div class="p-2 border rounded">
+                <small class="text-muted d-block">Best Day</small>
+                <strong>{{ best_day.date|date:'M d' }}</strong>
+                <div class="text-success">AED{{ best_day.total_sales|floatformat:0|intcomma }}</div>
+              </div>
+            </div>
+            <div class="col-4 text-center">
+              <div class="p-2 border rounded">
+                <small class="text-muted d-block">Avg Daily</small>
+                <strong>AED{{ avg_daily_sales|floatformat:0|intcomma }}</strong>
+                <div class="text-primary">Sales</div>
+              </div>
+            </div>
+            <div class="col-4 text-center">
+              <div class="p-2 border rounded">
+                <small class="text-muted d-block">Growth</small>
+                <strong class="{% if growth_rate >= 0 %}text-success{% else %}text-danger{% endif %}">
+                  {{ growth_rate|floatformat:1 }}%
+                </strong>
+                <div>vs Previous</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export and Tools -->
+  <div class="card shadow">
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <h6><i class="bi bi-download me-2"></i>Export Report</h6>
+          <div class="btn-group mt-2">
+            <a href="{% url 'daily_sale:generate_daily_report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&format=json"
+              class="btn btn-outline-primary" id="jsonExportBtn">
+              <i class="bi bi-file-earmark-text me-1"></i> JSON Report
+            </a>
+            <a href="{% url 'daily_sale:generate_daily_report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&format=csv"
+              class="btn btn-outline-success ms-2">
+              <i class="bi bi-file-excel me-1"></i> CSV
+            </a>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <h6><i class="bi bi-gear me-2"></i>Tools</h6>
+          <div class="mt-2">
+            <button class="btn btn-outline-secondary" onclick="generateReport()">
+              <i class="bi bi-file-earmark-plus me-1"></i> Generate Full Report
+            </button>
+            <button class="btn btn-outline-info ms-2" data-bs-toggle="modal" data-bs-target="#emailModal">
+              <i class="bi bi-envelope me-1"></i> Email Report
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden data for JavaScript -->
+  <input type="hidden" id="chartLabelsData" value="{{ chart_labels|safe }}">
+  <input type="hidden" id="chartSalesData" value="{{ chart_sales|safe }}">
+  <input type="hidden" id="chartCashInData" value="{{ chart_cash_in|safe }}">
+  <input type="hidden" id="chartCashOutData" value="{{ chart_cash_out|safe }}">
+  <!-- Email Modal -->
+  <div class="modal fade" id="emailModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Email Daily Report</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="emailForm">
+            <div class="mb-3">
+              <label class="form-label">Email Address</label>
+              <input type="email" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Date Range</label>
+              <input type="text" class="form-control"
+                value="{{ start_date|date:'M d, Y' }} - {{ end_date|date:'M d, Y' }}" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Include</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" checked>
+                <label class="form-check-label">Summary Statistics</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" checked>
+                <label class="form-check-label">Daily Breakdown</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox">
+                <label class="form-check-label">Transaction Details</label>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary">Send Report</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endblock %}
+
+  {% block extra_js %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Auto-refresh every 2 minutes
+    let refreshInterval;
+
+    function startAutoRefresh() {
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(() => {
+        refreshData();
+      }, 120000); // 2 minutes
+    }
+
+    function refreshData() {
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (refreshBtn) {
+        refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i> Refreshing...';
+        refreshBtn.disabled = true;
+
+        // Refresh page after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      }
+    }
+
+    // Initialize auto refresh
+    document.addEventListener('DOMContentLoaded', function () {
+      startAutoRefresh();
+
+      // Refresh button
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', function () {
+          refreshData();
+        });
+      }
+    });
+
+    // Revenue Chart
+    document.addEventListener('DOMContentLoaded', function () {
+      const revenueCanvas = document.getElementById('revenueChart');
+      if (revenueCanvas) {
+        try {
+          const revenueCtx = revenueCanvas.getContext('2d');
+
+          // Get data from Django template variables
+          const cashIn = parseFloat("{{ cash_in_total|default:0 }}".replace(/,/g, '')) || 0;
+          const cashOut = Math.abs(parseFloat("{{ cash_out_total|default:0 }}".replace(/,/g, ''))) || 0;
+          const netProfit = parseFloat("{{ net_profit|default:0 }}".replace(/,/g, '')) || 0;
+
+          // Only show positive values for doughnut chart
+          const doughnutData = [
+            Math.max(0, cashIn),
+            Math.max(0, cashOut),
+            Math.max(0, netProfit)
+          ];
+
+          const revenueChart = new Chart(revenueCtx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Cash In', 'Cash Out', 'Net Profit'],
+              datasets: [{
+                data: doughnutData,
+                backgroundColor: ['#10b981', '#f59e0b', '#3b82f6'],
+                borderWidth: 1,
+                borderColor: '#fff'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '60%',
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    padding: 20,
+                    usePointStyle: true,
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function (context) {
+                      let label = context.label || '';
+                      if (label) {
+                        label += ': ';
+                      }
+                      label += 'AED' + context.parsed.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      });
+                      return label;
+                    }
+                  }
+                }
+              }
+            }
+          });
+
+          // Update chart on window resize
+          window.addEventListener('resize', function () {
+            revenueChart.resize();
+          });
+        } catch (error) {
+          console.error('Error creating revenue chart:', error);
+        }
+      }
+    });
+
+    // Trend Chart
+    document.addEventListener('DOMContentLoaded', function () {
+      const trendCanvas = document.getElementById('trendChart');
+      if (trendCanvas) {
+        try {
+          const trendCtx = trendCanvas.getContext('2d');
+
+          // Parse data from Django template
+          let chartLabels = [];
+          let chartSales = [];
+          let chartCashIn = [];
+
+          try {
+            // Get chart data from hidden inputs or data attributes
+            const labelsElement = document.getElementById('chartLabelsData');
+            const salesElement = document.getElementById('chartSalesData');
+            const cashInElement = document.getElementById('chartCashInData');
+
+            if (labelsElement && salesElement && cashInElement) {
+              chartLabels = JSON.parse(labelsElement.value || '[]');
+              chartSales = JSON.parse(salesElement.value || '[]');
+              chartCashIn = JSON.parse(cashInElement.value || '[]');
+            } else {
+              // Fallback to template variables
+              const labelsJson = `{{ chart_labels|safe }}`;
+              const salesJson = `{{ chart_sales|safe }}`;
+              const cashInJson = `{{ chart_cash_in|safe }}`;
+
+              if (labelsJson && labelsJson !== 'None') {
+                chartLabels = JSON.parse(labelsJson);
+              }
+              if (salesJson && salesJson !== 'None') {
+                chartSales = JSON.parse(salesJson);
+              }
+              if (cashInJson && cashInJson !== 'None') {
+                chartCashIn = JSON.parse(cashInJson);
+              }
+            }
+          } catch (e) {
+            console.log('Using default chart data');
+            // Default sample data if parsing fails
+            chartLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
+            chartSales = [1000, 2000, 1500, 3000, 2500];
+            chartCashIn = [800, 1800, 1200, 2800, 2200];
+          }
+
+          const trendChart = new Chart(trendCtx, {
+            type: 'line',
+            data: {
+              labels: chartLabels,
+              datasets: [{
+                label: 'Daily Sales',
+                data: chartSales,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6
+              }, {
+                label: 'Cash In',
+                data: chartCashIn,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: {
+                mode: 'index',
+                intersect: false,
+              },
+              scales: {
+                x: {
+                  grid: {
+                    display: false
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  grid: {
+                    borderDash: [2, 2]
+                  },
+                  ticks: {
+                    callback: function (value) {
+                      return 'AED' + value.toLocaleString('en-US', {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                      });
+                    }
+                  }
+                }
+              },
+              plugins: {
+                tooltip: {
+                  mode: 'index',
+                  intersect: false,
+                  callbacks: {
+                    label: function (context) {
+                      let label = context.dataset.label || '';
+                      if (label) {
+                        label += ': ';
+                      }
+                      label += 'AED' + context.parsed.y.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      });
+                      return label;
+                    }
+                  }
+                },
+                legend: {
+                  position: 'top',
+                  labels: {
+                    usePointStyle: true,
+                  }
+                }
+              }
+            }
+          });
+
+          // Update chart on window resize
+          window.addEventListener('resize', function () {
+            trendChart.resize();
+          });
+
+        } catch (error) {
+          console.error('Error creating trend chart:', error);
+        }
+      }
+    });
+
+    // Generate Report
+    function generateReport() {
+      try {
+        const reportData = {
+          period: `{{ start_date|date:'Y-m-d' }} to {{ end_date|date:'Y-m-d' }}`,
+          total_sales: parseFloat(`{{ period_summary.total_sales|default:0 }}`.replace(/,/g, '')) || 0,
+          total_purchases: parseFloat(`{{ period_summary.total_purchases|default:0 }}`.replace(/,/g, '')) || 0,
+          net_profit: parseFloat(`{{ net_profit|default:0 }}`.replace(/,/g, '')) || 0,
+          cash_in_total: parseFloat(`{{ cash_in_total|default:0 }}`.replace(/,/g, '')) || 0,
+          cash_out_total: parseFloat(`{{ cash_out_total|default:0 }}`.replace(/,/g, '')) || 0,
+          transactions_count: parseInt(`{{ period_summary.transactions_count|default:0 }}`) || 0,
+          items_sold: parseInt(`{{ period_summary.items_sold|default:0 }}`) || 0,
+          days_analyzed: parseInt(`{{ daily_series|length|default:0 }}`) || 0,
+          generated_at: new Date().toISOString()
+        };
+
+        // Save to localStorage
+        localStorage.setItem('dailyReport', JSON.stringify(reportData, null, 2));
+
+        // Create downloadable JSON file
+        const dataStr = JSON.stringify(reportData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = `daily_report_AED{new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        alert('✅ Report generated and downloaded successfully!');
+
+      } catch (error) {
+        console.error('Error generating report:', error);
+        alert('❌ Error generating report. Please try again.');
+      }
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function (e) {
+      // Ctrl+R or F5 to refresh
+      if ((e.ctrlKey && e.key === 'r') || e.key === 'F5') {
+        e.preventDefault();
+        refreshData();
+      }
+      // Ctrl+P to print
+      if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+      }
+      // Ctrl+E to export
+      if (e.ctrlKey && e.key === 'e') {
+        e.preventDefault();
+        generateReport();
+      }
+      // Esc to clear filters
+      if (e.key === 'Escape') {
+        const clearBtn = document.querySelector('a[href*="daily-summary"]');
+        if (clearBtn) clearBtn.click();
+      }
+    });
+
+    // Auto update time
+    function updateTime() {
+      const timeElements = document.querySelectorAll('.last-updated');
+      if (timeElements.length > 0) {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        });
+
+        timeElements.forEach(element => {
+          element.textContent = `Last updated: AED{timeString}`;
+        });
+      }
+    }
+
+    // Start time update
+    updateTime();
+    setInterval(updateTime, 1000); // Update every second for real-time feel
+
+    // Initialize tooltips
+    document.addEventListener('DOMContentLoaded', function () {
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+    });
+
+    // Export to CSV
+    function exportToCSV() {
+      const url = new URL(window.location.href);
+      url.searchParams.set('export', 'csv');
+      window.open(url.toString(), '_blank');
+    }
+
+    // Email report
+    function emailReport() {
+      const emailModal = new bootstrap.Modal(document.getElementById('emailModal'));
+      emailModal.show();
+    }
+
+    // Quick filter buttons
+    document.querySelectorAll('.quick-filter').forEach(button => {
+      button.addEventListener('click', function () {
+        const days = parseInt(this.dataset.days);
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        window.location.href = `?start_date=AED{startDate}&end_date=AED{endDate}`;
+      });
+    });
+
+    // Real-time data update (AJAX)
+    function updateData() {
+      fetch(window.location.href + '&ajax=1')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Update summary cards
+            document.querySelectorAll('[data-metric="total_sales"]').forEach(el => {
+              el.textContent = 'AED' + parseFloat(data.total_sales).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              });
+            });
+
+            // Update other metrics...
+            console.log('Data updated successfully');
+          }
+        })
+        .catch(error => console.error('Update error:', error));
+    }
+
+    // Start periodic data updates (every 30 seconds)
+    setInterval(updateData, 30000);
+  </script>
+  {% endblock %}

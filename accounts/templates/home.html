@@ -2,270 +2,344 @@
 {% load i18n %}
 {% load static %}
 
-{% block title %}Company{% endblock %}
+{% block title %}Aura Motors | Luxury Automotive Excellence{% endblock %}
 
 {% block content %}
-
-<div class="dubai-exclusive-container">
-    <!-- Hero Section --> 
-    <section class="dubai-hero">
-        <div class="dubai-hero-content">
-            <div class="dubai-hero-badge">
+<div class="aura-motors-container">
+    <!-- Hero Section - Fullscreen -->
+    <section class="aura-hero">
+        <div class="aura-hero-content fade-in">
+            <div class="aura-hero-badge">
                 Established 2010 • Dubai
             </div>
 
-            <h1 class="dubai-hero-title">
-                <strong>Aura Motors</strong><br>
-                Where Automotive<br>
-                Dreams Become Reality
+            <h1 class="aura-hero-title">
+                Aura Motors<br>
+                <strong>Where Automotive Dreams Become Reality</strong>
             </h1>
 
-            <p class="dubai-hero-subtitle">
+            <p class="aura-hero-subtitle">
                 Experience the pinnacle of automotive excellence in the heart of Dubai.
                 Discover curated luxury vehicles with unparalleled service and attention to detail.
             </p>
 
-            <div class="dubai-hero-stats">
-                <div class="dubai-stat">
-                    <span class="dubai-stat-number">400+</span>
-                    <span class="dubai-stat-label">Exclusive Vehicles</span>
+            <div class="aura-hero-stats">
+                <div class="aura-stat">
+                    <span class="aura-stat-number">400+</span>
+                    <span class="aura-stat-label">Exclusive Vehicles</span>
                 </div>
-                <div class="dubai-stat">
-                    <span class="dubai-stat-number">14</span>
-                    <span class="dubai-stat-label">Years Excellence</span>
+                <div class="aura-stat">
+                    <span class="aura-stat-number">14</span>
+                    <span class="aura-stat-label">Years Excellence</span>
                 </div>
-                <div class="dubai-stat">
-                    <span class="dubai-stat-number">99%</span>
-                    <span class="dubai-stat-label">Client Satisfaction</span>
+                <div class="aura-stat">
+                    <span class="aura-stat-number">99%</span>
+                    <span class="aura-stat-label">Client Satisfaction</span>
                 </div>
             </div>
 
-            <div class="dubai-hero-actions">
-                <a href="#inventory" class="dubai-btn dubai-btn-primary">
-                    <i class="bi bi-search"></i>
+            <div class="aura-hero-actions">
+                <a href="#inventory" class="aura-btn aura-btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.35-4.35" />
+                    </svg>
                     Explore Collection
                 </a>
-                <a href="#contact" class="dubai-btn dubai-btn-secondary">
-                    <i class="bi bi-calendar-check"></i>
+                <a href="#contact" class="aura-btn aura-btn-secondary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
                     Schedule Viewing
                 </a>
             </div>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section class="dubai-features">
-        <div class="dubai-section-header">
-            <h2 class="dubai-section-title">
-                The <strong>Aura Experience</strong>
-            </h2>
-            <p class="dubai-section-subtitle">
-                Discover why discerning clients choose Aura Motors for their automotive journey in Dubai
-            </p>
-        </div>
-
-        <div class="dubai-features-grid">
-            <div class="dubai-feature">
-                <div class="dubai-feature-icon">
-                    <i class="bi bi-gem"></i>
-                </div>
-                <h3 class="dubai-feature-title">Curated Selection</h3>
-                <p class="dubai-feature-description">
-                    Each vehicle in our collection is meticulously selected for quality,
-                    performance, and aesthetic appeal, ensuring only the finest examples.
-                </p>
-            </div>
-
-            <div class="dubai-feature">
-                <div class="dubai-feature-icon">
-                    <i class="bi bi-shield-check"></i>
-                </div>
-                <h3 class="dubai-feature-title">Quality Assurance</h3>
-                <p class="dubai-feature-description">
-                    Comprehensive 150-point inspection process with full service history
-                    and warranty options for complete peace of mind.
-                </p>
-            </div>
-
-            <div class="dubai-feature">
-                <div class="dubai-feature-icon">
-                    <i class="bi bi-person-heart"></i>
-                </div>
-                <h3 class="dubai-feature-title">Personal Service</h3>
-                <p class="dubai-feature-description">
-                    Dedicated client managers providing bespoke service from initial
-                    consultation to after-sales support and maintenance.
-                </p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Inventory Section -->
-    <section id="inventory" class="dubai-inventory">
-        <div class="dubai-section-header">
-            <h2 class="dubai-section-title">
-                Featured <strong>Collection</strong>
-            </h2>
-            <p class="dubai-section-subtitle">
-                Explore our carefully selected range of luxury and performance vehicles
-            </p>
-        </div>
-
-        <div class="dubai-cars-grid">
-            <div class="dubai-car-card">
-                <div class="dubai-car-image">
-                    <img src="{% static 'images/bentley-continental.jpg' %}" alt="Bentley Continental GT">
-                    <div class="dubai-car-badge">New Arrival</div>
-                </div>
-                <div class="dubai-car-info">
-                    <h3 class="dubai-car-title">Bentley Continental GT</h3>
-                    <div class="dubai-car-price">AED 850,000</div>
-                    <div class="dubai-car-specs">
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-speedometer2"></i>
-                            <span>2024</span>
-                        </div>
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-fuel-pump"></i>
-                            <span>6.0L W12</span>
-                        </div>
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-lightning"></i>
-                            <span>635 HP</span>
-                        </div>
-                    </div>
-                    <button class="dubai-btn dubai-btn-primary" style="width: 100%;">
-                        View Details
-                    </button>
-                </div>
-            </div>
-
-            <div class="dubai-car-card">
-                <div class="dubai-car-image">
-                    <img src="{% static 'images/audi-rsq8.jpg' %}" alt="Audi RS Q8">
-                    <div class="dubai-car-badge">Best Seller</div>
-                </div>
-                <div class="dubai-car-info">
-                    <h3 class="dubai-car-title">Audi RS Q8</h3>
-                    <div class="dubai-car-price">AED 680,000</div>
-                    <div class="dubai-car-specs">
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-speedometer2"></i>
-                            <span>2023</span>
-                        </div>
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-fuel-pump"></i>
-                            <span>4.0L V8</span>
-                        </div>
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-car-front"></i>
-                            <span>Quattro</span>
-                        </div>
-                    </div>
-                    <button class="dubai-btn dubai-btn-primary" style="width: 100%;">
-                        View Details
-                    </button>
-                </div>
-            </div>
-
-            <div class="dubai-car-card">
-                <div class="dubai-car-image">
-                    <img src="{% static 'images/mercedes-g-wagon.jpg' %}" alt="Mercedes-Benz G 63">
-                    <div class="dubai-car-badge">Limited Edition</div>
-                </div>
-                <div class="dubai-car-info">
-                    <h3 class="dubai-car-title">Mercedes-AMG G 63</h3>
-                    <div class="dubai-car-price">AED 920,000</div>
-                    <div class="dubai-car-specs">
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-speedometer2"></i>
-                            <span>2024</span>
-                        </div>
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-fuel-pump"></i>
-                            <span>4.0L Biturbo</span>
-                        </div>
-                        <div class="dubai-car-spec">
-                            <i class="bi bi-lightning"></i>
-                            <span>577 HP</span>
-                        </div>
-                    </div>
-                    <button class="dubai-btn dubai-btn-primary" style="width: 100%;">
-                        View Details
-                    </button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- About Section -->
-    <section class="dubai-about">
-        <div class="dubai-about-content">
-            <div class="dubai-about-text">
-                <h2 class="dubai-heading-1" style="margin-bottom: 2rem;">
-                    <strong class="dubai-text-sand">Aura Motors Dubai</strong><br>
-                    Redefining Automotive Excellence
+    <!-- Features Section - Full Width -->
+    <section class="full-width-section aura-features">
+        <div class="section-inner">
+            <div class="aura-section-header fade-in">
+                <h2 class="aura-section-title">
+                    The <strong>Aura Experience</strong>
                 </h2>
-                <p class="dubai-body-large" style="margin-bottom: 2rem; color: var(--dubai-charcoal-light);">
-                    Since our establishment in 2010, Aura Motors has been at the forefront of
-                    luxury automotive retail in Dubai. Our name reflects the unique atmosphere
-                    of sophistication and excellence we create for every client.
+                <p class="aura-section-subtitle">
+                    Discover why discerning clients choose Aura Motors for their automotive journey in Dubai
                 </p>
-                <p class="dubai-body" style="margin-bottom: 2rem; color: var(--dubai-charcoal-light);">
-                    Located in the heart of Dubai's automotive district, our state-of-the-art
-                    showroom showcases an exclusive collection of the world's most prestigious
-                    automotive brands, each selected for its unique character and exceptional quality.
-                </p>
-
-                <div class="dubai-about-stats">
-                    <div class="dubai-stat">
-                        <span class="dubai-stat-number">3,500+</span>
-                        <span class="dubai-stat-label">Vehicles Delivered</span>
-                    </div>
-                    <div class="dubai-stat">
-                        <span class="dubai-stat-number">40+</span>
-                        <span class="dubai-stat-label">Brands Available</span>
-                    </div>
-                    <div class="dubai-stat">
-                        <span class="dubai-stat-number">24/7</span>
-                        <span class="dubai-stat-label">Client Support</span>
-                    </div>
-                    <div class="dubai-stat">
-                        <span class="dubai-stat-number">AED 1.5B+</span>
-                        <span class="dubai-stat-label">Annual Turnover</span>
-                    </div>
-                </div>
             </div>
 
-            <div class="dubai-about-image">
-                <img src="{% static 'images/aura-showroom.jpg' %}" alt="Aura Motors Dubai Showroom">
+            <div class="aura-features-grid ">
+                <div class="aura-feature fade-in">
+                    <div class="aura-feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                        </svg>
+                    </div>
+                    <h3 class="aura-feature-title">Curated Selection</h3>
+                    <p class="aura-feature-description">
+                        Each vehicle in our collection is meticulously selected for quality,
+                        performance, and aesthetic appeal, ensuring only the finest examples.
+                    </p>
+                </div>
+
+                <div class="aura-feature fade-in">
+                    <div class="aura-feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                    </div>
+                    <h3 class="aura-feature-title">Quality Assurance</h3>
+                    <p class="aura-feature-description">
+                        Comprehensive 150-point inspection process with full service history
+                        and warranty options for complete peace of mind.
+                    </p>
+                </div>
+
+                <div class="aura-feature fade-in">
+                    <div class="aura-feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                    </div>
+                    <h3 class="aura-feature-title">Personal Service</h3>
+                    <p class="aura-feature-description">
+                        Dedicated client managers providing bespoke service from initial
+                        consultation to after-sales support and maintenance.
+                    </p>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- CTA Section -->
-    <section id="contact" class="dubai-cta">
-        <div class="dubai-cta-content">
-            <h2 class="dubai-cta-title">
-                Experience the <strong>Aura Difference</strong>
-            </h2>
-            <p class="dubai-cta-description">
-                Visit our showroom in Dubai or schedule a private consultation.
-                Let us help you discover the perfect vehicle that reflects your style and aspirations.
-            </p>
-            <div class="dubai-cta-actions">
-                <a href="tel:+971800AURA" class="dubai-btn dubai-btn-outline">
-                    <i class="bi bi-telephone"></i>
-                    Call +971 800 AURA
-                </a>
-                <a href="https://maps.google.com/?q=Aura+Motors+Dubai" class="dubai-btn dubai-btn-outline">
-                    <i class="bi bi-geo-alt"></i>
-                    Visit Showroom
-                </a>
-                <a href="mailto:info@auramotors.ae" class="dubai-btn dubai-btn-outline">
-                    <i class="bi bi-envelope"></i>
-                    Email Inquiry
-                </a>
+    <!-- Inventory Section - Full Width -->
+    <section id="inventory" class=" aura-inventory">
+        <div class="section-inner">
+            <div class="aura-section-header fade-in">
+                <h2 class="aura-section-title">
+                    Featured <strong>Collection</strong>
+                </h2>
+                <p class="aura-section-subtitle">
+                    Explore our carefully selected range of luxury and performance vehicles
+                </p>
+            </div>
+
+            <div class="aura-cars-grid">
+                <!-- Car 1 -->
+                <div class="aura-car-card fade-in">
+                    <div class="aura-car-image">
+                        <img src="{% static 'img/car.jfif' %}"
+                            alt="Luxury Car 1">
+                        <div class="aura-car-badge">New Arrival</div>
+                    </div>
+                    <div class="aura-car-info">
+                        <h3 class="aura-car-title">Mercedes-AMG GT</h3>
+                        <div class="aura-car-price">AED 720,000</div>
+                        <div class="aura-car-specs">
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                </svg>
+                                <span>2024</span>
+                            </div>
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M3 3h18v18H3z" />
+                                </svg>
+                                <span>4.0L V8</span>
+                            </div>
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                                </svg>
+                                <span>523 HP</span>
+                            </div>
+                        </div>
+                        <button class="aura-btn aura-btn-primary" style="width: 100%">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Car 2 -->
+                <div class="aura-car-card fade-in">
+                    <div class="aura-car-image">
+                        <img src="{% static 'img/car1.jfif' %}"
+                            alt="Luxury Car 2">
+                        <div class="aura-car-badge">Best Seller</div>
+                    </div>
+                    <div class="aura-car-info">
+                        <h3 class="aura-car-title">Porsche 911 Turbo S</h3>
+                        <div class="aura-car-price">AED 850,000</div>
+                        <div class="aura-car-specs">
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                </svg>
+                                <span>2023</span>
+                            </div>
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M3 3h18v18H3z" />
+                                </svg>
+                                <span>3.8L Flat-6</span>
+                            </div>
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                                </svg>
+                                <span>640 HP</span>
+                            </div>
+                        </div>
+                        <button class="aura-btn aura-btn-primary" style="width: 100%">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Car 3 -->
+                <div class="aura-car-card fade-in">
+                    <div class="aura-car-image">
+                        <img src="{% static 'img/car3.jfif' %}"
+                            alt="Luxury Car 3">
+                        <div class="aura-car-badge">Limited Edition</div>
+                    </div>
+                    <div class="aura-car-info">
+                        <h3 class="aura-car-title">BMW M8 Competition</h3>
+                        <div class="aura-car-price">AED 680,000</div>
+                        <div class="aura-car-specs">
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                </svg>
+                                <span>2024</span>
+                            </div>
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M3 3h18v18H3z" />
+                                </svg>
+                                <span>4.4L V8</span>
+                            </div>
+                            <div class="aura-car-spec">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                                </svg>
+                                <span>617 HP</span>
+                            </div>
+                        </div>
+                        <button class="aura-btn aura-btn-primary" style="width: 100%">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section - Full Width -->
+    <section class="full-width-section aura-about">
+        <div class="section-inner">
+            <div class="aura-about-content">
+                <div class="aura-about-text">
+                    <h2 class="about-heading fade-in">
+                        <strong>Aura Motors Dubai</strong>
+                        Redefining Automotive Excellence
+                    </h2>
+                    <p class="about-body mb-24 fade-in">
+                        Since our establishment in 2010, Aura Motors has been at the forefront of
+                        luxury automotive retail in Dubai. Our name reflects the unique atmosphere
+                        of sophistication and excellence we create for every client.
+                    </p>
+                    <p class="about-body mb-32 fade-in">
+                        Located in the heart of Dubai's automotive district, our state-of-the-art
+                        showroom showcases an exclusive collection of the world's most prestigious
+                        automotive brands, each selected for its unique character and exceptional quality.
+                    </p>
+
+                    <div class="aura-about-stats fade-in">
+                        <div class="aura-stat">
+                            <span class="about-stat-number">3,500+</span>
+                            <span class="about-stat-label">Vehicles Delivered</span>
+                        </div>
+                        <div class="aura-stat">
+                            <span class="about-stat-number">40+</span>
+                            <span class="about-stat-label">Brands Available</span>
+                        </div>
+                        <div class="aura-stat">
+                            <span class="about-stat-number">24/7</span>
+                            <span class="about-stat-label">Client Support</span>
+                        </div>
+                        <div class="aura-stat">
+                            <span class="about-stat-number">AED 1.5B+</span>
+                            <span class="about-stat-label">Annual Turnover</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="aura-about-image fade-in">
+                    <img src="{% static 'img/car3.jfif' %}"
+                        alt="Aura Motors Dubai Showroom">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section - Full Width -->
+    <section id="contact" class="full-width-section aura-cta">
+        <div class="section-inner">
+            <div class="aura-cta-content">
+                <h2 class="aura-cta-title fade-in">
+                    Experience the <strong>Aura Difference</strong>
+                </h2>
+                <p class="aura-cta-description fade-in">
+                    Visit our showroom in Dubai or schedule a private consultation.
+                    Let us help you discover the perfect vehicle that reflects your style and aspirations.
+                </p>
+                <div class="aura-cta-actions fade-in">
+                    <a href="tel:+971800AURA" class="aura-btn aura-btn-outline">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                        Call +971 800 AURA
+                    </a>
+                    <a href="https://maps.google.com/?q=Aura+Motors+Dubai" target="_blank"
+                        class="aura-btn aura-btn-outline">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                            <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        Visit Showroom
+                    </a>
+                    <a href="mailto:info@auramotors.ae" class="aura-btn aura-btn-outline">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                            <polyline points="22,6 12,13 2,6" />
+                        </svg>
+                        Email Inquiry
+                    </a>
+                </div>
             </div>
         </div>
     </section>
@@ -273,68 +347,188 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Smooth scrolling
+        // Enhanced smooth scrolling with offset
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
                 if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
+                    const offset = 80;
+                    const targetPosition = target.getBoundingClientRect().top + window.pageYOffset;
+                    window.scrollTo({
+                        top: targetPosition - offset,
+                        behavior: 'smooth'
                     });
                 }
             });
         });
 
-        // Animate stats
+        // Stats animation
         const animateStats = () => {
-            const stats = document.querySelectorAll('.dubai-stat-number');
+            const stats = document.querySelectorAll('.aura-stat-number, .about-stat-number');
             stats.forEach(stat => {
-                const finalValue = parseInt(stat.textContent);
+                const text = stat.textContent;
+                const finalValue = parseInt(text.replace(/[^0-9]/g, ''));
+                const hasPlus = text.includes('+');
+
+                stat.textContent = '0';
+
                 let current = 0;
                 const increment = finalValue / 50;
                 const timer = setInterval(() => {
                     current += increment;
                     if (current >= finalValue) {
-                        stat.textContent = finalValue + (stat.textContent.includes('+') ? '+' : '');
+                        stat.textContent = finalValue + (hasPlus ? '+' : '');
                         clearInterval(timer);
+
+                        // Celebration effect
+                        stat.style.transform = 'scale(1.1)';
+                        setTimeout(() => {
+                            stat.style.transform = 'scale(1)';
+                        }, 300);
                     } else {
                         stat.textContent = Math.floor(current);
                     }
-                }, 40);
+                }, 30);
             });
         };
 
-        // Intersection Observer for stats animation
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    animateStats();
+                    // Stats animation
+                    if (entry.target.classList.contains('aura-hero-stats') ||
+                        entry.target.classList.contains('aura-about-stats')) {
+                        setTimeout(() => {
+                            animateStats();
+                        }, 200);
+                    }
+
+                    // Add fade-in class
+                    entry.target.classList.add('fade-in');
                     observer.unobserve(entry.target);
                 }
             });
-        }, { threshold: 0.5 });
+        }, observerOptions);
 
-        // Observe stats sections
-        const statsSections = document.querySelectorAll('.dubai-hero-stats, .dubai-about-stats');
-        statsSections.forEach(section => {
-            observer.observe(section);
+        // Observe all fade-in elements
+        const animatedElements = document.querySelectorAll(
+            '.aura-hero-stats, .aura-about-stats, .aura-feature, .aura-car-card, .aura-section-header, .aura-hero-content'
+        );
+
+        animatedElements.forEach(el => {
+            observer.observe(el);
         });
 
-        // Add hover effects to cards
-        const cards = document.querySelectorAll('.dubai-car-card, .dubai-feature');
+        // Parallax effect on hero section
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const hero = document.querySelector('.aura-hero');
+            if (hero) {
+                hero.style.transform = `translateY(${scrolled * 0.05}px)`;
+            }
+        });
+
+        // Add subtle hover effect to car cards
+        const cards = document.querySelectorAll('.aura-car-card, .aura-feature');
         cards.forEach(card => {
             card.addEventListener('mouseenter', function () {
-                this.style.transform = this.classList.contains('dubai-car-card')
-                    ? 'translateY(-8px)'
-                    : 'translateY(-5px)';
+                this.style.transform = 'translateY(-10px)';
             });
 
             card.addEventListener('mouseleave', function () {
                 this.style.transform = 'translateY(0)';
             });
         });
+
+        // Add scroll progress indicator
+        const progressBar = document.createElement('div');
+        progressBar.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #D4AF37, #B8860B);
+            z-index: 9999;
+            transition: width 0.1s;
+            width: 0%;
+        `;
+        document.body.appendChild(progressBar);
+
+        window.addEventListener('scroll', () => {
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            progressBar.style.width = scrolled + '%';
+        });
+
+        // Lazy loading for images
+        const images = document.querySelectorAll('.aura-car-image img, .aura-about-image img');
+        const imageObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                    }
+                    img.style.opacity = '1';
+                    img.style.transition = 'opacity 0.5s ease';
+                    imageObserver.unobserve(img);
+                }
+            });
+        }, { threshold: 0.1 });
+
+        images.forEach(img => {
+            img.style.opacity = '0.5';
+            imageObserver.observe(img);
+        });
+
+        // Button click animations
+        document.querySelectorAll('.aura-btn').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                const circle = document.createElement('span');
+                const rect = this.getBoundingClientRect();
+                const size = Math.max(rect.width, rect.height);
+                const x = e.clientX - rect.left - size / 2;
+                const y = e.clientY - rect.top - size / 2;
+
+                circle.style.cssText = `
+                    position: absolute;
+                    top: ${y}px;
+                    left: ${x}px;
+                    width: ${size}px;
+                    height: ${size}px;
+                    background: rgba(255, 255, 255, 0.3);
+                    border-radius: 50%;
+                    transform: scale(0);
+                    animation: ripple 0.6s linear;
+                `;
+
+                this.appendChild(circle);
+
+                setTimeout(() => {
+                    circle.remove();
+                }, 600);
+            });
+        });
+
+        // Add ripple animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes ripple {
+                to {
+                    transform: scale(4);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
     });
 </script>
 {% endblock content %}

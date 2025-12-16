@@ -3,298 +3,384 @@
 
 {% block content %}
 <div class="dashboard-layout">
-    <!-- Mobile Toggle -->
-    <button class="mobile-toggle" onclick="toggleNav()">
-        <i class="fas fa-bars"></i>
-    </button>
-
-    <!-- Navigation -->
-    <nav class="nav-container" id="navContainer">
-        <!-- Logo -->
-        <div class="logo-section">
-            <div class="brand">
-                <div class="brand-icon">E</div>
-                <div class="brand-text">
-                    <h1>Enterprise</h1>
+    <!-- Navigation Sidebar - Fixed to Left -->
+    <nav class="sidebar">
+        <div class="sidebar-inner">
+            <!-- Logo -->
+            <div class="sidebar-logo">
+                <div class="logo-icon">🚀</div>
+                <div class="logo-text">
+                    <h2>ENTERPRISE</h2>
+                    <p>Business Suite</p>
                 </div>
             </div>
-        </div>
 
-        <!-- Menu -->
-        <div class="nav-menu">
-            <div class="nav-section">
-                <div class="nav-label">Applications</div>
-                <ul class="nav-items">
-                    <li class="nav-item">
-                        <a href="{% url 'daily_sale:dashboard' %}" class="nav-link active" onclick="setActiveNav(this)">
-                            <i class="fas fa-shopping-cart nav-icon"></i>
-                            <span>Daily Sales</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{% url 'containers:list' %}" class="nav-link" onclick="setActiveNav(this)">
-                            <i class="fas fa-shipping-fast nav-icon"></i>
-                            <span>Containers</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{% url 'expenses:expense_dashboard' %}" class="nav-link" onclick="setActiveNav(this)">
-                            <i class="fas fa-money-bill-wave nav-icon"></i>
-                            <span>Expenses</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{% url 'employees:dashboard' %}" class="nav-link" onclick="setActiveNav(this)">
-                            <i class="fas fa-users nav-icon"></i>
-                            <span>Employees</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
-                            <i class="fas fa-chart-line nav-icon"></i>
-                            <span>Finance</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
-                            <i class="fas fa-file-alt nav-icon"></i>
-                            <span>Reports</span>
-                        </a>
-                    </li>
-                </ul>
-            </div>
+            <!-- Navigation Menu -->
+            <div class="sidebar-menu">
+                <div class="menu-section">
+                    <h3 class="section-title">MAIN</h3>
+                    <ul class="menu-list">
+                        <li class="menu-item">
+                            <a href="{% url 'daily_sale:transaction_list' %}" class="menu-link" data-app="sales">
+                                <i class="menu-icon fas fa-shopping-cart"></i>
+                                <span class="menu-label">Daily Sales</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'containers:list' %}" class="menu-link" data-app="containers">
+                                <i class="menu-icon fas fa-shipping-fast"></i>
+                                <span class="menu-label">Containers</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
 
-            <div class="nav-section">
-                <div class="nav-label">System</div>
-                <ul class="nav-items">
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
-                            <i class="fas fa-cog nav-icon"></i>
-                            <span>Settings</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
-                            <i class="fas fa-shield-alt nav-icon"></i>
-                            <span>Security</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" onclick="setActiveNav(this)">
-                            <i class="fas fa-life-ring nav-icon"></i>
-                            <span>Support</span>
-                        </a>
-                    </li>
-                </ul>
+                <div class="menu-section">
+                    <h3 class="section-title">BUSINESS</h3>
+                    <ul class="menu-list">
+                        <li class="menu-item">
+                            <a href="{% url 'expenses:expense_dashboard' %}" class="menu-link" data-app="expenses">
+                                <i class="menu-icon fas fa-money-bill-wave"></i>
+                                <span class="menu-label">Expenses</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'employee:dashboard' %}" class="menu-link" data-app="employees">
+                                <i class="menu-icon fas fa-users"></i>
+                                <span class="menu-label">Employees</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="menu-section">
+                    <h3 class="section-title">SYSTEM</h3>
+                    <ul class="menu-list">
+                        <li class="menu-item">
+                            <a href="#" class="menu-link" data-app="reports">
+                                <i class="menu-icon fas fa-chart-pie"></i>
+                                <span class="menu-label">Reports</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="#" class="menu-link" data-app="settings">
+                                <i class="menu-icon fas fa-cog"></i>
+                                <span class="menu-label">Settings</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="#" class="menu-link" data-app="support">
+                                <i class="menu-icon fas fa-headset"></i>
+                                <span class="menu-label">Support</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
+    <!-- Main Content - Takes Full Desktop Width -->
     <main class="main-content">
-        <!-- Top Bar -->
-        <header class="top-bar">
-            <div class="page-title">
-                <h1>Daily Sales</h1>
-                <div class="page-subtitle">Monitor transactions and sales performance</div>
+        <!-- Top Header -->
+        <div class="content-header">
+            <div class="header-left">
+                <h1 class="page-title">Corporate Dashboard</h1>
+                <p class="page-subtitle">Welcome to Enterprise Business Suite</p>
             </div>
+        </div>
 
-            <div class="top-actions">
-                <div class="search-box">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text" class="search-input" placeholder="Search transactions...">
-                </div>
-
-                <button class="btn btn-primary">
-                    <i class="fas fa-plus"></i>
-                    New Sale
+        <!-- Hero Banner -->
+        <div class="hero-banner">
+            <div class="banner-content">
+                <h2>Premium Automotive Collection</h2>
+                <p>Exclusive luxury vehicles for distinguished clients</p>
+                <button class="btn btn-white">
+                    <i class="fas fa-eye"></i>
+                    Explore Collection
                 </button>
             </div>
-        </header>
+        </div>
 
-        <!-- Content -->
-        <div class="content-area">
-            <!-- Stats -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Today's Sales</div>
-                            <div class="stat-value">$12,450</div>
-                            <div class="stat-trend trend-positive">
-                                <i class="fas fa-arrow-up"></i>
-                                12.5%
-                            </div>
-                        </div>
-                    </div>
+        <!-- Stats Overview -->
+        <div class="stats-overview">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-dollar-sign"></i>
                 </div>
-
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-receipt"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Transactions</div>
-                            <div class="stat-value">87</div>
-                            <div class="stat-trend trend-positive">
-                                <i class="fas fa-arrow-up"></i>
-                                3.2%
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-cube"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Items Sold</div>
-                            <div class="stat-value">345</div>
-                            <div class="stat-trend trend-negative">
-                                <i class="fas fa-arrow-down"></i>
-                                2.1%
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-chart-bar"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Avg Invoice</div>
-                            <div class="stat-value">$143.10</div>
-                            <div class="stat-trend trend-positive">
-                                <i class="fas fa-arrow-up"></i>
-                                7.3%
-                            </div>
-                        </div>
-                    </div>
+                <div class="stat-content">
+                    <h3>$12.8M</h3>
+                    <p>Quarterly Revenue</p>
+                    <span class="stat-trend positive">
+                        <i class="fas fa-arrow-up"></i> 12.4%
+                    </span>
                 </div>
             </div>
-
-            <!-- Table -->
-            <div class="data-table-container">
-                <div class="table-header">
-                    <div class="table-filters">
-                        <select>
-                            <option>All Status</option>
-                            <option>Completed</option>
-                            <option>Pending</option>
-                        </select>
-                    </div>
-                    <div class="table-info">
-                        <span style="font-size: 11px; color: var(--text-secondary);">87 transactions</span>
-                    </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
                 </div>
-
-                <div class="table-content">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Invoice</th>
-                                <th>Customer</th>
-                                <th>Date</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>INV-2023-00125</td>
-                                <td>Kimia Trading LLC</td>
-                                <td>2023-12-06</td>
-                                <td>$2,540.00</td>
-                                <td><span class="status status-success"><span class="status-dot"></span>Completed</span>
-                                </td>
-                                <td>
-                                    <div class="action-menu">
-                                        <button class="action-btn" title="View">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="action-btn" title="Print">
-                                            <i class="fas fa-print"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>INV-2023-00124</td>
-                                <td>Tehran Steel Co.</td>
-                                <td>2023-12-06</td>
-                                <td>$1,850.00</td>
-                                <td><span class="status status-pending"><span class="status-dot"></span>Pending</span>
-                                </td>
-                                <td>
-                                    <div class="action-menu">
-                                        <button class="action-btn" title="View">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>INV-2023-00123</td>
-                                <td>Persian Carpets</td>
-                                <td>2023-12-05</td>
-                                <td>$3,250.00</td>
-                                <td><span class="status status-success"><span class="status-dot"></span>Completed</span>
-                                </td>
-                                <td>
-                                    <div class="action-menu">
-                                        <button class="action-btn" title="View">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="stat-content">
+                    <h3>247</h3>
+                    <p>Active Clients</p>
+                    <span class="stat-trend positive">
+                        <i class="fas fa-arrow-up"></i> 8.2%
+                    </span>
                 </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>98.3%</h3>
+                    <p>Performance</p>
+                    <span class="stat-trend negative">
+                        <i class="fas fa-arrow-down"></i> 2.1%
+                    </span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>87</h3>
+                    <p>Today's Sales</p>
+                    <span class="stat-trend positive">
+                        <i class="fas fa-arrow-up"></i> 24.5%
+                    </span>
+                </div>
+            </div>
+        </div>
+
+       
+
+        <!-- Quick Actions -->
+        <div class="quick-actions-section">
+            <div class="section-header">
+                <h2>Quick Access</h2>
+            </div>
+            <div class="actions-grid">
+                <a href="{% url 'daily_sale:transaction_list' %}" class="action-card">
+                    <div class="action-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <div class="action-content">
+                        <h3>Daily Sales</h3>
+                        <p>Manage transactions and sales</p>
+                    </div>
+                    <i class="action-arrow fas fa-arrow-right"></i>
+                </a>
+                <a href="{% url 'containers:list' %}" class="action-card">
+                    <div class="action-icon">
+                        <i class="fas fa-shipping-fast"></i>
+                    </div>
+                    <div class="action-content">
+                        <h3>Containers</h3>
+                        <p>Track and manage shipments</p>
+                    </div>
+                    <i class="action-arrow fas fa-arrow-right"></i>
+                </a>
+                <a href="{% url 'expenses:expense_dashboard' %}" class="action-card">
+                    <div class="action-icon">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
+                    <div class="action-content">
+                        <h3>Expenses</h3>
+                        <p>Manage business expenses</p>
+                    </div>
+                    <i class="action-arrow fas fa-arrow-right"></i>
+                </a>
+                <a href="{% url 'employee:dashboard' %}" class="action-card">
+                    <div class="action-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="action-content">
+                        <h3>Employees</h3>
+                        <p>HR and employee management</p>
+                    </div>
+                    <i class="action-arrow fas fa-arrow-right"></i>
+                </a>
             </div>
         </div>
     </main>
 </div>
 
 <script>
-    function setActiveNav(element) {
-        document.querySelectorAll('.nav-link').forEach(item => {
-            item.classList.remove('active');
+document.addEventListener('DOMContentLoaded', function() {
+    // Navigation functionality
+    const menuLinks = document.querySelectorAll('.menu-link');
+    const sidebar = document.querySelector('.sidebar');
+    
+    // Set active menu item
+    menuLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            // Remove active class from all links
+            menuLinks.forEach(l => l.classList.remove('active'));
+            
+            // Add active class to clicked link
+            this.classList.add('active');
+            
+            // Update page title based on app
+            const appName = this.getAttribute('data-app');
+            const pageTitle = document.querySelector('.page-title');
+            const pageSubtitle = document.querySelector('.page-subtitle');
+            
+            const titles = {
+                'dashboard': ['Corporate Dashboard', 'Welcome to Enterprise Business Suite'],
+                'sales': ['Daily Sales', 'Transaction Management'],
+                'containers': ['Containers', 'Logistics Management'],
+                'expenses': ['Expenses', 'Cost Management'],
+                'employees': ['Employees', 'HR Management'],
+                'cars': ['Premium Cars', 'Luxury Vehicles Collection'],
+                'reports': ['Reports', 'Business Analytics'],
+                'settings': ['Settings', 'System Configuration'],
+                'support': ['Support', 'Help & Assistance']
+            };
+            
+            if (titles[appName] && pageTitle && pageSubtitle) {
+                pageTitle.textContent = titles[appName][0];
+                pageSubtitle.textContent = titles[appName][1];
+            }
+            
+            // Close sidebar on mobile
+            if (window.innerWidth < 768) {
+                sidebar.classList.remove('active');
+            }
         });
-        element.classList.add('active');
-
-        if (window.innerWidth <= 768) {
-            document.getElementById('navContainer').classList.remove('active');
-        }
-
-        return false;
-    }
-
-    function toggleNav() {
-        const nav = document.getElementById('navContainer');
-        nav.classList.toggle('active');
-    }
-
-    // Close nav on outside click
-    document.addEventListener('click', function (event) {
-        const nav = document.getElementById('navContainer');
-        const toggle = document.querySelector('.mobile-toggle');
-
-        if (window.innerWidth <= 768 &&
-            nav.classList.contains('active') &&
-            !nav.contains(event.target) &&
-            !toggle.contains(event.target)) {
-            nav.classList.remove('active');
-        }
     });
+    
+    // Quick view buttons
+    const quickViewButtons = document.querySelectorAll('.quick-view-btn');
+    quickViewButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const carCard = this.closest('.car-card');
+            const carTitle = carCard.querySelector('.car-title').textContent;
+            alert(`Quick View: ${carTitle}\nFull details available in the Premium Cars section.`);
+        });
+    });
+    
+    // Car card click
+    const carCards = document.querySelectorAll('.car-card');
+    carCards.forEach(card => {
+        card.addEventListener('click', function(e) {
+            if (!e.target.closest('.quick-view-btn') && !e.target.closest('.btn')) {
+                const carTitle = this.querySelector('.car-title').textContent;
+                alert(`Selected: ${carTitle}\nRedirecting to details page...`);
+            }
+        });
+    });
+    
+    // Hero banner button
+    const heroButton = document.querySelector('.btn-white');
+    if (heroButton) {
+        heroButton.addEventListener('click', function() {
+            const carsLink = document.querySelector('.menu-link[data-app="cars"]');
+            if (carsLink) {
+                carsLink.click();
+            }
+        });
+    }
+
+    
+    // View all link
+    const viewAllLink = document.querySelector('.view-all-link');
+    if (viewAllLink) {
+        viewAllLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            const carsLink = document.querySelector('.menu-link[data-app="cars"]');
+            if (carsLink) {
+                carsLink.click();
+            }
+        });
+    }
+    
+    // Animate elements on scroll
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('animate-in');
+            }
+        });
+    }, observerOptions);
+    
+    // Observe all animated elements
+    document.querySelectorAll('.stat-card, .car-card, .action-card').forEach(el => {
+        observer.observe(el);
+    });
+    
+    // Add CSS for scroll animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-in {
+            animation: slideIn 0.6s ease forwards;
+        }
+        
+        .hero-banner {
+            animation: slideIn 0.8s ease;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Mobile menu toggle
+    const mobileMenuBtn = document.createElement('button');
+    mobileMenuBtn.className = 'mobile-menu-btn';
+    mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+    mobileMenuBtn.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1001;
+        width: 48px;
+        height: 48px;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 20px;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: var(--shadow-lg);
+    `;
+    
+    document.body.appendChild(mobileMenuBtn);
+    
+    mobileMenuBtn.addEventListener('click', function() {
+        sidebar.classList.toggle('active');
+    });
+    
+    // Show/hide mobile menu button
+    function checkMobile() {
+        if (window.innerWidth < 768) {
+            mobileMenuBtn.style.display = 'flex';
+        } else {
+            mobileMenuBtn.style.display = 'none';
+            sidebar.classList.remove('active');
+        }
+    }
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+});
 </script>
 {% endblock content %}

@@ -1,42 +1,225 @@
 <!doctype html>
+{% load humanize %}
+{% load i18n %}
+{% load static %}
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{% block title %}Daily Sale{% endblock %}</title>
+  <title>{% block title %}Daily Sale Dashboard{% endblock %}</title>
+
+  <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+
+  <!-- Select2 -->
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.2.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.2.0/dist/select2-bootstrap-5-theme.min.css"
+    rel="stylesheet" />
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{% static 'css/daily_sale_style.css' %}">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
   {% block extra_head %}{% endblock %}
 </head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="{% url 'daily_sale:dashboard' %}">DailySale</a>
-    <div class="collapse navbar-collapse">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="{% url 'accounts:dashboard' %}">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'daily_sale:transaction_create' %}">New Transaction</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'daily_sale:transaction_list' %}">Transactions</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'daily_sale:daily_summary' %}">Daily Summary</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'daily_sale:old_transactions' %}">Old Transaction</a></li>
-      </ul>
+
+<body class="d-flex flex-column min-vh-100">
+
+  <!-- Modern Navigation -->
+  <nav class="navbar navbar-expand-lg navbar-dark modern-nav">
+    <div class="container-fluid">
+      <div class="brand-container">
+        <i class="bi bi-graph-up-arrow brand-icon"></i>
+        <span class="brand-text">Daily<span class="brand-accent">Sale</span></span>
+      </div>
+
+
+      <!-- Mobile Toggle -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <!-- Nav Items -->
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'accounts:dashboard' %}active{% endif %}"
+              href="{% url 'accounts:dashboard' %}">
+              <i class="bi bi-list-check me-2"></i>
+              Home 
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'transaction_create' %}active{% endif %}"
+              href="{% url 'daily_sale:transaction_create' %}">
+              <i class="bi bi-plus-circle me-2"></i>
+              New Transaction
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}"
+              href="{% url 'daily_sale:transaction_list' %}">
+              <i class="bi bi-list-check me-2"></i>
+              Transactions
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'daily_summary' %}active{% endif %}"
+              href="{% url 'daily_sale:daily_summary' %}">
+              <i class="bi bi-file-text me-2"></i>
+              Daily Summary
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'outstanding' %}active{% endif %}"
+              href="{% url 'daily_sale:outstanding' %}">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              Old Transactions
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'cleared_transactions' %}active{% endif %}"
+              href="{% url 'daily_sale:cleared_transactions' %}">
+              <i class="bi bi-speedometer2 me-2"></i>
+              Cleared Cashes
+            </a>
+          </li>
+        </ul>
+
+        <!-- User Menu -->
+        <div class="navbar-right">
+          <div class="dropdown user-dropdown">
+            <button class="btn btn-user dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="bi bi-person-circle me-2"></i>
+              {% if user.get_full_name %}
+              {{ user.get_full_name }}
+              {% else %}
+              {{ user.username }}
+              {% endif %}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i> Profile</a></li>
+              <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i> Settings</a></li>
+              <li>
+                <hr class="dropdown-divider">
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-</nav>
+  </nav>
 
-<main class="container">
-  {% if messages %}
-    {% for m in messages %}
-      <div class="alert alert-{{ m.tags }}">{{ m }}</div>
-    {% endfor %}
-  {% endif %}
-  {% block content %}{% endblock %}
-</main>
+  <!-- Main Content -->
+  <main class="container-fluid modern-main">
+    <!-- Messages -->
+    {% if messages %}
+    <div class="message-container">
+      {% for m in messages %}
+      <div class="alert alert-{{ m.tags }} alert-dismissible fade show message-alert" role="alert">
+        <i
+          class="bi bi-{% if m.tags == 'success' %}check-circle{% elif m.tags == 'error' %}x-circle{% elif m.tags == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+        {{ m }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-{% block extra_js %}{% endblock %}
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="page-header-content">
+        <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+        <p class="page-subtitle">{% block page_subtitle %}Daily sales overview and analytics{% endblock %}</p>
+      </div>
+      <div class="page-header-actions">
+        <div class="date-display">
+          <i class="bi bi-calendar3 me-2"></i>
+          <span id="currentDateTime">
+            {% now "F d, Y" %}
+          </span>
+        </div>
+        {% block page_actions %}{% endblock %}
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content-wrapper">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="modern-footer mt-auto">
+    <div class="container-fluid">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <div class="footer-brand">
+            <i class="bi bi-graph-up-arrow"></i>
+            <span>DailySale System v1.0</span>
+          </div>
+          <p class="footer-text">Sales management made simple and efficient</p>
+        </div>
+        <div class="col-md-6 text-md-end">
+          <div class="footer-links">
+            <a href="#" class="footer-link">Privacy Policy</a>
+            <a href="#" class="footer-link">Terms of Service</a>
+            <a href="#" class="footer-link">Help Center</a>
+            <a href="#" class="footer-link">Contact Support</a>
+          </div>
+          <div class="footer-copy">
+            &copy; {% now "Y" %} DailySale. All rights reserved.
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+  <!-- Custom JS -->
+  <script>
+    // Update current date time
+    function updateDateTime() {
+      const now = new Date();
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      document.getElementById('currentDateTime').textContent = now.toLocaleDateString('en-US', options);
+    }
+
+    // Initialize
+    $(document).ready(function () {
+      updateDateTime();
+      setInterval(updateDateTime, 60000); // Update every minute
+
+      // Initialize Select2
+      $('.select2').select2({
+        theme: 'bootstrap-5',
+        width: '100%'
+      });
+
+      // Add animation to alerts
+      $('.alert').addClass('animate__animated animate__fadeIn');
+    });
+  </script>
+
+  {% block extra_js %}{% endblock %}
 </body>
+
 </html>

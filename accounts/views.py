@@ -1,24 +1,25 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from daily_sale.models import DailySaleTransaction
 from expenses.models import ExpenseItem
 from containers.models import Container, Inventory_List
-from . forms import SignUpForm, UserUpdateForm, UpdatePasswordForm, UpdateUserInfo
+from .forms import SignUpForm, UserUpdateForm, UpdatePasswordForm, UpdateUserInfo
 from .models import UserProfile
 from django.contrib.auth.models import User
 from django.utils.translation import gettext as _
-from django.contrib.auth.decorators import user_passes_test
 from django.utils.translation import get_language
 from functools import wraps
 
+# Decorator سفارشی برای ادمین‌ها
 def admin_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
         if not request.user.is_authenticated:
+            messages.error(request, _("Please login first"))
             return redirect('accounts:login')
         if not request.user.is_staff:
             messages.error(request, _("Admin access required"))
@@ -26,123 +27,144 @@ def admin_required(view_func):
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 
-@user_passes_test(admin_required) #فقط به ادمین‌ها اجازه ورود می‌دهد
-def admin_panel(request):
-    return redirect('admin:index')
-
+# صفحه اصلی - برای همه
 def home(request):    
     context = {
         'welcome_message': _("Hello Welcome!")
     }
     return render(request, 'home.html', context)
 
-
+# صفحه login اصلاح شده
+# accounts/views.py
 def login_user(request):
     """Login view that handles user login with appropriate messages"""
     if request.user.is_authenticated:
         messages.info(request, _("You are already logged in!"))
-        return redirect("accounts:dashboard")  # Redirect to dashboard after login
+        
+        # اگر کاربر ادمین است به داشبورد، اگر کاربر عادی است به صفحه مشتری
+        if request.user.is_staff:
+            return redirect("accounts:dashboard")
+        else:
+            # کاربر عادی را به صفحه مشتری هدایت می‌کنیم
+            return redirect("daily_sale:customer_detail")
 
     if request.method == "POST":
-        username = request.POST.get('username').strip()
-        password = request.POST.get('password').strip()
-        user = authenticate(request, username=username, password=password)
-
-        if user:
-            login(request, user)
-            next_page = request.GET.get('next', 'accounts:dashboard')
-            if '/admin/' in next_page and not user.is_staff:
-                messages.error(request, _("You don't have permission to access the admin panel"))
-                return redirect('accounts:dashboard')
-
-            return redirect(next_page)
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        
+        if not username or not password:
+            messages.error(request, _("Please enter both username and password"))
         else:
-            messages.error(request, _("Incorrect username or password!"))
+            user = authenticate(request, username=username, password=password)
+
+            if user:
+                login(request, user)
+                messages.success(request, _("Login successful!"))
+                
+                # بررسی next page
+                next_page = request.GET.get('next')
+                
+                # اگر کاربر ادمین است
+                if user.is_staff:
+                    if next_page and '/admin/' in next_page:
+                        return redirect(next_page)
+                    return redirect('accounts:dashboard')
+                # اگر کاربر عادی است
+                else:
+                    if next_page and ('/admin/' in next_page or '/dashboard/' in next_page):
+                        messages.warning(request, _("Access denied. Redirecting to your profile."))
+                        return redirect('dailysale:customer_self_view')
+                    return redirect('dailysale:customer_self_view')
+            else:
+                messages.error(request, _("Incorrect username or password!"))
 
     return render(request, 'login.html')
-
+# صفحه signup
 def signup_user(request):
     """User registration view that handles form submission for user signup"""
     if request.method == "POST":
         form = SignUpForm(request.POST)
         if form.is_valid():
-            form.save()  # Save user and their profile data
-            messages.success(request, _("Registration successful!"))
+            user = form.save()
+            messages.success(request, _("Registration successful! You can now login."))
             return redirect('accounts:login')
         else:
             messages.error(request, _("Please correct the form errors"))
-            return render(request, 'signup.html', {'form': form})
-
-    form = SignUpForm()
+    else:
+        form = SignUpForm()
+    
     return render(request, 'signup.html', {'form': form})
 
+# داشبورد - فقط برای ادمین‌ها
 @login_required
+@admin_required
 def dashboard(request):
-    """User Dashboard with role-based access"""
+    """Admin Dashboard with quick stats and app navigation"""
     
-    # اگر کاربر ادمین باشد، به داشبورد مدیریتی هدایت شود
-    if request.user.is_staff: 
-        return redirect('admin:index')
+    # Quick statistics - با داده‌های واقعی
+    try:
+        total_sales = DailySaleTransaction.objects.count()
+    except:
+        total_sales = 0
     
-    # اگر کاربر عادی باشد، به صفحه هوم هدایت شود
-    messages.info(request, _("Welcome to your account!"))
-    return redirect('accounts:home')
-
-@login_required
-def dashboard(request):
-    """User Dashboard with quick stats and app navigation"""
+    try:
+        total_expenses = ExpenseItem.objects.count()
+    except:
+        total_expenses = 0
     
-    # Quick statistics
+    try:
+        total_containers = Container.objects.count()
+    except:
+        total_containers = 0
+    
+    try:
+        total_users = User.objects.count()
+    except:
+        total_users = 0
+    
     quick_stats = {
-        'total_sales': 1247,
-        'total_inventory': 856,
-        'active_containers': 23,
-        'pending_expenses': 45,
+        'total_sales': total_sales,
+        'total_expenses': total_expenses,
+        'total_containers': total_containers,
+        'total_users': total_users,
     }
     
-
-    # App navigation setup - with direct URLs
+    # App navigation setup - با URLهای Django
     apps = [
         {
             'name': 'Daily Sales', 
-            'url': '/daily_sale/',  # URL مستقیم
-            'icon': '💰', 
-            'active': True,
+            'url': 'daily_sale:transaction_list',  # با نام URL
+            'icon': 'fas fa-shopping-cart', 
             'description': 'Daily transactions and sales management'
         },
         {
             'name': 'Containers', 
-            'url': '/containers/transactions/report/',  # URL مستقیم
-            'icon': '🚢', 
-            'active': True,
+            'url': 'containers:list',  # با نام URL
+            'icon': 'fas fa-shipping-fast', 
             'description': 'Container and shipping management'
         },
         {
             'name': 'Expenses', 
-            'url': '/expenses/',  # URL مستقیم
-            'icon': '💸', 
-            'active': True,
+            'url': 'expenses:report/',  # با نام URL
+            'icon': 'fas fa-money-bill-wave', 
             'description': 'Expense tracking and management'
         },
         {
             'name': 'Employees', 
-            'url': '/employee/',  # URL مستقیم
-            'icon': '👥',  
-            'active': True,
+            'url': 'employee:employees',  # با نام URL
+            'icon': 'fas fa-users',  
             'description': 'Employee and staff management'
         },
         {
             'name': 'Finance', 
-            'url': '/finance/',  # URL مستقیم
-            'icon': '📊', 
-            'active': True,
+            'url': '#',  # اگر وجود ندارد
+            'icon': 'fas fa-chart-line', 
             'description': 'Financial reports and analysis'
         },
         {
             'name': 'Reports', 
-            'url': '/reports/',  # URL مستقیم
-            'icon': '📋', 
-            'active': True,
+            'url': '#',  # اگر وجود ندارد
+            'icon': 'fas fa-file-alt', 
             'description': 'Comprehensive reporting system'
         },
     ]
@@ -153,41 +175,46 @@ def dashboard(request):
     }
     return render(request, 'dashboard.html', context)
 
+# پنل ادمین Django
+@login_required
+@admin_required
+def admin_panel(request):
+    """Redirect to Django admin panel"""
+    return redirect('admin:index')
 
+# logout
 def logout_user(request):
-	logout(request)
-	messages.success(request, "You Have Been Logged Out...")
-	return redirect('accounts:home')
+    logout(request)
+    messages.success(request, _("You Have Been Logged Out..."))
+    return redirect('accounts:home')
 
+# update user info
+@login_required
 def update_user(request):
-    if request.user.is_authenticated: #ابتدا بررسی می‌کنیم که آیا کاربر وارد شده است یا خیر.
-        current_user = User.objects.get(id=request.user.id) # استفاده از request.user.is_authenticated برای بررسی وضعیت ورود
-        user_form = UserUpdateForm(request.POST or None, instance = current_user) # استفاده از فرم UserUpdateForm برای بروزرسانی داده‌ها
-        if user_form.is_valid(): 
-            user_form.save() # ذخیره‌سازی و بروزرسانی اطلاعات
-            login(request, current_user) # بروزرسانی اطلاعات کاربر و ورود مجدد به سیستم
-            messages.success(request, 'Updated!')
-            return redirect('home')
-        return render(request, 'update_user.html', {'user_form': user_form})
-       
-    else:
-        messages.error(request, 'login First') # اگر کاربر وارد نشده باشد
-        return redirect('home')
+    current_user = request.user  # استفاده از request.user که همیشه لاگین شده است
+    user_form = UserUpdateForm(request.POST or None, instance=current_user)
     
+    if request.method == "POST":
+        if user_form.is_valid(): 
+            user_form.save()
+            # login(request, current_user)  # این خط را حذف کنید، چون کاربر قبلا لاگین است
+            messages.success(request, _('Profile updated successfully!'))
+            return redirect('accounts:home')
+    
+    return render(request, 'update_user.html', {'user_form': user_form})
+
+# update password
+@login_required
 def update_password(request):
-    if not request.user.is_authenticated:
-        messages.error(request, _('please login first!'))
-        return redirect('login')
-
     current_user = request.user
-
+    
     if request.method == 'POST':
         form = UpdatePasswordForm(current_user, request.POST)
         if form.is_valid():
             form.save()
             login(request, current_user)
-            messages.success(request, 'password changed successfuly!')
-            return redirect('update_user')
+            messages.success(request, _('Password changed successfully!'))
+            return redirect('accounts:home')
         else:
             for error in list(form.errors.values()):
                 messages.error(request, error)
@@ -196,22 +223,14 @@ def update_password(request):
 
     return render(request, 'update_password.html', {'form': form})
 
-def update_info(request):
-    if not request.user.is_authenticated:
-        messages.error(request, _('please login first'))
-        return redirect('login')
 
-    current_user, created = UserProfile.objects.get_or_create(user=request.user) # اطلاعات کاربر ساخته شده را ذخیره میکنیم تا در مراحل بعدی استفاده کنیم
 
-    if request.method == "POST":
-        form = UpdateUserInfo(request.POST, instance=current_user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, _(' ')) 
-            return redirect('home')
-        else:
-            messages.error(request, _('Error'))
-    else:
-        form = UpdateUserInfo(instance=current_user) # نمایش یک فرم خالی برای کاربر و وارد کردن اطلاعات
-
-    return render(request, 'update_info.html', {'form': form})
+# صفحه برای کاربران عادی - اگر به داشبورد دسترسی پیدا کردند
+@login_required
+def user_home(request):
+    """Home page for regular users after login"""
+    context = {
+        'user': request.user,
+        'is_admin': request.user.is_staff
+    }
+    return render(request, 'home.html', context)

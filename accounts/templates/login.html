@@ -5,80 +5,147 @@
 {% block title %}{% trans 'Login' %}{% endblock %}
 
 {% block content %}
-
-<div class="login-container">
-    <div class="login-card">
-        <!-- Header -->
-        <div class="login-header">
-            <h1 class="login-title">Welcome Back</h1>
-            <p class="login-subtitle">Sign in to your account to continue</p>
+<div class="page-container">
+    <!-- Right Side - Login Form -->
+    <div class="login-side">
+        <div class="welcome-text">
+            <h2>Hi, <span>Welcome to</span></h2>
+            <div class="cobra-logo">Company</div>
         </div>
 
-        <!-- Error Messages -->
-        {% if form.errors %}
-        <div class="login-error">
-            Please enter a correct username and password. Note that both fields may be case-sensitive.
-        </div>
-        {% endif %}
+        <div class="form-container">
+            <!-- Messages -->
+            {% if form.errors %}
+            <div class="error-message">
+                Please enter a correct username and password.
+            </div>
+            {% endif %}
 
-        {% if messages %}
-        {% for message in messages %}
-        <div class="login-{{ message.tags }}">
-            {{ message }}
-        </div>
-        {% endfor %}
-        {% endif %}
+            {% if messages %}
+            {% for message in messages %}
+            <div class="error-message" style="background: #e8f5e9; border-color: #2ecc71; color: #27ae60;">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
 
-        <!-- Login Form -->
-        <form method="POST" class="login-form">
-            {% csrf_token %}
+            <!-- Login Form -->
+            <form method="POST" id="loginForm">
+                {% csrf_token %}
 
-            <div class="login-form-group username">
-                <input type="text" name="username" class="login-form-control" placeholder="{% trans 'Username' %}"
-                    required autofocus>
+                <div class="form-group">
+                    <label class="form-label">Email address</label>
+                    <input type="text" name="username" class="form-input" placeholder="Enter your email" required
+                        autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-input" placeholder="Enter your password"
+                        required>
+                </div>
+
+                <div class="button-row">
+                    <button type="submit" class="btn btn-register" id="registerBtn">
+                        Register
+                    </button>
+                </div>
+            </form>
+
+            <!-- OR Divider -->
+            <div class="or-divider">
+                Or
             </div>
 
-            <div class="login-form-group password">
-                <input type="password" name="password" class="login-form-control" placeholder="{% trans 'Password' %}"
-                    required>
+            <!-- Additional Links -->
+            <div class="additional-links">
+                <a href="{% url 'accounts:signup' %}">
+                    Don't have an account? Sign up here
+                </a>
             </div>
-
-            <button type="submit" class="login-btn" id="loginButton">
-                {% trans 'Sign In' %}
-            </button>
-        </form>
-
-        <!-- Signup Link -->
-        <div class="login-signup">
-            <p class="login-signup-text">Don't have an account?</p>
-            <a href="{% url 'accounts:signup' %}" class="login-signup-link">
-                Create new account
-            </a>
         </div>
     </div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const loginButton = document.getElementById('loginButton');
-        const loginForm = document.querySelector('.login-form');
+        // Get elements
+        const loginForm = document.getElementById('loginForm');
+        const registerBtn = document.getElementById('registerBtn');
+        const engineBtn = document.getElementById('engineBtn');
+        const fingerprintBtn = document.getElementById('fingerprintBtn');
 
-        loginForm.addEventListener('submit', function () {
-            loginButton.classList.add('loading');
-            loginButton.disabled = true;
-        });
+        // Form submission
+        if (loginForm && registerBtn) {
+            loginForm.addEventListener('submit', function (e) {
+                registerBtn.classList.add('loading');
+                registerBtn.disabled = true;
+            });
+        }
 
-        // Add focus effects
-        const inputs = document.querySelectorAll('.login-form-control');
+        // Engine button
+        if (engineBtn) {
+            engineBtn.addEventListener('click', function () {
+                const originalText = this.textContent;
+                this.textContent = 'Starting...';
+                this.disabled = true;
+
+                // Add engine sound effect
+                const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-car-engine-starting-1667.mp3');
+                audio.volume = 0.3;
+                audio.play().catch(e => console.log("Audio play failed"));
+
+                // Reset button
+                setTimeout(() => {
+                    this.textContent = originalText;
+                    this.disabled = false;
+                }, 1500);
+            });
+        }
+
+        // Fingerprint button
+        if (fingerprintBtn) {
+            fingerprintBtn.addEventListener('click', function () {
+                const icon = this.querySelector('.fingerprint-icon');
+                const originalIcon = icon.textContent;
+
+                // Scanning animation
+                this.style.borderColor = '#e74c3c';
+                icon.textContent = '🔍';
+
+                // Simulate fingerprint scan
+                setTimeout(() => {
+                    icon.textContent = '✓';
+                    icon.style.color = '#2ecc71';
+                    this.style.borderColor = '#2ecc71';
+
+                    // Redirect after success
+                    setTimeout(() => {
+                        window.location.href = '/dashboard/';
+                    }, 800);
+                }, 1200);
+            });
+        }
+
+        // Simple input focus effects
+        const inputs = document.querySelectorAll('.form-input');
         inputs.forEach(input => {
             input.addEventListener('focus', function () {
-                this.parentElement.classList.add('focused');
+                this.style.background = '#fff';
+                this.style.borderColor = '#e74c3c';
             });
 
             input.addEventListener('blur', function () {
-                this.parentElement.classList.remove('focused');
+                if (!this.value) {
+                    this.style.background = '#f5f5f5';
+                }
+                this.style.borderColor = '#ddd';
             });
         });
+
+        // Preload car image for better performance
+        const carImage = new Image();
+        carImage.src = 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?q=80&w=1887&auto=format&fit=crop&ixlib=rb-4.0.3';
     });
 </script>
 {% endblock %}

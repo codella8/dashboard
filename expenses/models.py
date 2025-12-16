@@ -2,31 +2,25 @@ from django.db import models
 from django.core.validators import MinValueValidator
 
 class ExpenseCategory(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="نام دسته‌بندی")
-    description = models.TextField(blank=True, verbose_name="توضیحات")
+    name = models.CharField(max_length=100, unique=True, verbose_name="category name")
+    description = models.TextField(blank=True, verbose_name="description")
     
     def __str__(self):
         return self.name
     
-    class Meta:
-        verbose_name = "دسته‌بندی هزینه"
-        verbose_name_plural = "دسته‌بندی هزینه‌ها"
 
 class ExpenseItem(models.Model):
-    name = models.CharField(max_length=100, verbose_name="نام آیتم")
-    category = models.ForeignKey(ExpenseCategory, on_delete=models.CASCADE, verbose_name="دسته‌بندی")
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="قیمت واحد")
+    name = models.CharField(max_length=100, verbose_name="Item name")
+    category = models.ForeignKey(ExpenseCategory, on_delete=models.CASCADE, verbose_name="category")
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="price")
     
     def __str__(self):
         return f"{self.name} - {self.category.name}"
     
-    class Meta:
-        verbose_name = "آیتم هزینه"
-        verbose_name_plural = "آیتم‌های هزینه"
 
 class ExpenseRecord(models.Model):
     PAYMENT_METHODS = [
-        ('cash', 'نقدی'),
+        ('cash', 'cash'),
         ('bank', 'حواله بانکی'),
         ('card', 'کارتخوان'),
     ]
