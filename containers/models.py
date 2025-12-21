@@ -68,7 +68,7 @@ class Inventory_List(models.Model):
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True, 
-        related_name='inventory_items'  # ✅ تغییر به inventory_items
+        related_name='inventory_items'
     )
     
     date_added = models.DateField(default=timezone.now, db_index=True)
@@ -85,7 +85,7 @@ class Inventory_List(models.Model):
     description = models.TextField(blank=True)
 
     class Meta:
-        verbose_name = "Inventory Item"  # ✅ بهتره اسمش رو عوض کنیم
+        verbose_name = "Inventory Item" 
         verbose_name_plural = "Inventory Items"
         indexes = [
             models.Index(fields=['code']), 

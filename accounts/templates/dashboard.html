@@ -1,5 +1,6 @@
 {% extends "accounts_base.html" %}
 {% load static %}
+{% block title %}Almuqbil | Dashboard{% endblock %}
 
 {% block content %}
 <div class="dashboard-layout">
@@ -10,8 +11,7 @@
             <div class="sidebar-logo">
                 <div class="logo-icon">🚀</div>
                 <div class="logo-text">
-                    <h2>ENTERPRISE</h2>
-                    <p>Business Suite</p>
+                    <h2>COMPANYNAME</h2>
                 </div>
             </div>
 
@@ -50,58 +50,19 @@
                                 <span class="menu-label">Employees</span>
                             </a>
                         </li>
+                        <a href="#" class="menu-link" data-app="reports">
+                            <i class="menu-icon fas fa-chart-pie"></i>
+                            <span class="menu-label">Reports</span>
+                        </a>
                     </ul>
                 </div>
 
-                <div class="menu-section">
-                    <h3 class="section-title">SYSTEM</h3>
-                    <ul class="menu-list">
-                        <li class="menu-item">
-                            <a href="#" class="menu-link" data-app="reports">
-                                <i class="menu-icon fas fa-chart-pie"></i>
-                                <span class="menu-label">Reports</span>
-                            </a>
-                        </li>
-                        <li class="menu-item">
-                            <a href="#" class="menu-link" data-app="settings">
-                                <i class="menu-icon fas fa-cog"></i>
-                                <span class="menu-label">Settings</span>
-                            </a>
-                        </li>
-                        <li class="menu-item">
-                            <a href="#" class="menu-link" data-app="support">
-                                <i class="menu-icon fas fa-headset"></i>
-                                <span class="menu-label">Support</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
             </div>
         </div>
     </nav>
 
     <!-- Main Content - Takes Full Desktop Width -->
     <main class="main-content">
-        <!-- Top Header -->
-        <div class="content-header">
-            <div class="header-left">
-                <h1 class="page-title">Corporate Dashboard</h1>
-                <p class="page-subtitle">Welcome to Enterprise Business Suite</p>
-            </div>
-        </div>
-
-        <!-- Hero Banner -->
-        <div class="hero-banner">
-            <div class="banner-content">
-                <h2>Premium Automotive Collection</h2>
-                <p>Exclusive luxury vehicles for distinguished clients</p>
-                <button class="btn btn-white">
-                    <i class="fas fa-eye"></i>
-                    Explore Collection
-                </button>
-            </div>
-        </div>
-
         <!-- Stats Overview -->
         <div class="stats-overview">
             <div class="stat-card">
@@ -154,7 +115,7 @@
             </div>
         </div>
 
-       
+
 
         <!-- Quick Actions -->
         <div class="quick-actions-section">
@@ -208,117 +169,117 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Navigation functionality
-    const menuLinks = document.querySelectorAll('.menu-link');
-    const sidebar = document.querySelector('.sidebar');
-    
-    // Set active menu item
-    menuLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            // Remove active class from all links
-            menuLinks.forEach(l => l.classList.remove('active'));
-            
-            // Add active class to clicked link
-            this.classList.add('active');
-            
-            // Update page title based on app
-            const appName = this.getAttribute('data-app');
-            const pageTitle = document.querySelector('.page-title');
-            const pageSubtitle = document.querySelector('.page-subtitle');
-            
-            const titles = {
-                'dashboard': ['Corporate Dashboard', 'Welcome to Enterprise Business Suite'],
-                'sales': ['Daily Sales', 'Transaction Management'],
-                'containers': ['Containers', 'Logistics Management'],
-                'expenses': ['Expenses', 'Cost Management'],
-                'employees': ['Employees', 'HR Management'],
-                'cars': ['Premium Cars', 'Luxury Vehicles Collection'],
-                'reports': ['Reports', 'Business Analytics'],
-                'settings': ['Settings', 'System Configuration'],
-                'support': ['Support', 'Help & Assistance']
-            };
-            
-            if (titles[appName] && pageTitle && pageSubtitle) {
-                pageTitle.textContent = titles[appName][0];
-                pageSubtitle.textContent = titles[appName][1];
-            }
-            
-            // Close sidebar on mobile
-            if (window.innerWidth < 768) {
-                sidebar.classList.remove('active');
-            }
-        });
-    });
-    
-    // Quick view buttons
-    const quickViewButtons = document.querySelectorAll('.quick-view-btn');
-    quickViewButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const carCard = this.closest('.car-card');
-            const carTitle = carCard.querySelector('.car-title').textContent;
-            alert(`Quick View: ${carTitle}\nFull details available in the Premium Cars section.`);
-        });
-    });
-    
-    // Car card click
-    const carCards = document.querySelectorAll('.car-card');
-    carCards.forEach(card => {
-        card.addEventListener('click', function(e) {
-            if (!e.target.closest('.quick-view-btn') && !e.target.closest('.btn')) {
-                const carTitle = this.querySelector('.car-title').textContent;
-                alert(`Selected: ${carTitle}\nRedirecting to details page...`);
-            }
-        });
-    });
-    
-    // Hero banner button
-    const heroButton = document.querySelector('.btn-white');
-    if (heroButton) {
-        heroButton.addEventListener('click', function() {
-            const carsLink = document.querySelector('.menu-link[data-app="cars"]');
-            if (carsLink) {
-                carsLink.click();
-            }
-        });
-    }
+    document.addEventListener('DOMContentLoaded', function () {
+        // Navigation functionality
+        const menuLinks = document.querySelectorAll('.menu-link');
+        const sidebar = document.querySelector('.sidebar');
 
-    
-    // View all link
-    const viewAllLink = document.querySelector('.view-all-link');
-    if (viewAllLink) {
-        viewAllLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            const carsLink = document.querySelector('.menu-link[data-app="cars"]');
-            if (carsLink) {
-                carsLink.click();
-            }
+        // Set active menu item
+        menuLinks.forEach(link => {
+            link.addEventListener('click', function (e) {
+                // Remove active class from all links
+                menuLinks.forEach(l => l.classList.remove('active'));
+
+                // Add active class to clicked link
+                this.classList.add('active');
+
+                // Update page title based on app
+                const appName = this.getAttribute('data-app');
+                const pageTitle = document.querySelector('.page-title');
+                const pageSubtitle = document.querySelector('.page-subtitle');
+
+                const titles = {
+                    'dashboard': ['Corporate Dashboard', 'Welcome to Enterprise Business Suite'],
+                    'sales': ['Daily Sales', 'Transaction Management'],
+                    'containers': ['Containers', 'Logistics Management'],
+                    'expenses': ['Expenses', 'Cost Management'],
+                    'employees': ['Employees', 'HR Management'],
+                    'cars': ['Premium Cars', 'Luxury Vehicles Collection'],
+                    'reports': ['Reports', 'Business Analytics'],
+                    'settings': ['Settings', 'System Configuration'],
+                    'support': ['Support', 'Help & Assistance']
+                };
+
+                if (titles[appName] && pageTitle && pageSubtitle) {
+                    pageTitle.textContent = titles[appName][0];
+                    pageSubtitle.textContent = titles[appName][1];
+                }
+
+                // Close sidebar on mobile
+                if (window.innerWidth < 768) {
+                    sidebar.classList.remove('active');
+                }
+            });
         });
-    }
-    
-    // Animate elements on scroll
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
-    
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('animate-in');
-            }
+
+        // Quick view buttons
+        const quickViewButtons = document.querySelectorAll('.quick-view-btn');
+        quickViewButtons.forEach(button => {
+            button.addEventListener('click', function (e) {
+                e.stopPropagation();
+                const carCard = this.closest('.car-card');
+                const carTitle = carCard.querySelector('.car-title').textContent;
+                alert(`Quick View: ${carTitle}\nFull details available in the Premium Cars section.`);
+            });
         });
-    }, observerOptions);
-    
-    // Observe all animated elements
-    document.querySelectorAll('.stat-card, .car-card, .action-card').forEach(el => {
-        observer.observe(el);
-    });
-    
-    // Add CSS for scroll animation
-    const style = document.createElement('style');
-    style.textContent = `
+
+        // Car card click
+        const carCards = document.querySelectorAll('.car-card');
+        carCards.forEach(card => {
+            card.addEventListener('click', function (e) {
+                if (!e.target.closest('.quick-view-btn') && !e.target.closest('.btn')) {
+                    const carTitle = this.querySelector('.car-title').textContent;
+                    alert(`Selected: ${carTitle}\nRedirecting to details page...`);
+                }
+            });
+        });
+
+        // Hero banner button
+        const heroButton = document.querySelector('.btn-white');
+        if (heroButton) {
+            heroButton.addEventListener('click', function () {
+                const carsLink = document.querySelector('.menu-link[data-app="cars"]');
+                if (carsLink) {
+                    carsLink.click();
+                }
+            });
+        }
+
+
+        // View all link
+        const viewAllLink = document.querySelector('.view-all-link');
+        if (viewAllLink) {
+            viewAllLink.addEventListener('click', function (e) {
+                e.preventDefault();
+                const carsLink = document.querySelector('.menu-link[data-app="cars"]');
+                if (carsLink) {
+                    carsLink.click();
+                }
+            });
+        }
+
+        // Animate elements on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-in');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all animated elements
+        document.querySelectorAll('.stat-card, .car-card, .action-card').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Add CSS for scroll animation
+        const style = document.createElement('style');
+        style.textContent = `
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -338,13 +299,13 @@ document.addEventListener('DOMContentLoaded', function() {
             animation: slideIn 0.8s ease;
         }
     `;
-    document.head.appendChild(style);
-    
-    // Mobile menu toggle
-    const mobileMenuBtn = document.createElement('button');
-    mobileMenuBtn.className = 'mobile-menu-btn';
-    mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
-    mobileMenuBtn.style.cssText = `
+        document.head.appendChild(style);
+
+        // Mobile menu toggle
+        const mobileMenuBtn = document.createElement('button');
+        mobileMenuBtn.className = 'mobile-menu-btn';
+        mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+        mobileMenuBtn.style.cssText = `
         position: fixed;
         top: 20px;
         left: 20px;
@@ -362,25 +323,25 @@ document.addEventListener('DOMContentLoaded', function() {
         justify-content: center;
         box-shadow: var(--shadow-lg);
     `;
-    
-    document.body.appendChild(mobileMenuBtn);
-    
-    mobileMenuBtn.addEventListener('click', function() {
-        sidebar.classList.toggle('active');
-    });
-    
-    // Show/hide mobile menu button
-    function checkMobile() {
-        if (window.innerWidth < 768) {
-            mobileMenuBtn.style.display = 'flex';
-        } else {
-            mobileMenuBtn.style.display = 'none';
-            sidebar.classList.remove('active');
+
+        document.body.appendChild(mobileMenuBtn);
+
+        mobileMenuBtn.addEventListener('click', function () {
+            sidebar.classList.toggle('active');
+        });
+
+        // Show/hide mobile menu button
+        function checkMobile() {
+            if (window.innerWidth < 768) {
+                mobileMenuBtn.style.display = 'flex';
+            } else {
+                mobileMenuBtn.style.display = 'none';
+                sidebar.classList.remove('active');
+            }
         }
-    }
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-});
+
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+    });
 </script>
 {% endblock content %}

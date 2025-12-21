@@ -1,18 +1,18 @@
 {% extends 'container/container_base.html' %}
 {% load static %}
-{% block title %}گزارش کل تراکنش‌ها{% endblock %}
+{% block title %}Almuqbil | total_container{% endblock %}
 {% block content %}
-<h3>گزارش کلی تراکنش‌ها</h3>
+<h3>All reports</h3>
 
 
 
 <table class="table table-bordered table-hover">
   <thead>
     <tr>
-      <th>وضعیت فروش</th>
-      <th>وضعیت حمل</th>
-      <th>وضعیت پرداخت</th>
-      <th>جمع مبلغ</th>
+      <th>sale status</th>
+      <th>transport status</th>
+      <th>payment status</th>
+      <th>total</th>
     </tr>
   </thead>
   <tbody>
@@ -24,7 +24,7 @@
         <td>{{ row.total_amount|floatformat:2 }}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="4" class="text-center">هیچ داده‌ای یافت نشد</td></tr>
+      <tr><td colspan="4" class="text-center">no data found</td></tr>
     {% endfor %}
   </tbody>
 </table>

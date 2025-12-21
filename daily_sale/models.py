@@ -4,11 +4,8 @@ from django.db import models
 from django.utils import timezone
 from django.conf import settings
 from django.core.validators import MinValueValidator
-
-# external models (adjust import paths if your project differs)
 from accounts.models import UserProfile, Company
 from containers.models import Inventory_List, Container
-
 
 class DailySaleTransaction(models.Model):
     """Core transaction record."""

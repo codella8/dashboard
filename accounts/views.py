@@ -151,7 +151,7 @@ def dashboard(request):
         },
         {
             'name': 'Employees', 
-            'url': 'employee:employees',  # با نام URL
+            'url': 'employee:employees/',  # با نام URL
             'icon': 'fas fa-users',  
             'description': 'Employee and staff management'
         },
