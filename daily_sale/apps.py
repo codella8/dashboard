@@ -7,5 +7,4 @@ class DailySaleConfig(AppConfig):
     verbose_name = "Daily Sale"
 
     def ready(self):
-        # import signals so they get registered
-        from . import signals  # noqa: F401
+        from . import signals

@@ -1,13 +1,7 @@
 from django.db.models import Sum, Count, F, Q
-from django.utils import timezone
-from datetime import datetime
-from .models import Container, ContainerTransaction, Inventory_List, Saraf
+from .models import Container, ContainerTransaction, Saraf
 
 def container_inventory_summary(company_id=None):
-    """
-    Returns per-container inventory summary:
-      container_id, container_number, products_count, total_in_stock_qty, total_inventory_value
-    """
     qs = Container.objects.all()
     if company_id:
         qs = qs.filter(company_id=company_id)
@@ -22,9 +16,6 @@ def container_inventory_summary(company_id=None):
     return qs
 
 def container_financial_summary(container_id=None, company_id=None, start_date=None, end_date=None):
-    """
-    Returns aggregated financial summary for a container (or company if container_id None).
-    """
     tx_qs = ContainerTransaction.objects.all()
     if container_id:
         tx_qs = tx_qs.filter(container_id=container_id)
@@ -43,9 +34,6 @@ def container_financial_summary(container_id=None, company_id=None, start_date=N
     return summary
 
 def saraf_balance_summary(company_id=None):
-    """
-    Return per-saraf totals and balances.
-    """
     qs = Saraf.objects.all()
     if company_id:
         qs = qs.filter(user__company_id=company_id)
@@ -68,9 +56,6 @@ def total_container_transactions_report(company_id=None, start_date=None, end_da
     return tx_qs.values('sale_status', 'transport_status', 'payment_status').annotate(total_amount=Sum('total_price')).order_by('-total_amount')
 
 def saraf_overview_for_admin(company_id=None):
-    """
-    Return small dict for admin dashboard: total sarafs, total outstanding balances, top 5 debtors
-    """
     qs = saraf_balance_summary(company_id=company_id)
     total_sarafs = qs.count()
     total_outstanding = qs.aggregate(total_out=Sum('balance'))['total_out'] or 0

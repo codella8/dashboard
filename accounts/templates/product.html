@@ -1,0 +1,49 @@
+{% extends "accounts_base.html" %}
+{% load static %}
+{% load i18n %}
+{% load humanize %}
+
+{% block title %}{{ product.name }} | Almuqbil{% endblock %}
+{% block content1 %}
+
+<section class="product-detail mt-5">
+    <div class="container">
+        <div class="product-main">
+            <div class="product-gallery">
+                <div class="main-image-container">
+                    <img src="{{ product.picture.url }}" alt="{{ product.name }}" class="main-image img-fluid">
+                </div>
+                {% if product.picture2 or product.picture3 %}
+                <div class="thumbnail-gallery">
+                    <div class="thumbnail-container">
+                        <img src="{{ product.picture.url }}" alt="{{ product.name }}" class="thumbnail active">
+                        {% if product.picture2 %}
+                        <img src="{{ product.picture2.url }}" alt="{{ product.name }}" class="thumbnail">
+                        {% endif %}
+                        {% if product.picture3 %}
+                        <img src="{{ product.picture3.url }}" alt="{{ product.name }}" class="thumbnail">
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="product-info">
+                <div class="product-header">
+                    <h1 class="product-title">{{ product.name }}</h1>
+                    <div class="product-meta">
+                        <span class="product-category badge bg-primary">{{ product.category }}</span>
+                        <span class="product-code">{% trans 'کد محصول :' %} {{ product.id }}</span>
+                    </div>
+                </div>
+                <div class="short-description">
+                    <h3>{% trans 'توضیحات کامل محصول' %}</h3>
+                    <ul class="features-list">
+                        <p>{{ product.description }}</p>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

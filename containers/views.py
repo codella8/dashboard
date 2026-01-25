@@ -1,20 +1,20 @@
 # containers/views.py
 from django.shortcuts import render, get_object_or_404
-from django.views.generic import ListView, DetailView, TemplateView, View, CreateView
+from django.views.generic import ListView, DetailView, TemplateView,  CreateView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, F, Count
+from django.db.models import Sum, F, Count, DecimalField, Max, Min, Avg
 from django.utils import timezone
-from datetime import datetime
-from .models import Saraf, Container, ContainerTransaction, Inventory_List, SarafTransaction
+from datetime import datetime, timedelta
+from .models import Saraf, Container, ContainerTransaction, Inventory_List
 from . import report
 from django.utils.dateparse import parse_date
 from django.urls import reverse_lazy
 from django import forms
-from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import Coalesce
 from decimal import Decimal
+from accounts.models import UserProfile
+from collections import defaultdict
 
 
 def container_financial_report(request, container_id):
@@ -35,27 +35,10 @@ def container_financial_report(request, container_id):
         'total_sold_qty': total_sold_qty,
         'transactions': transactions
     })
-
-def saraf_balance_report(request):
-    sarafs = Saraf.objects.annotate(
-        total_received=Sum('transactions__received_from_saraf'),
-        total_paid=Sum('transactions__paid_by_company'),
-        total_debit=Sum('transactions__debit_company'),
-    ).annotate(
-        balance=F('total_received') + F('total_debit') - F('total_paid')
-    )
-
-    return render(request, 'container/saraf_balance_report.html', {'sarafs': sarafs})  # اصلاح typo
-
-# containers/views.py
 @login_required
 def saraf_transactions_report(request, saraf_id):
-    """
-    گزارش تراکنش‌های یک صراف خاص
-    """
     saraf = get_object_or_404(Saraf, id=saraf_id)
-    
-    # فیلتر کردن بر اساس تاریخ اگر وجود دارد
+
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
     
@@ -65,8 +48,7 @@ def saraf_transactions_report(request, saraf_id):
         transactions = transactions.filter(transaction_time__gte=parse_date(start_date))
     if end_date:
         transactions = transactions.filter(transaction_time__lte=parse_date(end_date))
-    
-    # محاسبه جمع‌های مالی
+
     total_received = transactions.aggregate(total=Sum('received_from_saraf'))['total'] or 0
     total_paid = transactions.aggregate(total=Sum('paid_by_company'))['total'] or 0
     total_debit = transactions.aggregate(total=Sum('debit_company'))['total'] or 0
@@ -117,8 +99,6 @@ class CompanyAccessMixin:
             return None
         return profile.company
 
-# --- Saraf views ---
-
 class SarafListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
     model = Saraf
     template_name = "container/saraf_list.html"
@@ -127,18 +107,124 @@ class SarafListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
 
     def get_queryset(self):
 
-        qs = Saraf.objects.select_related("user")
         company = self.get_company()
+        qs = Saraf.objects.filter(
+            user__role='saraf',
+            is_active=True,
+            user__is_active=True
+        ).select_related(
+            "user", 
+            "user__user"  
+        )
+        
         if company:
             qs = qs.filter(user__company=company)
-        
-        # محاسبات فقط در ویو
         return qs.annotate(
-            total_received=Coalesce(Sum("transactions__received_from_saraf"), Decimal('0')),
-            total_paid=Coalesce(Sum("transactions__paid_by_company"), Decimal('0')),
+            total_received=Coalesce(
+                Sum("transactions__received_from_saraf"), 
+                Decimal('0'),
+                output_field=DecimalField(max_digits=28, decimal_places=0)
+            ),
+            total_paid=Coalesce(
+                Sum("transactions__paid_by_company"), 
+                Decimal('0'),
+                output_field=DecimalField(max_digits=28, decimal_places=0)
+            ),
+        ).annotate(
+            balance=F("total_received") - F("total_paid")
+        ).order_by("-created_at")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sarafs = context['sarafs']
+        all_sarafs = self.get_queryset()
+        
+        total_received_sum = all_sarafs.aggregate(
+            total=Coalesce(Sum('total_received'), Decimal('0'))
+        )['total']
+        
+        total_paid_sum = all_sarafs.aggregate(
+            total=Coalesce(Sum('total_paid'), Decimal('0'))
+        )['total']
+        
+        net_balance_sum = all_sarafs.aggregate(
+            total=Coalesce(Sum('balance'), Decimal('0'))
+        )['total']
+        creditors_count = all_sarafs.filter(balance__gt=0).count()
+        debtors_count = all_sarafs.filter(balance__lt=0).count()
+        balanced_count = all_sarafs.filter(balance=0).count()
+        
+        context.update({
+            'total_received_sum': total_received_sum,
+            'total_paid_sum': total_paid_sum,
+            'net_balance_sum': net_balance_sum,
+            'creditors_count': creditors_count,
+            'debtors_count': debtors_count,
+            'balanced_count': balanced_count,
+            'total_count': all_sarafs.count(),
+            'page_title': 'Sarafs Management',
+            'page_subtitle': 'Financial accounts overview',
+        })
+        
+        return context
+
+class SarafListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
+    model = Saraf
+    template_name = "container/saraf_list.html"
+    context_object_name = "sarafs"
+    paginate_by = 25
+
+    def get_queryset(self):
+        qs = Saraf.objects.select_related("user")
+        company = self.get_company()
+        
+        if company:
+            qs = qs.filter(user__company=company)
+        return qs.annotate(
+            total_received=Coalesce(
+                Sum("transactions__received_from_saraf"), 
+                Decimal('0'),
+                output_field=DecimalField(max_digits=20, decimal_places=2)
+            ),
+            total_paid=Coalesce(
+                Sum("transactions__paid_by_company"), 
+                Decimal('0'),
+                output_field=DecimalField(max_digits=20, decimal_places=2)
+            ),
         ).annotate(
             balance=F("total_received") - F("total_paid")
         ).order_by("-balance")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sarafs = context['sarafs']
+        all_sarafs = self.get_queryset()
+        
+        total_received_sum = all_sarafs.aggregate(
+            total=Coalesce(Sum('total_received'), Decimal('0'))
+        )['total']
+        
+        total_paid_sum = all_sarafs.aggregate(
+            total=Coalesce(Sum('total_paid'), Decimal('0'))
+        )['total']
+        
+        net_balance_sum = total_received_sum - total_paid_sum
+        creditors_count = all_sarafs.filter(balance__gt=0).count()
+        debtors_count = all_sarafs.filter(balance__lt=0).count()
+        balanced_count = all_sarafs.filter(balance=0).count()
+        context.update({
+            'total_received_sum': total_received_sum,
+            'total_paid_sum': total_paid_sum,
+            'net_balance_sum': net_balance_sum,
+            'creditors_count': creditors_count,
+            'debtors_count': debtors_count,
+            'balanced_count': balanced_count,
+            'total_count': all_sarafs.count(),
+            'page_title': 'Sarafs Management',
+            'page_subtitle': 'Financial accounts overview',
+        })
+        
+        return context
 
 class SarafDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
     model = Saraf
@@ -147,22 +233,177 @@ class SarafDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
     pk_url_kwarg = "saraf_id"
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related("user")
+        qs = super().get_queryset().select_related(
+            "user",
+            "user__user",
+            "user__company"
+        )
         company = self.get_company()
         if company:
             qs = qs.filter(user__company=company)
         return qs
 
+    def get_transaction_summary(self, saraf):
+        transactions = saraf.transactions.all()
+        summary = transactions.aggregate(
+            total_received=Coalesce(Sum('received_from_saraf'), Decimal('0')),
+            total_paid=Coalesce(Sum('paid_by_company'), Decimal('0')),
+            avg_received=Coalesce(Avg('received_from_saraf'), Decimal('0')),
+            avg_paid=Coalesce(Avg('paid_by_company'), Decimal('0')),
+            max_received=Coalesce(Max('received_from_saraf'), Decimal('0')),
+            max_paid=Coalesce(Max('paid_by_company'), Decimal('0')),
+            transaction_count=Count('id'),
+            first_transaction=Min('transaction_time'),
+            last_transaction=Max('transaction_time')
+        )
+        summary['balance'] = summary['total_received'] - summary['total_paid']
+        
+        return summary
+
+    def get_currency_breakdown(self, saraf):
+        transactions = saraf.transactions.all()
+        currency_data = {}
+        for currency in ['usd', 'eur', 'aed']:
+            currency_trans = transactions.filter(currency=currency)
+            
+            if currency_trans.exists():
+                stats = currency_trans.aggregate(
+                    total_received=Coalesce(Sum('received_from_saraf'), Decimal('0')),
+                    total_paid=Coalesce(Sum('paid_by_company'), Decimal('0')),
+                    count=Count('id'),
+                    avg_amount=Coalesce(Avg('received_from_saraf'), Decimal('0'))
+                )
+                
+                stats['balance'] = stats['total_received'] - stats['total_paid']
+        return currency_data
+
+    def get_monthly_summary(self, saraf):
+        current_year = timezone.now().year
+        transactions = saraf.transactions.filter(
+            transaction_time__year=current_year
+        )
+        
+        monthly_data = []
+        for month in range(1, 13):
+            month_trans = transactions.filter(
+                transaction_time__month=month
+            )
+            
+            month_stats = month_trans.aggregate(
+                received=Coalesce(Sum('received_from_saraf'), Decimal('0')),
+                paid=Coalesce(Sum('paid_by_company'), Decimal('0')),
+                count=Count('id')
+            )
+            
+            month_stats['balance'] = month_stats['received'] - month_stats['paid']
+            month_stats['month_name'] = timezone.datetime(current_year, month, 1).strftime('%b')
+            monthly_data.append(month_stats)
+        return monthly_data
+
+    def get_container_summary(self, saraf):
+        transactions = saraf.transactions.filter(
+            container__isnull=False
+        ).select_related('container')
+        
+        containers = defaultdict(lambda: {
+            'received': Decimal('0'),
+            'paid': Decimal('0'),
+            'count': 0,
+            'last_transaction': None
+        })
+        
+        for tx in transactions:
+            container = tx.container
+            if container:
+                containers[container.id]['container'] = container
+                containers[container.id]['received'] += tx.received_from_saraf
+                containers[container.id]['paid'] += tx.paid_by_company
+                containers[container.id]['count'] += 1
+                containers[container.id]['balance'] = containers[container.id]['received'] - containers[container.id]['paid']
+                
+                if not containers[container.id]['last_transaction'] or \
+                   tx.transaction_time > containers[container.id]['last_transaction']:
+                    containers[container.id]['last_transaction'] = tx.transaction_time
+        
+        return list(containers.values())
+
+    def get_recent_activity(self, saraf, days=30):
+        cutoff_date = timezone.now() - timedelta(days=days)
+        return saraf.transactions.filter(
+            transaction_time__gte=cutoff_date
+        ).select_related('container').order_by('-transaction_time')
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         saraf = self.object
-        ctx["transactions"] = saraf.transactions.select_related("container").order_by("-transaction_time")[:200]
-        ctx["summary"] = report.saraf_balance_summary()
+        date_filter = self.request.GET.get('date_filter', 'all')
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+        transactions = saraf.transactions.select_related("container").all()
+        
+        if date_filter == 'today':
+            today = timezone.now().date()
+            transactions = transactions.filter(transaction_time__date=today)
+        elif date_filter == 'week':
+            week_ago = timezone.now() - timedelta(days=7)
+            transactions = transactions.filter(transaction_time__gte=week_ago)
+        elif date_filter == 'month':
+            month_ago = timezone.now() - timedelta(days=30)
+            transactions = transactions.filter(transaction_time__gte=month_ago)
+        elif date_filter == 'year':
+            year_ago = timezone.now() - timedelta(days=365)
+            transactions = transactions.filter(transaction_time__gte=year_ago)
+        elif start_date and end_date:
+            transactions = transactions.filter(
+                transaction_time__date__range=[start_date, end_date]
+            )
+        financial_summary = self.get_transaction_summary(saraf)
+        currency_breakdown = self.get_currency_breakdown(saraf)
+        monthly_summary = self.get_monthly_summary(saraf)
+        container_summary = self.get_container_summary(saraf)
+        recent_activity = self.get_recent_activity(saraf, 30)
+        user_info = {}
+        if saraf.user:
+            user_info = {
+                'full_name': saraf.user.full_name,
+                'phone': saraf.user.phone,
+                'email': saraf.user.email,
+                'address': saraf.user.address,
+                'national_id': saraf.user.national_id,
+                'company_name': saraf.user.company_name if saraf.user.company else None,
+                'date_joined': saraf.user.user.date_joined if saraf.user.user else None,
+                'last_login': saraf.user.user.last_login if saraf.user.user else None,
+            }
+
+        status_info = {
+            'is_active': saraf.is_active,
+            'created_at': saraf.created_at,
+            'updated_at': saraf.updated_at,
+            'status': 'Creditor' if financial_summary['balance'] > 0 else \
+                'Debtor' if financial_summary['balance'] < 0 else 'Balanced',
+            'status_class': 'success' if financial_summary['balance'] > 0 else \
+                'danger' if financial_summary['balance'] < 0 else 'secondary'
+        }
+        ctx.update({
+            'transactions': transactions.order_by('-transaction_time')[:100],
+            'total_transactions_count': transactions.count(),
+            'financial_summary': financial_summary,
+            'currency_breakdown': currency_breakdown,
+            'monthly_summary': monthly_summary,
+            'container_summary': container_summary[:10],
+            'recent_activity': recent_activity[:20],
+            'user_info': user_info,
+            'status_info': status_info,
+            'date_filter': date_filter,
+            'start_date': start_date,
+            'end_date': end_date,
+            'today': timezone.now().date(),
+            'page_title': f'Saraf Details - {user_info.get("full_name", "Unknown")}',
+            'page_subtitle': f'ID: {saraf.id} | Balance: ${financial_summary["balance"]:,.0f}',
+        })
+        
         return ctx
 
-# --- Container views ---
-
-# containers/views.py
 class ContainerListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
     model = Container
     template_name = "container/container_list.html"
@@ -174,16 +415,13 @@ class ContainerListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
         company = self.get_company()
         if company:
             qs = qs.filter(company=company)
-        
-        # استفاده از نام فیلدهای صحیح بر اساس مدل Container
         qs = qs.annotate(
-            products_count=Count('inventory_items', distinct=True),  # اصلاح به inventory_items
+            products_count=Count('inventory_items', distinct=True), 
             total_in_stock_qty=Sum('inventory_items__in_stock_qty'),
             total_inventory_value=Sum(F('inventory_items__in_stock_qty') * F('inventory_items__unit_price'))
         )
         return qs.order_by('-created_at')
-
-# اضافه کردن view های جدید
+ 
 class ContainerDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
     model = Container
     template_name = "container/container_detail.html"
@@ -195,26 +433,9 @@ class ContainerDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
         if company:
             qs = qs.filter(company=company)
         return qs
-
-class ContainerCreateView(LoginRequiredMixin, CompanyAccessMixin, CreateView):
-    model = Container
-    template_name = "container/container_form.html"
-    fields = ['name', 'container_number', 'company', 'description']  # تنظیم فیلدهای مورد نیاز
-    success_url = reverse_lazy("container:list")
-
-    def form_valid(self, form):
-        # اگر کاربر متعلق به شرکت است، به صورت خودکار شرکت را تنظیم کنید
-        company = self.get_company()
-        if company:
-            form.instance.company = company
-        return super().form_valid(form)
-
+    
 @login_required
 def container_financial_report_view(request, container_id):
-    """
-    Page: Container financial summary and list of transactions.
-    GET params: start_date, end_date
-    """
     container = get_object_or_404(Container, id=container_id)
     start = request.GET.get("start_date")
     end = request.GET.get("end_date")
@@ -226,7 +447,6 @@ def container_financial_report_view(request, container_id):
             start_parsed = None
     else:
         start_parsed = None
-        
     if end:
         try:
             end_parsed = datetime.fromisoformat(end)
@@ -252,9 +472,9 @@ def total_container_transactions_report_view(request):
     start = request.GET.get("start_date")
     end = request.GET.get("end_date")
     data = report.total_container_transactions_report(company_id=(company.id if company else None), start_date=start, end_date=end)
-    return render(request, "container/total_container_transactions_report.html", {"report": data})
+    return render(request, "container/container_transactions_report.html", {"report": data})
 
-# quick admin overview (dashboard widget)
+
 class ContainersAdminOverview(LoginRequiredMixin, TemplateView, CompanyAccessMixin):
     template_name = "container/admin_overview.html"
 

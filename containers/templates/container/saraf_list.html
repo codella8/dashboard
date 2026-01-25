@@ -1,51 +1,141 @@
 {% extends 'container/container_base.html' %}
-{% block title %}Almuqbil | saraf_list{% endblock %}
-{% block content %}
+{% load humanize %}
 
-<div class="sarafs-page">
-  <!-- Loading State -->
-  <div class="loading-skeleton" id="loadingSkeleton">
-    <div class="skeleton-header"></div>
-    <div class="skeleton-table">
-      <div class="skeleton-row"></div>
-      <div class="skeleton-row"></div>
-      <div class="skeleton-row"></div>
+{% block title %} Almuqbil | saraf_list {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h2 mb-2 text-dark">{{ page_title }}</h1>
+      <p class="text-muted mb-0">{{ page_subtitle }}</p>
+    </div>
+    <div class="top-bar">
+      <div class="top-actions">
+        <button class="export-btn" onclick="exportToCSV()">
+          <i class="fas fa-file-export"></i> Export CSV
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="bg-primary bg-opacity-10 rounded-3 p-3 me-3">
+              <i class="fas fa-users text-primary fs-3"></i>
+            </div>
+            <div>
+              <h3 class="mb-1">{{ total_count }}</h3>
+              <p class="text-muted mb-0">Total Sarafs</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="bg-success bg-opacity-10 rounded-3 p-3 me-3">
+              <i class="fas fa-arrow-down text-success fs-3"></i>
+            </div>
+            <div>
+              <h3 class="mb-1 text-success">AED{{ total_received_sum|floatformat:0|intcomma }}</h3>
+              <p class="text-muted mb-0">Total Received</p>
+            </div>
+          </div>
+          <div class="mt-3">
+            <small class="text-success">
+              <i class="fas fa-chart-line me-1"></i> All-time total
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="bg-danger bg-opacity-10 rounded-3 p-3 me-3">
+              <i class="fas fa-arrow-up text-danger fs-3"></i>
+            </div>
+            <div>
+              <h3 class="mb-1 text-danger">AED{{ total_paid_sum|floatformat:0|intcomma }}</h3>
+              <p class="text-muted mb-0">Total Paid</p>
+            </div>
+          </div>
+          <div class="mt-3">
+            <small class="text-danger">
+              <i class="fas fa-chart-line me-1"></i> All-time total
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="bg-info bg-opacity-10 rounded-3 p-3 me-3">
+              <i class="fas fa-scale-balanced text-info fs-3"></i>
+            </div>
+            <div>
+              <h3
+                class="mb-1 {% if net_balance_sum > 0 %}text-success{% elif net_balance_sum < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                AED{{ net_balance_sum|floatformat:0|intcomma }}
+              </h3>
+              <p class="text-muted mb-0">Net Balance</p>
+            </div>
+          </div>
+          <div class="mt-3">
+            <small
+              class="{% if net_balance_sum > 0 %}text-success{% elif net_balance_sum < 0 %}text-danger{% else %}text-secondary{% endif %}">
+              <i
+                class="fas fa-{% if net_balance_sum > 0 %}arrow-up{% elif net_balance_sum < 0 %}arrow-down{% else %}equals{% endif %} me-1"></i>
+              {% if net_balance_sum > 0 %}Company is Creditor{% elif net_balance_sum < 0 %}Company is Debtor{% else%}Perfectly Balanced{% endif %} </small>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="container" id="mainContent" style="display: none;">
-    <div class="content-wrapper">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <a href="{% url 'admin:containers_saraf_add' %}" class="btn btn-primary">
+        <i class="fas fa-plus-circle me-2"></i> Add New Saraf
+      </a>
+    </div>
 
-      <!-- Header -->
-      <div class="page-header">
-        <div class="header-main">
-          <h1 class="page-title">Sarafs</h1>
-          <p class="page-subtitle">Financial accounts management</p>
-        </div>
-        <div class="header-actions">
-          <button class="action-btn export-btn" onclick="exportData()">
-            <svg class="icon" width="16" height="16" viewBox="0 0 24 24">
-              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-            </svg>
-            Export Report
-          </button>
+  </div>
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 py-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Sarafs List</h5>
+        <div class="text-muted small">
+          {{ sarafs.start_index|default:1 }} - {{ sarafs.end_index|default:sarafs|length }} {{sarafs.paginator.count }}
         </div>
       </div>
+    </div>
 
-      <!-- Table -->
-      <div class="table-wrapper">
-        <table class="data-table" id="sarafsTable">
-          <thead>
+    <div class="card-body p-0">
+      {% if sarafs %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
             <tr>
-              <th class="sortable" data-sort="name">Name</th>
-              <th class="sortable" data-sort="received">Total Received</th>
-              <th class="sortable" data-sort="paid">Total Paid</th>
-              <th class="sortable" data-sort="balance">Total Debt</th>
-              <th class="actions-col">Actions</th>
+              <th class="ps-4 py-3">Saraf Information</th>
+              <th class="text-center py-3">Received</th>
+              <th class="text-center py-3">Paid</th>
+              <th class="text-center py-3">Balance</th>
+              <th class="text-center py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <!-- این دقیقاً منطق کد اصلی شماست -->
             {% for saraf in sarafs %}
             <tr class="data-row" data-id="{{ saraf.id }}" data-name="{{ saraf.user.get_full_name|default:saraf.user }}"
               data-received="{{ saraf.total_received }}" data-paid="{{ saraf.total_paid }}"
@@ -55,7 +145,6 @@
                 <div class="user-cell">
                   <div class="user-info">
                     <div class="user-name">{{ saraf.user.get_full_name|default:saraf.user }}</div>
-                    <div class="user-id">ID: {{ saraf.id }}</div>
                   </div>
                 </div>
               </td>
@@ -84,18 +173,11 @@
       {% endif %}
       </td>
       <td>
-        <div class="actions-cell">
+        <div class="actions-cell align-items-center">
           <a href="{% url 'containers:saraf_detail' saraf.id %}" class="action-link view-link" title="View">
             <svg width="16" height="16" viewBox="0 0 24 24">
               <path
                 d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
-            </svg>
-          </a>
-          <a href="{% url 'containers:saraf_transactions_report' saraf.id %}" class="action-link report-link"
-            title="Transactions">
-            <svg width="16" height="16" viewBox="0 0 24 24">
-              <path
-                d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
             </svg>
           </a>
         </div>
@@ -113,156 +195,35 @@
             <p>Start by adding your first saraf</p>
           </div>
         </td>
+
       </tr>
       {% endfor %}
       </tbody>
       </table>
     </div>
+    {% else %}
+
+    <!-- Empty State -->
+    <div class="text-center py-5">
+      <div class="mb-4">
+        <i class="fas fa-user-friends fa-4x text-light"></i>
+      </div>
+      <h4 class="text-muted mb-3">No Sarafs Found</h4>
+      <p class="text-muted mb-4">Start by adding your first saraf account to the system.</p>
+      <a href="{% url 'admin:containers_saraf_add' %}" class="btn btn-primary px-4 py-2">
+        <i class="fas fa-plus-circle me-2"></i> Add First Saraf
+      </a>
+    </div>
+    {% endif %}
   </div>
 </div>
 </div>
-
-<!-- JavaScript -->
 <script>
-  // Initialize after page load
   document.addEventListener('DOMContentLoaded', function () {
-    setTimeout(() => {
-      const loadingSkeleton = document.getElementById('loadingSkeleton');
-      const mainContent = document.getElementById('mainContent');
-
-      if (loadingSkeleton) loadingSkeleton.style.display = 'none';
-      if (mainContent) mainContent.style.display = 'block';
-
-      initSarafsPage();
-    }, 200);
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
   });
-
-  function initSarafsPage() {
-    // Setup sortable headers
-    initSortableHeaders();
-
-    // Optimize hover effects
-    initOptimizedHover();
-  }
-
-  // Optimized hover effects
-  function initOptimizedHover() {
-    const rows = document.querySelectorAll('.data-row');
-
-    rows.forEach(row => {
-      let hoverTimer;
-
-      row.addEventListener('mouseenter', () => {
-        clearTimeout(hoverTimer);
-        requestAnimationFrame(() => {
-          row.classList.add('row-hover');
-        });
-      });
-
-      row.addEventListener('mouseleave', () => {
-        clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(() => {
-          requestAnimationFrame(() => {
-            row.classList.remove('row-hover');
-          });
-        }, 50);
-      });
-    });
-  }
-
-  // Initialize sortable table headers
-  let currentSort = { field: 'name', direction: 'asc' };
-  function initSortableHeaders() {
-    const headers = document.querySelectorAll('.sortable');
-    headers.forEach(header => {
-      header.addEventListener('click', () => {
-        const field = header.dataset.sort;
-        if (currentSort.field === field) {
-          currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-        } else {
-          currentSort.field = field;
-          currentSort.direction = 'asc';
-        }
-        sortTable(field);
-      });
-    });
-  }
-
-  // Sort table data
-  function sortTable(field) {
-    const table = document.getElementById('sarafsTable');
-    if (!table) return;
-
-    const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('.data-row'));
-
-    if (rows.length === 0) return;
-
-    const direction = currentSort.direction === 'asc' ? 1 : -1;
-
-    // Perform sort
-    rows.sort((a, b) => {
-      let aVal, bVal;
-
-      switch (field) {
-        case 'name':
-          aVal = a.dataset.name || '';
-          bVal = b.dataset.name || '';
-          return direction * aVal.localeCompare(bVal);
-
-        case 'received':
-          aVal = parseFloat(a.dataset.received) || 0;
-          bVal = parseFloat(b.dataset.received) || 0;
-          return direction * (bVal - aVal);
-
-        case 'paid':
-          aVal = parseFloat(a.dataset.paid) || 0;
-          bVal = parseFloat(b.dataset.paid) || 0;
-          return direction * (bVal - aVal);
-
-        case 'balance':
-          aVal = parseFloat(a.dataset.balance) || 0;
-          bVal = parseFloat(b.dataset.balance) || 0;
-          return direction * (bVal - aVal);
-
-        default:
-          return 0;
-      }
-    });
-
-    // Update table
-    const fragment = document.createDocumentFragment();
-    rows.forEach(row => fragment.appendChild(row));
-    tbody.innerHTML = '';
-    tbody.appendChild(fragment);
-  }
-
-  // Export data to CSV
-  function exportData() {
-    const rows = document.querySelectorAll('.data-row');
-    let csv = 'Name,Total Received,Total Paid,Total Debt\n';
-
-    rows.forEach(row => {
-      const name = row.dataset.name || '';
-      const received = row.dataset.received || 0;
-      const paid = row.dataset.paid || 0;
-      const balance = row.dataset.balance || 0;
-
-      csv += `"${name}",${received},${paid},${balance}\n`;
-    });
-
-    // Create download link
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'sarafs_report.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
 </script>
 {% endblock %}

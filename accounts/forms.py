@@ -1,32 +1,29 @@
 from django.contrib.auth.models import User
-#از ماژول فرم‌های احراز هویت Django، فرم‌های ساخت و ویرایش کاربر و تعیین رمز عبور جدید را وارد می‌کنیم.
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, SetPasswordForm
 from .models import UserProfile
-#ماژول فرم‌های جنگو برای ساخت فرم‌های دلخواه وارد می‌شود
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
 
 class UpdateUserInfo(forms.ModelForm):
-    """Form for updating user's personal information"""
     phone = forms.CharField(
         required=True,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('تلفن')})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('phone')})
     )
     address1 = forms.CharField(
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('1 آدرس')}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('address1')}),
         required=False
     )
     address2 = forms.CharField(
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('2 آدرس')}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('address2')}),
         required=False
     )
     city = forms.CharField(
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('شهر')}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('city')}),
         required=False
     )
     country = forms.CharField(
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('کشور')}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('country')}),
         required=False
     )
 
@@ -37,10 +34,10 @@ class UpdateUserInfo(forms.ModelForm):
 class UpdatePasswordForm(SetPasswordForm):
     new_password1 = forms.CharField(
         label="",
-        widget=forms.PasswordInput( # مشخص میکند که قالب یک ورودی از نوع رمز نمایش داده شود و محتوا به صورت نقطه و مخفی باشد
+        widget=forms.PasswordInput(
             attrs={
                 'class': 'form-control',
-                'placeholder': _('رمز جدید را وارد کنید')
+                'placeholder': _('Enter New Password:')
             }
         )
     )
@@ -50,7 +47,7 @@ class UpdatePasswordForm(SetPasswordForm):
         widget=forms.PasswordInput(
             attrs={
                 'class': 'form-control',
-                'placeholder': _('رمز جدید را دوباره وارد کنید')
+                'placeholder': _('Enter Password Again:')
             }
         )
     )
@@ -60,7 +57,7 @@ class UserUpdateForm(UserChangeForm):
     first_name = forms.CharField(
         label="",
         max_length=50,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('اسم')}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Name')}),
         required=False
     )
 
@@ -68,20 +65,20 @@ class UserUpdateForm(UserChangeForm):
     last_name = forms.CharField(
         label="",
         max_length=50,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('نام خانوادگی')}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('LastName')}),
         required=False
     )
 
     email = forms.EmailField(
         label="",
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('ایمیل')}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Email')}),
         required=False
     )
 
     username = forms.CharField(
         label="",
         max_length=20,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('نام کاربری')}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('UserName')}),
         required=False
     )
      
@@ -91,38 +88,37 @@ class UserUpdateForm(UserChangeForm):
         fields = ('first_name', 'last_name', 'email', 'username')
 
 class SignUpForm(UserCreationForm):
-    """Form for new user registration"""
     first_name = forms.CharField(
         label="",
         max_length=50,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('نام ')})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Name')})
     )
 
     last_name = forms.CharField(
         label="",
         max_length=50,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('نام خانوادگی')})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('LastName')})
     )
 
     email = forms.EmailField(
         label="",
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('ایمیل')})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Email')})
     )
 
     username = forms.CharField(
         label="",
         max_length=20,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('نام کاربری')})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('UserName')})
     )
 
     password1 = forms.CharField(
         label="",
-        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': _('رمز خود را وارد کنید')})
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': _('Enter Your Password:')})
     )
 
     password2 = forms.CharField(
         label="",
-        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': _('رمز را دوباره وارد کنید')})
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': _('Enter Password Again:')})
     )
 
     class Meta:

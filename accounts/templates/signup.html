@@ -7,7 +7,6 @@
 {% block content %}
 <div class="signup-page">
   <div class="signup-card">
-    <!-- Header -->
     <div class="signup-header">
       <div class="company-logo">
         <div class="logo-icon">C</div>
@@ -16,8 +15,6 @@
       <h1 class="signup-title">Create Account</h1>
       <p class="signup-subtitle">Join our professional community and unlock exclusive features</p>
     </div>
-
-    <!-- Error Messages -->
     {% if form.errors %}
     <div class="signup-error">
       Please correct the errors below to create your account.
@@ -32,16 +29,14 @@
     {% endfor %}
     {% endif %}
 
-    <!-- Signup Form -->
     <form method="POST" class="signup-form" id="signupForm">
       {% csrf_token %}
 
-      <!-- Name Fields -->
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">First Name</label>
           <input type="text" name="first_name" class="form-control {% if form.first_name.errors %}error{% endif %}"
-            placeholder="John" value="{{ form.first_name.value|default:'' }}" required>
+            placeholder="firstname" value="{{ form.first_name.value|default:'' }}" required>
           {% if form.first_name.errors %}
           <span class="field-error">{{ form.first_name.errors.0 }}</span>
           {% endif %}
@@ -50,34 +45,31 @@
         <div class="form-group">
           <label class="form-label">Last Name</label>
           <input type="text" name="last_name" class="form-control {% if form.last_name.errors %}error{% endif %}"
-            placeholder="Doe" value="{{ form.last_name.value|default:'' }}" required>
+            placeholder="lastname" value="{{ form.last_name.value|default:'' }}" required>
           {% if form.last_name.errors %}
           <span class="field-error">{{ form.last_name.errors.0 }}</span>
           {% endif %}
         </div>
       </div>
 
-      <!-- Email -->
       <div class="form-group">
         <label class="form-label">Email Address</label>
         <input type="email" name="email" class="form-control {% if form.email.errors %}error{% endif %}"
-          placeholder="john.doe@company.com" value="{{ form.email.value|default:'' }}" required>
+          placeholder="email@.com" value="{{ form.email.value|default:'' }}" required>
         {% if form.email.errors %}
         <span class="field-error">{{ form.email.errors.0 }}</span>
         {% endif %}
       </div>
 
-      <!-- Username -->
       <div class="form-group">
         <label class="form-label">Username</label>
         <input type="text" name="username" class="form-control {% if form.username.errors %}error{% endif %}"
-          placeholder="johndoe" value="{{ form.username.value|default:'' }}" required>
+          placeholder="username" value="{{ form.username.value|default:'' }}" required>
         {% if form.username.errors %}
         <span class="field-error">{{ form.username.errors.0 }}</span>
         {% endif %}
       </div>
 
-      <!-- Password -->
       <div class="form-group">
         <label class="form-label">Password</label>
         <input type="password" name="password1" class="form-control {% if form.password1.errors %}error{% endif %}"
@@ -102,7 +94,6 @@
         {% endif %}
       </div>
 
-      <!-- Confirm Password -->
       <div class="form-group">
         <label class="form-label">Confirm Password</label>
         <input type="password" name="password2" class="form-control {% if form.password2.errors %}error{% endif %}"
@@ -112,13 +103,11 @@
         {% endif %}
       </div>
 
-      <!-- Submit Button -->
       <button type="submit" class="signup-btn" id="signupButton">
         Create Account
       </button>
     </form>
 
-    <!-- Login Link -->
     <div class="signup-login">
       <p class="signup-login-text">Already have an account?</p>
       <a href="{% url 'accounts:login' %}" class="signup-login-link">

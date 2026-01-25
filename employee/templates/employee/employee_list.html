@@ -1,253 +1,373 @@
-{% extends 'employee_base.html' %}
-{% block title %}لیست کارمندان{% endblock %}
+{% extends 'employee/employee_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Employee Directory{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/employee_list.minimal.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">
-            <i class="fas fa-user-tie me-2"></i>لیست کارمندان
-        </h1>
-        <div>
-            <a href="{% url 'admin:employee_employee_add' %}" class="btn btn-primary me-2">
-                <i class="fas fa-plus me-2"></i>کارمند جدید
-            </a>
-            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" 
-                    data-bs-target="#filterCollapse" aria-expanded="false">
-                <i class="fas fa-filter me-2"></i>فیلتر پیشرفته
-            </button>
+<div class="employee-list-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1>
+                <i class="fas fa-users"></i>
+                Employee Directory
+            </h1>
+            <p class="subtitle">Manage and monitor all active employees</p>
         </div>
     </div>
 
-    <!-- فیلترهای پیشرفته (قابل جمع شدن) -->
-    <div class="collapse mb-4" id="filterCollapse">
-        <div class="card">
-            <div class="card-body">
-                <form method="get" class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">دپارتمان</label>
-                        <select name="department" class="form-select">
-                            <option value="">همه دپارتمان‌ها</option>
-                            {% for dept in departments %}
-                            <option value="{{ dept.id }}" 
-                                    {% if filters.department == dept.id|stringformat:"s" %}selected{% endif %}>
-                                {{ dept.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">نوع استخدام</label>
-                        <select name="employment_type" class="form-select">
-                            <option value="">همه انواع</option>
-                            <option value="full_time" {% if filters.employment_type == 'full_time' %}selected{% endif %}>
-                                تمام وقت
-                            </option>
-                            <option value="part_time" {% if filters.employment_type == 'part_time' %}selected{% endif %}>
-                                پاره وقت
-                            </option>
-                            <option value="contract" {% if filters.employment_type == 'contract' %}selected{% endif %}>
-                                قراردادی
-                            </option>
-                            <option value="freelance" {% if filters.employment_type == 'freelance' %}selected{% endif %}>
-                                فریلنسر
-                            </option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">وضعیت پرداخت</label>
-                        <select name="payment_status" class="form-select">
-                            <option value="">همه وضعیت‌ها</option>
-                            <option value="paid" {% if filters.payment_status == 'paid' %}selected{% endif %}>
-                                پرداخت شده
-                            </option>
-                            <option value="unpaid" {% if filters.payment_status == 'unpaid' %}selected{% endif %}>
-                                پرداخت نشده
-                            </option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">وضعیت فعال بودن</label>
-                        <select name="is_active" class="form-select">
-                            <option value="">همه</option>
-                            <option value="true" {% if filters.is_active == 'true' %}selected{% endif %}>
-                                فعال
-                            </option>
-                            <option value="false" {% if filters.is_active == 'false' %}selected{% endif %}>
-                                غیرفعال
-                            </option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">حداقل حقوق</label>
-                        <input type="number" name="min_salary" class="form-control" 
-                               value="{{ filters.min_salary|default:'' }}" 
-                               placeholder="مثلاً 1000" step="0.01">
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">حداکثر حقوق</label>
-                        <input type="number" name="max_salary" class="form-control" 
-                               value="{{ filters.max_salary|default:'' }}" 
-                               placeholder="مثلاً 5000" step="0.01">
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">تاریخ استخدام از</label>
-                        <input type="date" name="hire_start" class="form-control" 
-                               value="{{ filters.hire_start|default:'' }}">
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">تاریخ استخدام تا</label>
-                        <input type="date" name="hire_end" class="form-control" 
-                               value="{{ filters.hire_end|default:'' }}">
-                    </div>
-                    
-                    <div class="col-12">
-                        <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary me-2">
-                                <i class="fas fa-search me-2"></i>اعمال فیلترها
-                            </button>
-                            <a href="{% url 'employee:employee_list' %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-2"></i>حذف فیلترها
-                            </a>
-                        </div>
-                    </div>
-                </form>
+    <!-- Quick Stats -->
+    <div class="quick-stats">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ total_stats.active_employees|intcomma }}</div>
+                <div class="stat-label">Active Employees</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">${{ total_stats.total_salary|floatformat:0|intcomma }}</div>
+                <div class="stat-label">Monthly Budget</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">${{ total_stats.total_paid|floatformat:0|intcomma }}</div>
+                <div class="stat-label">Total Paid</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">${{ total_stats.avg_salary|floatformat:0|intcomma }}</div>
+                <div class="stat-label">Average Salary</div>
             </div>
         </div>
     </div>
 
-    <!-- آمار فیلترشده -->
-    {% if filters %}
-    <div class="alert alert-info mb-3">
-        <i class="fas fa-info-circle me-2"></i>
-        نمایش نتایج با فیلترهای اعمال شده
-        {% if filters.department %}
-        <span class="badge bg-info me-2">دپارتمان: {{ filters.department }}</span>
-        {% endif %}
-        {% if filters.employment_type %}
-        <span class="badge bg-info me-2">نوع: {{ filters.employment_type|employment_type_display }}</span>
-        {% endif %}
-        {% if filters.payment_status %}
-        <span class="badge bg-info me-2">پرداخت: {{ filters.payment_status }}</span>
-        {% endif %}
-        <a href="{% url 'employee:employee_list' %}" class="text-danger small">
-            <i class="fas fa-times me-1"></i>حذف همه
-        </a>
+    <!-- Filters -->
+    <div class="filter-section">
+        <form method="get" class="filter-form">
+            <div class="filter-grid">
+                <div class="filter-group">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" 
+                               name="search" 
+                               placeholder="Search employees..."
+                               value="{{ filters.search }}">
+                        {% if filters.search %}
+                        <button type="button" class="clear-search" onclick="clearSearch()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="filter-group">
+                    <select name="department" class="form-select" onchange="this.form.submit()">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept.id }}" {% if filters.department == dept.id|stringformat:"s" %}selected{% endif %}>
+                            {{ dept.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <select name="status" class="form-select" onchange="this.form.submit()">
+                        <option value="all">All Status</option>
+                        <option value="paid" {% if filters.status == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="partial" {% if filters.status == 'partial' %}selected{% endif %}>Partial</option>
+                        <option value="unpaid" {% if filters.status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <select name="type" class="form-select" onchange="this.form.submit()">
+                        <option value="all">All Types</option>
+                        <option value="full_time" {% if filters.type == 'full_time' %}selected{% endif %}>Full Time</option>
+                        <option value="part_time" {% if filters.type == 'part_time' %}selected{% endif %}>Part Time</option>
+                        <option value="contract" {% if filters.type == 'contract' %}selected{% endif %}>Contract</option>
+                        <option value="freelance" {% if filters.type == 'freelance' %}selected{% endif %}>Freelance</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <select name="sort" class="form-select" onchange="this.form.submit()">
+                        <option value="-created_at">Newest First</option>
+                        <option value="created_at" {% if filters.sort == 'created_at' %}selected{% endif %}>Oldest First</option>
+                        <option value="salary" {% if filters.sort == 'salary' %}selected{% endif %}>Salary Low-High</option>
+                        <option value="-salary" {% if filters.sort == '-salary' %}selected{% endif %}>Salary High-Low</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-actions">
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-filter"></i>
+                    Apply Filters
+                </button>
+                <a href="{% url 'employee:employee_list' %}" class="btn-secondary">
+                    <i class="fas fa-redo"></i>
+                    Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Department Distribution -->
+    {% if department_distribution %}
+    <div class="department-section">
+        <h3>Department Overview</h3>
+        <div class="department-grid">
+            {% for dept in department_distribution %}
+            <div class="department-card">
+                <div class="dept-header">
+                    <div class="dept-name">{{ dept.name }}</div>
+                    <div class="dept-count">{{ dept.employee_count }} employees</div>
+                </div>
+                <div class="dept-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+                <div class="dept-footer">
+                    <span class="dept-salary">${{ dept.total_salary|floatformat:0|intcomma }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
     {% endif %}
 
-    <!-- جدول کارمندان -->
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>نام کامل</th>
-                            <th>سمت</th>
-                            <th>دپارتمان</th>
-                            <th>نوع استخدام</th>
-                            <th>حقوق تعیین شده</th>
-                            <th>پرداخت شده</th>
-                            <th>وضعیت</th>
-                            <th>عملیات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in employees_with_financials %}
-                        {% with employee=item.employee financials=item.financials %}
-                        <tr>
-                            <td>
-                                <strong>{{ employee.employee.user.get_full_name|default:"نامشخص" }}</strong>
-                                <br>
-                                <small class="text-muted">{{ employee.employee.user.email|default:"-" }}</small>
-                            </td>
-                            <td>{{ employee.position|default:"-" }}</td>
-                            <td>
-                                {% if employee.department %}
-                                <span class="badge bg-info">{{ employee.department.name }}</span>
-                                {% else %}
-                                -
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge bg-secondary">
-                                    {{ employee.employment_type|employment_type_display }}
-                                </span>
-                            </td>
-                            <td class="fw-bold">{{ employee.salary_due|currency }}</td>
-                            <td>
-                                {{ financials.total_paid|currency }}
-                                <div class="small text-muted mt-1">
-                                    {{ financials.payment_progress|floatformat:0 }}% پرداخت شده
-                                </div>
-                            </td>
-                            <td>
-                                {% if financials.is_fully_paid %}
-                                <span class="badge bg-success">تسویه شده</span>
-                                {% elif financials.remaining_balance > 0 %}
-                                <span class="badge bg-warning">معلق</span>
-                                {% else %}
-                                <span class="badge bg-info">فعال</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'employee:employee_detail' employee.id %}" 
-                                       class="btn btn-outline-primary" 
-                                       title="مشاهده">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{% url 'admin:employee_employee_change' employee.id %}" 
-                                       class="btn btn-outline-warning"
-                                       title="ویرایش">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <a href="{% url 'admin:employee_salarypayment_add' %}?employee={{ employee.id }}" 
-                                       class="btn btn-outline-success"
-                                       title="پرداخت حقوق">
-                                        <i class="fas fa-money-bill"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endwith %}
-                        {% empty %}
-                        <tr>
-                            <td colspan="8" class="text-center py-4">
-                                <i class="fas fa-user-slash fa-3x text-muted mb-3"></i>
-                                <p class="text-muted">هیچ کارمندی با فیلترهای اعمال شده یافت نشد</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- شمارش نتایج -->
-            <div class="d-flex justify-content-between align-items-center mt-3">
-                <div class="text-muted small">
-                    <i class="fas fa-chart-bar me-1"></i>
-                    نمایش {{ employees_with_financials|length }} کارمند
-                </div>
-                
-                {% if employees_with_financials|length > 20 %}
-                <nav>
-                    <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item"><a class="page-link" href="#">1</a></li>
-                        <li class="page-item"><a class="page-link" href="#">2</a></li>
-                        <li class="page-item"><a class="page-link" href="#">3</a></li>
-                    </ul>
-                </nav>
-                {% endif %}
+    <!-- Employees Table -->
+    <div class="table-section">
+        <div class="table-header">
+            <h3>All Employees</h3>
+            <div class="table-info">
+                Showing {{ page_obj.start_index }} - {{ page_obj.end_index }} of {{ page_obj.paginator.count }}
             </div>
         </div>
+        
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Position</th>
+                        <th>Salary</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in employees_data %}
+                    <tr>
+                        <td>
+                            <div class="employee-cell">
+                                <div class="employee-avatar">
+                                    {% if item.employee.employee and item.employee.employee.user %}
+                                        {{ item.employee.employee.user.first_name|first|upper }}{{ item.employee.employee.user.last_name|first|upper }}
+                                    {% else %}
+                                        ?
+                                    {% endif %}
+                                </div>
+                                <div class="employee-info">
+                                    <div class="employee-name">
+                                        {% if item.employee.employee and item.employee.employee.user %}
+                                            {{ item.employee.employee.user.get_full_name }}
+                                        {% else %}
+                                            Unknown Employee
+                                        {% endif %}
+                                    </div>
+                                    <div class="employee-email">
+                                        {% if item.employee.employee and item.employee.employee.user %}
+                                            {{ item.employee.employee.user.email }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if item.employee.department %}
+                            <span class="dept-badge">
+                                {{ item.employee.department.name }}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="position-cell">
+                                <div class="position-title">{{ item.employee.position|default:"—" }}</div>
+                                {% if item.employee.employment_type %}
+                                <div class="employment-type">
+                                    {{ item.employee.get_employment_type_display }}
+                                </div>
+                                {% endif %}
+                        </td>
+                        <td>
+                            <div class="salary-cell">
+                                <div class="salary-amount">${{ item.employee.salary_due|floatformat:0|intcomma }}</div>
+                                {% if item.payment_progress > 0 %}
+                                <div class="salary-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                    <div class="progress-text">{{ item.payment_progress|floatformat:1 }}% paid</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="status-cell">
+                                <span class="status-badge status-{{ item.payment_status.label|lower }}">
+                                    <i class="fas fa-{{ item.payment_status.icon }}"></i>
+                                    {{ item.payment_status.label }}
+                                </span>
+                                {% if item.financials.remaining_balance > 0 %}
+                                <div class="balance-due">
+                                    ${{ item.financials.remaining_balance|floatformat:0|intcomma }} due
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{% url 'employee:employee_detail' item.employee.id %}" class="btn-action" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'admin:employees_employee_change' item.employee.id %}" class="btn-action" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'employee:process_salary_payment' %}?employee={{ item.employee.id }}" class="btn-action" title="Process Payment">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-content">
+                                <i class="fas fa-user-slash"></i>
+                                <h4>No employees found</h4>
+                                <p>
+                                    {% if filters.search or filters.department or filters.status != 'all' %}
+                                    Try adjusting your filters
+                                    {% else %}
+                                    No employees have been added yet
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination">
+            <nav>
+                <ul class="pagination-list">
+                    {% if page_obj.has_previous %}
+                    <li>
+                        <a href="?page=1{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="?page={{ page_obj.previous_page_number }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li>
+                            <span class="pagination-link active">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li>
+                            <a href="?page={{ num }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
+                                {{ num }}
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li>
+                        <a href="?page={{ page_obj.next_page_number }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="?page={{ page_obj.paginator.num_pages }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            <div class="pagination-info">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Minimal JavaScript
+function clearSearch() {
+    const searchInput = document.querySelector('input[name="search"]');
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.closest('form').submit();
+    }
+}
+
+// Simple form validation
+document.addEventListener('DOMContentLoaded', function() {
+    // Add loading state to form submit
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function() {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+                submitBtn.disabled = true;
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

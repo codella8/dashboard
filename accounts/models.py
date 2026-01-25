@@ -3,6 +3,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.core.validators import RegexValidator, EmailValidator
+from django.core.exceptions import ValidationError
 
 class Company(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -151,3 +152,14 @@ class UserProfile(models.Model):
         """Soft deactivate the user profile."""
         self.is_active = False
         self.save(update_fields=["is_active", "updated_at"])
+
+class Product(models.Model):
+    name = models.CharField(max_length=40, verbose_name="product name")
+    description = models.CharField(max_length=500, verbose_name="description", default='', blank=True, null=True)
+    picture = models.ImageField(upload_to='upload/product', null=True, blank=True)
+    
+    def __str__(self):  
+        return self.name
+    
+    class Meta:
+        verbose_name = "product"

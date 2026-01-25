@@ -42,7 +42,6 @@ INSTALLED_APPS = [
     'daily_sale',
     'containers',
     'accounts',
-    'finance',
     'reports',
     'expenses',
     'employee',
@@ -133,37 +132,34 @@ STATICFILES_DIRS = [
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 #jazzmin setting
-# settings.py
 JAZZMIN_SETTINGS = {
-    # عنوان سایت
-    "site_title": "🚀 Management Panel",
-    "site_header": "🏭Vehichle Management System",
-    "site_brand": "Dashboard",
-    
-    # لوگو
+
+    "site_title": "Almuqbil",
+    "site_header": "Almuqbil",
+    "site_brand": "Almuqbil",
+
     "site_logo": "assets/car.png",
     "login_logo": "assets/logo-login.png",
-    
-    # رنگ‌بندی مدرن
-    "theme": "darkly",  # یا: flatly, material, modern
+
+    "theme": "darkly", 
     "dark_mode_theme": "darkly",
-    
-    # استایل کاستوم
+
     "custom_css": "css/admin-custom.css",
     "custom_js": "js/admin-custom.js",
-    
-    # منوی کناری
+
     "navigation_expanded": True,
     "show_sidebar": True,
     "show_ui_builder": True,
-    
-    # آیکون‌های حرفه‌ای
+
     "icons": {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
@@ -175,20 +171,16 @@ JAZZMIN_SETTINGS = {
         "sales.Transaction": "fas fa-shopping-cart",
         "containers.Container": "fas fa-ship",
     },
-    
-    # منوی سفارشی
+
     "topmenu_links": [
         {"name": "Main Dashbord", "url": "/accounts/dashboard/", "permissions": ["auth.view_user"]},
-        {"name": "Reports", "url": "/reports/", "permissions": ["auth.view_user"]},
     ],
-    
-    # ویدجت‌های داشبورد
+
     "usermenu_links": [
-        {"name": "پشتیبانی", "url": "https://t.me/yourchannel", "new_window": True},
+        {"name": "Help", "url": "https://t.me/yourchannel", "new_window": True},
     ],
 }
 
-# رنگ‌بندی مدرن
 JAZZMIN_UI_TWEAKS = {
     "navbar_small_text": False,
     "footer_small_text": False,

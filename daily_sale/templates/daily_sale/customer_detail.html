@@ -1,17 +1,15 @@
-{% extends "daily_sale/daily_sale_base.html" %}
 {% load static humanize %}
 {% block title %}Almuqbil | customer_detail{% endblock %}
 
 {% block content %}
 <div class="customer-detail-container">
     <div class="container">
-        <!-- Customer Header -->
         <div class="glass-card fade-in">
             <div class="customer-header">
                 <div class="row align-items-center">
                     <div class="col-md-8">
                         {% if is_self_view %}
-                        <h1 class="display-5 fw-bold mb-3">👋 Hello, {{ customer.full_name }}</h1>
+                        <h1 class="display-5 fw-bold mb-3">Hello, {{ customer.full_name }}</h1>
                         <p class="lead mb-0">
                             <i class="fas fa-envelope me-2"></i>{{ customer.email }} |
                             <i class="fas fa-phone ms-3 me-2"></i>{{ customer.phone|default:"Not provided" }}
@@ -37,9 +35,6 @@
                     </div>
                     <div class="col-md-4 text-end">
                         <div class="d-flex justify-content-end gap-3">
-                            <button onclick="window.print()" class="btn print-btn no-print">
-                                <i class="fas fa-print me-2"></i>Print Report
-                            </button>
                             {% if not is_self_view %}
                             <a href="#" class="btn export-btn no-print">
                                 <i class="fas fa-file-export me-2"></i>Export
@@ -49,8 +44,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Stats Cards -->
             <div class="p-4">
                 <div class="row g-4">
                     <div class="col-md-3">
@@ -105,7 +98,7 @@
                             </div>
                         </div>
                     </div>
-
+ 
                     <div class="col-md-3">
                         <div class="card stat-card debt h-100">
                             <div class="card-body">
@@ -114,7 +107,7 @@
                                 </div>
                                 <h6 class="text-uppercase text-muted mb-2">Remaining Balance</h6>
                                 <h2 class="mb-1 amount-negative">${{ total_remaining|intcomma }}</h2>
-                                <small class="text-muted">Outstanding amount</small>
+                                <small class="text-muted">Old amount</small>
                                 {% if total_remaining > 0 %}
                                 <div class="mt-3">
                                     <button class="btn btn-sm btn-outline-danger">
@@ -129,7 +122,6 @@
             </div>
         </div>
 
-        <!-- Search and Filter -->
         <div class="search-filter glass-card no-print">
             <div class="row align-items-center">
                 <div class="col-md-6">
@@ -159,7 +151,6 @@
             </div>
         </div>
 
-        <!-- Transactions Table -->
         <div class="glass-card fade-in">
             <div class="p-4">
                 <h3 class="mb-4">
@@ -250,8 +241,6 @@
                         </table>
                     </div>
                 </div>
-
-                <!-- Summary -->
                 <div class="row mt-4">
                     <div class="col-md-4">
                         <div class="card bg-light">
@@ -327,7 +316,6 @@
             </div>
 
             {% else %}
-            <!-- Empty State -->
             <div class="empty-state">
                 <div class="empty-state-icon">
                     <i class="fas fa-shopping-cart fa-3x text-muted"></i>
@@ -335,55 +323,19 @@
                 <h3 class="mb-3">No Transactions Found</h3>
                 <p class="text-muted mb-4">
                     {% if is_self_view %}
-                    You haven't made any purchases yet. Your transaction history will appear here once you start
-                    shopping.
-                    {% else %}
                     This customer hasn't made any purchases yet. Their transaction history will appear here once they
                     start shopping.
                     {% endif %}
                 </p>
-                {% if is_self_view %}
-                <a href="{% url 'home' %}" class="btn btn-primary btn-lg">
-                    <i class="fas fa-store me-2"></i>Start Shopping
-                </a>
-                {% endif %}
             </div>
             {% endif %}
         </div>
     </div>
-
-    <!-- Footer Actions -->
-    {% if not is_self_view %}
-    <div class="glass-card no-print mt-4">
-        <div class="p-4">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-1">Customer Actions</h5>
-                    <p class="text-muted mb-0">Manage this customer's account</p>
-                </div>
-                <div class="d-flex gap-3">
-                    <a href="mailto:{{ customer.email }}" class="btn btn-outline-primary">
-                        <i class="fas fa-envelope me-2"></i>Send Email
-                    </a>
-                    <a href="tel:{{ customer.phone }}" class="btn btn-outline-success" {% if not customer.phone
-                        %}disabled{% endif %}>
-                        <i class="fas fa-phone me-2"></i>Call Customer
-                    </a>
-                    <button class="btn btn-outline-warning" onclick="sendPaymentReminder()">
-                        <i class="fas fa-bell me-2"></i>Payment Reminder
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Search functionality
     document.getElementById('searchInput').addEventListener('keyup', function () {
         const searchTerm = this.value.toLowerCase();
         const rows = document.querySelectorAll('#transactionsTable tbody tr');
@@ -394,27 +346,22 @@
         });
     });
 
-    // Filter by type
     document.getElementById('typeFilter').addEventListener('change', function () {
         const type = this.value;
         const rows = document.querySelectorAll('#transactionsTable tbody tr');
-
         rows.forEach(row => {
             if (!type) {
                 row.style.display = '';
                 return;
             }
-
             const rowType = row.getAttribute('data-type');
             row.style.display = rowType.includes(type) ? '' : 'none';
         });
     });
 
-    // Filter by date
     document.getElementById('dateFilter').addEventListener('change', function () {
         const days = parseInt(this.value);
         if (!days) {
-            // Show all rows
             document.querySelectorAll('#transactionsTable tbody tr').forEach(row => {
                 row.style.display = '';
             });
@@ -430,25 +377,18 @@
         });
     });
 
-    // Export functionality
     function exportToCSV() {
         const rows = document.querySelectorAll('#transactionsTable tr');
         let csv = [];
-
-        // Add headers
         const headers = [];
         document.querySelectorAll('#transactionsTable thead th').forEach(th => {
             headers.push(th.textContent.trim());
         });
         csv.push(headers.join(','));
-
-        // Add data rows
         rows.forEach(row => {
             if (row.querySelector('thead') || row.style.display === 'none') return;
-
             const rowData = [];
             row.querySelectorAll('td').forEach(td => {
-                // Remove icons and extra formatting
                 let text = td.textContent.trim();
                 text = text.replace(/\$|,/g, '');
                 rowData.push(`"${text}"`);
@@ -456,7 +396,6 @@
             csv.push(rowData.join(','));
         });
 
-        // Download CSV
         const csvContent = csv.join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
@@ -467,34 +406,17 @@
         a.click();
         document.body.removeChild(a);
     }
-
-    // Print report with better formatting
-    function printReport() {
-        const originalTitle = document.title;
-        document.title = `Customer Report - {{ customer.full_name }} - ${new Date().toLocaleDateString()}`;
-        window.print();
-        document.title = originalTitle;
-    }
-
-    // Payment reminder function
     function sendPaymentReminder() {
         if (confirm('Send payment reminder to {{ customer.full_name }}?')) {
-            // Show loading state
             const btn = event.target;
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending...';
             btn.disabled = true;
-
-            // Simulate API call
             setTimeout(() => {
                 btn.innerHTML = '<i class="fas fa-check me-2"></i>Sent!';
                 btn.classList.remove('btn-outline-warning');
                 btn.classList.add('btn-success');
-
-                // Show success message
                 showNotification('Payment reminder sent successfully!', 'success');
-
-                // Reset button after 3 seconds
                 setTimeout(() => {
                     btn.innerHTML = originalText;
                     btn.disabled = false;
@@ -504,8 +426,6 @@
             }, 1500);
         }
     }
-
-    // Notification system
     function showNotification(message, type = 'info') {
         const notification = document.createElement('div');
         notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
@@ -520,8 +440,6 @@
             notification.remove();
         }, 5000);
     }
-
-    // Add hover effects to table rows
     document.querySelectorAll('#transactionsTable tbody tr').forEach(row => {
         row.addEventListener('mouseenter', function () {
             this.style.backgroundColor = '#f8fafc';
@@ -531,8 +449,6 @@
             this.style.backgroundColor = '';
         });
     });
-
-    // Initialize tooltips
     document.addEventListener('DOMContentLoaded', function () {
         const tooltips = document.querySelectorAll('[title]');
         tooltips.forEach(el => {
@@ -557,24 +473,5 @@
     document.querySelectorAll('.stat-card').forEach(card => {
         observer.observe(card);
     });
-
-    // Add export button functionality
-    document.querySelector('.export-btn').addEventListener('click', function (e) {
-        e.preventDefault();
-        exportToCSV();
-        showNotification('Export started. Your download will begin shortly.', 'info');
-    });
-
-    // Add print button functionality
-    document.querySelector('.print-btn').addEventListener('click', printReport);
 </script>
-
-<!-- Animate.css for animations -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
-
-<!-- Font Awesome for icons -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
-<!-- Bootstrap Icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
 {% endblock %}

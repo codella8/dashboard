@@ -1,507 +1,585 @@
 {% extends "daily_sale/daily_sale_base.html" %}
+{% load static %}
 {% load humanize %}
 
-{% block title %}Almuqbil | cleared_transactions{% endblock %}
+{% block title %}Almuqbil | Cleared Transactions {% endblock %}
 
 {% block content %}
-<div class="dashboard-content">
-    <!-- Header Section -->
-    <div class="dashboard-header-section">
-        <div class="header-left">
-            <h1 class="dashboard-title">
-                <i class="bi bi-check-circle-fill text-success"></i>
-                Cleared & Paid Transactions
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2 text-gray-800">
+                <i class="fas fa-check-circle text-success me-2"></i>
+                Cleared Transactions
             </h1>
-            <p class="dashboard-subtitle">
-                <i class="bi bi-info-circle"></i>
-                Fully settled transactions with zero balance
+            <p class="text-muted mb-0">
+                <i class="fas fa-chart-line me-1"></i>
+                Comprehensive financial analysis of not paid transactions
             </p>
         </div>
-        <div class="header-actions">
-            <div class="date-selector">
-                <select class="form-select" id="periodSelect">
-                    <option value="today">Today</option>
-                    <option value="yesterday">Yesterday</option>
-                    <option value="week">This Week</option>
-                    <option value="month" selected>This Month</option>
-                    <option value="quarter">This Quarter</option>
-                    <option value="year">This Year</option>
-                    <option value="custom">Custom Range</option>
-                </select>
-            </div>
-            <button class="btn-refresh" id="refreshBtn">
-                <i class="bi bi-arrow-clockwise"></i>
-                Refresh
-            </button>
-            <button class="btn-export" onclick="exportClearedTransactions()">
-                <i class="bi bi-download"></i>
-                Export
+        <div class="d-flex gap-2">
+            <button class="btn btn-danger" id="refreshBtn">
+                <i class="fas fa-sync-alt me-1"></i> Refresh
             </button>
         </div>
     </div>
-
-    <!-- Stats Cards for Cleared Transactions -->
-    <div class="stats-grid">
-        <!-- Total Cleared Amount -->
-        <div class="stat-card card-success">
-            <div class="stat-card-header">
-                <div class="stat-icon">
-                    <i class="bi bi-cash-stack text-success"></i>
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-success text-uppercase mb-2">Total Cleared Amount</h6>
+                            <h2 class="mb-2">AED {{ cleared_stats.total_amount|floatformat:0|intcomma }}</h2>
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-success me-2">{{ cleared_stats.total_transactions }}</span>
+                                <small class="text-muted">Transactions</small>
+                            </div>
+                        </div>
+                        <div class="text-success opacity-25">
+                            <i class="fas fa-money-bill-wave fa-2x"></i>
+                        </div>
+                    </div>
                 </div>
-                <h3>Total Cleared</h3>
-            </div>
-            <div class="stat-card-value">
-                ${{ cleared_stats.total_amount|floatformat:0|intcomma }}
-            </div>
-            <div class="stat-card-details">
-                <span class="stat-badge">{{ cleared_stats.transaction_count }} transactions</span>
-                <span class="stat-change">
-                    <i class="bi bi-arrow-up-right"></i>
-                    {{ cleared_stats.percentage_of_total|floatformat:1 }}% of all transactions
-                </span>
             </div>
         </div>
 
-        <!-- Average Settlement Time -->
-        <div class="stat-card card-info">
-            <div class="stat-card-header">
-                <div class="stat-icon">
-                    <i class="bi bi-clock-history text-info"></i>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-primary text-uppercase mb-2">Unpaid</h6>
+                            <h2 class="mb-2">{{ cleared_stats.avg_days_to_settle|floatformat:1 }} days</h2>
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-primary me-2">{{ cleared_stats.total_customers }}</span>
+                                <small class="text-muted">Customers</small>
+                            </div>
+                        </div>
+                        <div class="text-primary opacity-25">
+                            <i class="fas fa-tachometer-alt fa-2x"></i>
+                        </div>
+                    </div>
                 </div>
-                <h3>Avg. Settlement</h3>
-            </div>
-            <div class="stat-card-value">
-                {{ cleared_stats.avg_settlement_days|floatformat:1 }} days
-            </div>
-            <div class="stat-card-details">
-                <span class="stat-badge">{{ cleared_stats.immediate_settlements }} immediate</span>
-                <span class="stat-change">
-                    <i class="bi bi-graph-down"></i>
-                    {{ cleared_stats.avg_discount|floatformat:1 }}% avg discount
-                </span>
             </div>
         </div>
 
-        <!-- Top Customer -->
-        <div class="stat-card card-warning">
-            <div class="stat-card-header">
-                <div class="stat-icon">
-                    <i class="bi bi-person-check text-warning"></i>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-info text-uppercase mb-2">Payment Types</h6>
+                            <h2 class="mb-2">{{ cleared_stats.full_payments }}/{{ cleared_stats.partial_payments }}</h2>
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-info me-2">Full/Partial</span>
+                            </div>
+                        </div>
+                        <div class="text-info opacity-25">
+                            <i class="fas fa-percentage fa-2x"></i>
+                        </div>
+                    </div>
                 </div>
-                <h3>Top Customer</h3>
-            </div>
-            <div class="stat-card-value">
-                {{ cleared_stats.top_customer.name|truncatechars:15|default:"N/A" }}
-            </div>
-            <div class="stat-card-details">
-                <span class="stat-badge">${{ cleared_stats.top_customer.amount|floatformat:0|intcomma }}</span>
-                <span class="stat-change">
-                    <i class="bi bi-receipt"></i>
-                    {{ cleared_stats.top_customer.count }} transactions
-                </span>
             </div>
         </div>
 
-        <!-- Quick Settlement -->
-        <div class="stat-card card-primary">
-            <div class="stat-card-header">
-                <div class="stat-icon">
-                    <i class="bi bi-lightning-charge text-primary"></i>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-warning text-uppercase mb-2">Average Transaction</h6>
+                            <h2 class="mb-2">AED {{ cleared_stats.avg_amount|floatformat:0|intcomma }}</h2>
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-warning me-2">Range</span>
+                                <small class="text-muted">{{ cleared_stats.fastest_settle }} - {{
+                                    cleared_stats.slowest_settle }} days</small>
+                            </div>
+                        </div>
+                        <div class="text-warning opacity-25">
+                            <i class="fas fa-chart-bar fa-2x"></i>
+                        </div>
+                    </div>
                 </div>
-                <h3>Quick Settled</h3>
-            </div>
-            <div class="stat-card-value">
-                {{ cleared_stats.quick_settlements }}
-            </div>
-            <div class="stat-card-details">
-                <span class="stat-badge">< 7 days</span>
-                <span class="stat-change">
-                    <i class="bi bi-arrow-up-right"></i>
-                    {{ cleared_stats.quick_settlement_rate|floatformat:1 }}% rate
-                </span>
             </div>
         </div>
     </div>
-
-    <!-- Filters Bar -->
-    <div class="filters-bar">
-        <div class="filter-group">
-            <label>Customer:</label>
-            <select class="form-select filter-select" id="customerFilter">
-                <option value="">All Customers</option>
-                {% for customer in customers %}
-                <option value="{{ customer.id }}">{{ customer.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        
-        <div class="filter-group">
-            <label>Payment Method:</label>
-            <select class="form-select filter-select" id="paymentMethodFilter">
-                <option value="">All Methods</option>
-                <option value="cash">Cash</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="check">Check</option>
-                <option value="credit_card">Credit Card</option>
-            </select>
-        </div>
-        
-        <div class="filter-group">
-            <label>Settlement Type:</label>
-            <select class="form-select filter-select" id="settlementTypeFilter">
-                <option value="">All Types</option>
-                <option value="full">Full Payment</option>
-                <option value="partial">Partial Payments</option>
-                <option value="advance">Advance Payment</option>
-            </select>
-        </div>
-        
-        <div class="filter-group">
-            <label>Sort By:</label>
-            <select class="form-select filter-select" id="sortByFilter">
-                <option value="date_desc">Date (Newest)</option>
-                <option value="date_asc">Date (Oldest)</option>
-                <option value="amount_desc">Amount (High to Low)</option>
-                <option value="amount_asc">Amount (Low to High)</option>
-                <option value="settlement_desc">Settlement Days</option>
-            </select>
-        </div>
-        
-        <button class="btn-clear-filters" onclick="clearFilters()">
-            <i class="bi bi-x-circle"></i>
-            Clear Filters
-        </button>
-    </div>
-
-    <!-- Cleared Transactions Table -->
-    <div class="content-card">
+    <div class="card shadow mb-4">
         <div class="card-header">
-            <h2>
-                <i class="bi bi-list-check text-success"></i>
-                Cleared Transactions List
-                <span class="badge bg-success">{{ paginator.count }}</span>
-            </h2>
-            <div class="card-actions">
-                <div class="search-box">
-                    <i class="bi bi-search"></i>
-                    <input type="text" placeholder="Search invoice, customer, item..." id="searchInput">
+            <h5 class="mb-0">
+                <i class="fas fa-filter me-2"></i>
+                Advanced Filters & Analytics
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Period</label>
+                    <select class="form-select" name="period">
+                        <option value="today" {% if request.GET.period == 'today' %}selected{% endif %}>Today</option>
+                        <option value="week" {% if request.GET.period == 'week' %}selected{% endif %}>This Week</option>
+                        <option value="month" {% if request.GET.period == 'month' or not request.GET.period %}selected{% endif %}>This Month</option>
+                        <option value="year" {% if request.GET.period == 'year' %}selected{% endif %}>This Year</option>
+                        <option value="all" {% if request.GET.period == 'all' %}selected{% endif %}>All Time</option>
+                    </select>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label">Sort By</label>
+                    <select class="form-select" name="sort">
+                        <option value="date_desc" {% if request.GET.sort == 'date_desc' %}selected{% endif %}>Newest First
+                        </option>
+                        <option value="date_asc" {% if request.GET.sort == 'date_asc' %}selected{% endif %}>Oldest First
+                        </option>
+                        <option value="amount_desc" {% if request.GET.sort == 'amount_desc' %}selected{% endif %}>Highest
+                            Amount</option>
+                        <option value="amount_asc" {% if request.GET.sort == 'amount_asc' %}selected{% endif %}>Lowest
+                            Amount</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Search</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search" placeholder="Invoice or Customer..."
+                            value="{{ search_query }}">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="card shadow">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list-check me-2"></i>
+                    Cleared Transactions
+                </h5>
             </div>
         </div>
-        
-        <div class="table-responsive">
-            <table class="table transactions-table">
-                <thead>
-                    <tr>
-                        <th class="text-center">#</th>
-                        <th>Invoice Details</th>
-                        <th>Customer</th>
-                        <th>Transaction Details</th>
-                        <th class="text-end">Financials</th>
-                        <th>Settlement Info</th>
-                        <th class="text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for transaction in cleared_transactions %}
-                    <tr class="transaction-row {% if transaction.is_recent %}new-row{% endif %}">
-                        <!-- Serial Number -->
-                        <td class="text-center">
-                            <span class="serial-number">{{ forloop.counter0|add:page_obj.start_index }}</span>
-                        </td>
-                        
-                        <!-- Invoice Details -->
-                        <td>
-                            <div class="invoice-info">
-                                <strong class="invoice-number">
-                                    <i class="bi bi-receipt"></i>
-                                    {{ transaction.invoice_number }}
-                                </strong>
-                                <div class="invoice-meta">
-                                    <span class="badge bg-secondary">{{ transaction.date|date:"M d, Y" }}</span>
-                                    {% if transaction.due_date %}
-                                    <span class="text-muted">Due: {{ transaction.due_date|date:"M d" }}</span>
-                                    {% endif %}
-                                </div>
-                                {% if transaction.description %}
-                                <small class="text-muted d-block mt-1">
-                                    <i class="bi bi-chat-left"></i>
-                                    {{ transaction.description|truncatechars:50 }}
-                                </small>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Invoice No.</th>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th class="text-end">Amount</th>
+                            <th class="text-end">Paid</th>
+                            <th>Settlement</th>
+                            <th class="text-end">Days</th>
+                            <th>Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody">
+                        {% for transaction in cleared_transactions %}
+                        <tr
+                            class="{% if transaction.settlement_type == 'full' %}table-success{% else %}table-info{% endif %}">
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ transaction.invoice_number }}</strong>
+                            </td>
+                            <td>{{ transaction.date|date:"Y-m-d" }}</td>
+                            <td>{{ transaction.customer_name }}</td>
+                            <td class="text-end">
+                                <strong>AED {{ transaction.total_amount|floatformat:2|intcomma }}</strong>
+                            </td>
+                            <td class="text-end text-success">
+                                AED {{ transaction.paid_amount|floatformat:2|intcomma }}
+                            </td>
+                            <td>
+                                {% if transaction.settlement_date %}
+                                {{ transaction.settlement_date|date:"Y-m-d" }}
+                                {% else %}
+                                <span class="text-muted">N/A</span>
                                 {% endif %}
-                            </div>
-                        </td>
-                        
-                        <!-- Customer Info -->
-                        <td>
-                            <div class="customer-info">
-                                <div class="customer-avatar bg-success">
-                                    {{ transaction.customer.initials|default:"C" }}
-                                </div>
-                                <div class="customer-details">
-                                    <strong>{{ transaction.customer.name|default:"Unknown Customer" }}</strong>
-                                    <div class="customer-contact">
-                                        {% if transaction.customer.phone %}
-                                        <small><i class="bi bi-telephone"></i> {{ transaction.customer.phone }}</small>
-                                        {% endif %}
-                                        {% if transaction.customer.email %}
-                                        <small><i class="bi bi-envelope"></i> {{ transaction.customer.email|truncatechars:20 }}</small>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </td>
-                        
-                        <!-- Transaction Details -->
-                        <td>
-                            <div class="transaction-details">
-                                <div class="item-info">
-                                    <strong>
-                                        <i class="bi bi-box"></i>
-                                        {{ transaction.item.name|truncatechars:25|default:"N/A" }}
-                                    </strong>
-                                    <small class="text-muted d-block">
-                                        Qty: {{ transaction.quantity }} × ${{ transaction.unit_price|floatformat:2 }}
-                                    </small>
-                                </div>
-                                {% if transaction.container %}
-                                <div class="container-info mt-1">
-                                    <small>
-                                        <i class="bi bi-archive"></i>
-                                        Container: {{ transaction.container.name|truncatechars:20 }}
-                                    </small>
-                                </div>
+                            </td>
+                            <td class="text-end">
+                                {% if transaction.days_to_settle > 0 %}
+                                <span
+                                    class="badge {% if transaction.days_to_settle <= 7 %}bg-success{% elif transaction.days_to_settle <= 30 %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ transaction.days_to_settle }} days
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
                                 {% endif %}
-                                <div class="transaction-type mt-1">
-                                    <span class="badge {% if transaction.transaction_type == 'sale' %}bg-success{% else %}bg-primary{% endif %}">
-                                        {{ transaction.transaction_type|title }}
-                                    </span>
-                                </div>
-                            </div>
-                        </td>
-                        
-                        <!-- Financials -->
-                        <td class="text-end">
-                            <div class="financials">
-                                <div class="amount-row">
-                                    <span class="label">Total:</span>
-                                    <span class="value">${{ transaction.total_amount|floatformat:2|intcomma }}</span>
-                                </div>
-                                <div class="amount-row text-success">
-                                    <span class="label">Paid:</span>
-                                    <span class="value">${{ transaction.paid_amount|floatformat:2|intcomma }}</span>
-                                </div>
-                                {% if transaction.discount > 0 %}
-                                <div class="amount-row text-warning">
-                                    <span class="label">Discount:</span>
-                                    <span class="value">${{ transaction.discount|floatformat:2|intcomma }}</span>
-                                </div>
+                            </td>
+                            <td>
+                                {% if transaction.settlement_type == 'full' %}
+                                <span class="badge bg-success">Full</span>
+                                {% else %}
+                                <span class="badge bg-info">Partial ({{ transaction.payment_count }})</span>
                                 {% endif %}
-                                {% if transaction.advance > 0 %}
-                                <div class="amount-row text-info">
-                                    <span class="label">Advance:</span>
-                                    <span class="value">${{ transaction.advance|floatformat:2|intcomma }}</span>
-                                </div>
-                                {% endif %}
-                                <div class="amount-row">
-                                    <span class="label">Tax:</span>
-                                    <span class="value">${{ transaction.tax|floatformat:2|intcomma }}</span>
-                                </div>
-                                <div class="final-balance text-success">
-                                    <strong>Balance: $0.00</strong>
-                                </div>
-                            </div>
-                        </td>
-                        
-                        <!-- Settlement Info -->
-                        <td>
-                            <div class="settlement-info">
-                                <div class="settlement-status">
-                                    <span class="badge bg-success">
-                                        <i class="bi bi-check-circle"></i>
-                                        Fully Cleared
-                                    </span>
-                                </div>
-                                <div class="settlement-details mt-2">
-                                    <small class="d-block">
-                                        <i class="bi bi-calendar-check"></i>
-                                        Settled: {{ transaction.settlement_date|date:"M d, Y"|default:"N/A" }}
-                                    </small>
-                                    <small class="d-block">
-                                        <i class="bi bi-clock-history"></i>
-                                        Days to settle: {{ transaction.days_to_settle|default:"0" }}
-                                    </small>
-                                    {% if transaction.last_payment_method %}
-                                    <small class="d-block">
-                                        <i class="bi bi-credit-card"></i>
-                                        Method: {{ transaction.last_payment_method }}
-                                    </small>
-                                    {% endif %}
-                                    <small class="d-block">
-                                        <i class="bi bi-cash-coin"></i>
-                                        Payments: {{ transaction.payment_count }}
-                                    </small>
-                                </div>
-                            </div>
-                        </td>
-                        
-                        <!-- Actions -->
-                        <td class="text-center">
-                            <div class="action-buttons">
-                                <button class="btn-action btn-view" 
-                                        onclick="viewTransaction('{{ transaction.id }}')"
-                                        title="View Details">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                                <button class="btn-action btn-print" 
-                                        onclick="printInvoice('{{ transaction.id }}')"
-                                        title="Print Invoice">
-                                    <i class="bi bi-printer"></i>
-                                </button>
-                                <button class="btn-action btn-receipt" 
-                                        onclick="downloadReceipt('{{ transaction.id }}')"
-                                        title="Download Receipt">
-                                    <i class="bi bi-receipt"></i>
-                                </button>
-                                <div class="dropdown">
-                                    <button class="btn-action btn-more dropdown-toggle" 
-                                            type="button" 
-                                            data-bs-toggle="dropdown">
-                                        <i class="bi bi-three-dots"></i>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary download-receipt-btn"
+                                        data-transaction-id="{{ transaction.id }}">
+                                        <i class="fas fa-receipt"></i>
                                     </button>
-                                    <ul class="dropdown-menu">
-                                        <li>
-                                            <a class="dropdown-item" href="#" 
-                                               onclick="sendReceiptEmail('{{ transaction.id }}')">
-                                                <i class="bi bi-envelope me-2"></i>Email Receipt
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="#" 
-                                               onclick="duplicateTransaction('{{ transaction.id }}')">
-                                                <i class="bi bi-copy me-2"></i>Duplicate
-                                            </a>
-                                        </li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <a class="dropdown-item text-danger" href="#" 
-                                               onclick="voidTransaction('{{ transaction.id }}')">
-                                                <i class="bi bi-x-circle me-2"></i>Void Transaction
-                                            </a>
-                                        </li>
-                                    </ul>
+                                    <button class="btn btn-outline-info view-details-btn"
+                                        data-transaction-id="{{ transaction.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <a href="{% url 'daily_sale:transaction_detail' transaction.id %}"
+                                        class="btn btn-outline-secondary">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
                                 </div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center py-5">
-                            <div class="empty-state">
-                                <i class="bi bi-check-circle display-1 text-success"></i>
-                                <h3 class="mt-3">No Cleared Transactions</h3>
-                                <p class="text-muted">All transactions are either pending or have outstanding balance</p>
-                                <a href="{% url 'daily_sale:transaction_list' %}" class="btn btn-primary mt-2">
-                                    <i class="bi bi-receipt me-2"></i>
-                                    View All Transactions
-                                </a>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Pagination -->
-        {% if paginator.num_pages > 1 %}
-        <div class="card-footer">
-            <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-center mb-0">
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10" class="text-center py-4">
+                                <div class="text-muted">
+                                    <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                                    <h5>No Cleared Transactions Found</h5>
+                                    <p>No fully paid transactions in the selected period.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="4" class="text-end">TOTALS:</th>
+                            <th class="text-end">AED {{ cleared_stats.total_amount|floatformat:2|intcomma }}</th>
+                            <th class="text-end text-success">AED {{ cleared_stats.total_amount|floatformat:2|intcomma }}</th>
+                            <th colspan="2"></th>
+                            <th>
+                                {{ cleared_stats.full_payments }} Full / {{ cleared_stats.partial_payments }} Partial
+                            </th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
                     {% if page_obj.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page=1">
-                            <i class="bi bi-chevron-double-left"></i>
-                        </a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
-                            <i class="bi bi-chevron-left"></i>
+                        <a class="page-link"
+                            href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode|cut:'page=' }}"
+                            aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
                         </a>
                     </li>
                     {% endif %}
-                    
+
                     {% for num in page_obj.paginator.page_range %}
-                        {% if page_obj.number == num %}
-                        <li class="page-item active">
-                            <span class="page-link">{{ num }}</span>
-                        </li>
-                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <li class="page-item"><a
+                            class="page-link" href="?page={{ num }}&{{ request.GET.urlencode|cut:'page=' }}">{{ num }}</a></li>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
                         <li class="page-item">
-                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            <a class="page-link"
+                                href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode|cut:'page=' }}"
+                                aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
                         </li>
                         {% endif %}
-                    {% endfor %}
-                    
-                    {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">
-                            <i class="bi bi-chevron-right"></i>
-                        </a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ paginator.num_pages }}">
-                            <i class="bi bi-chevron-double-right"></i>
-                        </a>
-                    </li>
-                    {% endif %}
                 </ul>
-                <div class="text-center text-muted mt-2">
-                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} cleared transactions
-                </div>
             </nav>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
-    
-    <!-- Summary Section -->
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="content-card">
-                <div class="card-header">
-                    <h4><i class="bi bi-pie-chart me-2"></i>Settlement Analysis</h4>
-                </div>
-                <div class="card-body">
-                    <canvas id="settlementChart" height="250"></canvas>
-                </div>
-            </div>
+
+    <div class="card shadow mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Financial Summary</h5>
         </div>
-        <div class="col-md-6">
-            <div class="content-card">
-                <div class="card-header">
-                    <h4><i class="bi bi-bar-chart me-2"></i>Cleared Amount Trend</h4>
-                </div>
-                <div class="card-body">
-                    <canvas id="trendChart" height="250"></canvas>
+        <div class="card-body">
+            <div class="row">
+               
+                <div class="col-md-6">
+                    <h6>Export Options</h6>
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <button class="btn btn-outline-primary w-100" onclick="exportToPDF()">
+                                <i class="fas fa-file-pdf me-2"></i>PDF Report
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<!-- Modals -->
-<div class="modal fade" id="transactionModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Transaction Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="transactionDetails">
-                <!-- Loaded via AJAX -->
-            </div>
-        </div>
-    </div>
+<div id="chart-data" data-transactions='{{ transactions_json|safe }}' style="display: none;">
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let transactionsData = [];
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const chartDataElement = document.getElementById('chart-data');
+        if (chartDataElement && chartDataElement.dataset.transactions) {
+            try {
+                transactionsData = JSON.parse(chartDataElement.dataset.transactions);
+            } catch (e) {
+                console.error('Error parsing transaction data:', e);
+            }
+        }
+
+        initializeCharts();
+        document.querySelectorAll('.download-receipt-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const transactionId = this.dataset.transactionId;
+                downloadReceipt(transactionId);
+            });
+        });
+
+        document.querySelectorAll('.view-details-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const transactionId = this.dataset.transactionId;
+                viewTransactionDetails(transactionId);
+            });
+        });
+
+        // Auto-refresh
+        let refreshInterval = setInterval(refreshData, 120000);
+        let autoRefreshEnabled = true;
+
+        // Manual refresh button
+        document.getElementById('refreshBtn').addEventListener('click', function () {
+            window.location.reload();
+        });
+            
+    });
+
+    function refreshData() {
+        if (!autoRefreshEnabled) return;
+
+        const refreshBtn = document.getElementById('refreshBtn');
+        if (refreshBtn) {
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Refreshing...';
+            refreshBtn.disabled = true;
+
+            showNotification('Updating cleared transactions data...', 'info');
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+    }
+    function viewTransactionDetails(transactionId) {
+        const transaction = transactionsData.find(t => t.id == transactionId);
+        if (transaction) {
+            const detailsContent = document.getElementById('detailsContent');
+            detailsContent.innerHTML = `
+        <div class="row">
+          <div class="col-md-6">
+            <h6>Transaction Information</h6>
+            <table class="table table-sm">
+              <tr>
+                <th>Invoice Number:</th>
+                <td>${transaction.invoice_number}</td>
+              </tr>
+              <tr>
+                <th>Transaction Date:</th>
+                <td>${transaction.date}</td>
+              </tr>
+              <tr>
+                <th>Customer:</th>
+                <td>${transaction.customer_name}</td>
+              </tr>
+              <tr>
+                <th>Total Amount:</th>
+                <td class="text-success">AED ${transaction.total_amount.toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+          <div class="col-md-6">
+            <h6>Settlement Details</h6>
+            <table class="table table-sm">
+              <tr>
+                <th>Settlement Type:</th>
+                <td>
+                  <span class="badge ${transaction.settlement_type === 'full' ? 'bg-success' : 'bg-info'}">
+                    ${transaction.settlement_type === 'full' ? 'Full Payment' : 'Partial Payments'}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <th>Number of Payments:</th>
+                <td>${transaction.payment_count || 1}</td>
+              </tr>
+              <tr>
+                <th>Days to Settle:</th>
+                <td>
+                  <span class="badge ${transaction.days_to_settle <= 7 ? 'bg-success' : transaction.days_to_settle <= 30 ? 'bg-warning' : 'bg-danger'}">
+                    ${transaction.days_to_settle} days
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <th>Settlement Date:</th>
+                <td>${transaction.settlement_date || 'N/A'}</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="mt-3">
+          <h6>Payment History</h6>
+          <p class="text-muted">Payment history would be displayed here in real implementation.</p>
+        </div>
+      `;
+            new bootstrap.Modal(document.getElementById('detailsModal')).show();
+        } else {
+            showNotification('Transaction details not found', 'danger');
+        }
+    }
+    function exportToPDF() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('export', 'pdf');
+        window.open(url.toString(), '_blank');
+    }
+
+    function viewAnalytics() {
+        window.open("{% url 'daily_sale:cleared_transactions' %}?analytics=true", '_blank');
+    }
+
+    function initializeCharts() {
+        if (transactionsData.length === 0) return;
+
+        const settlementCtx = document.getElementById('settlementChart');
+        if (settlementCtx) {
+            let fullPaymentCount = 0;
+            let partialPaymentCount = 0;
+
+            transactionsData.forEach(transaction => {
+                if (transaction.settlement_type === 'full') {
+                    fullPaymentCount++;
+                } else {
+                    partialPaymentCount++;
+                }
+            });
+
+            new Chart(settlementCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Full Payment', 'Partial Payments'],
+                    datasets: [{
+                        data: [fullPaymentCount, partialPaymentCount],
+                        backgroundColor: ['#1cc88a', '#f6c23e'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const total = fullPaymentCount + partialPaymentCount;
+                                    const percentage = Math.round((context.parsed / total) * 100);
+                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        const trendCtx = document.getElementById('trendChart');
+        if (trendCtx) {
+            const monthlyData = {};
+
+            transactionsData.forEach(transaction => {
+                const date = new Date(transaction.date);
+                const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+                if (!monthlyData[monthKey]) {
+                    monthlyData[monthKey] = 0;
+                }
+                monthlyData[monthKey] += transaction.total_amount;
+            });
+
+            const months = Object.keys(monthlyData);
+            const amounts = Object.values(monthlyData);
+
+            new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'Cleared Amount',
+                        data: amounts,
+                        borderColor: '#4e73df',
+                        backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#4e73df',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `AED ${context.parsed.y.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    })}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (value) {
+                                    return 'AED ' + value.toLocaleString('en-US', {
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 0
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+        setTimeout(() => {
+            toastElement.remove();
+        }, 3000);
+
+</script>
+{% endblock %}

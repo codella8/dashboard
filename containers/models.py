@@ -3,10 +3,7 @@ from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 from django.core.validators import MinValueValidator
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes.fields import GenericForeignKey
 from accounts.models import Company, UserProfile
-from django.db.models import Sum
 
 class Saraf(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -33,13 +30,12 @@ class Container(models.Model):
     name = models.CharField(max_length=150, blank=True)
     price = models.DecimalField(max_digits=15, decimal_places=0, default=0)
     
-    # اصلاح related_name
     company = models.ForeignKey(
         Company, 
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True, 
-        related_name="company"  # ✅ تغییر به containers
+        related_name="company"
     )
     
     description = models.TextField(blank=True)
@@ -61,8 +57,6 @@ CURRENCY_CHOICES = [
 
 class Inventory_List(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    
-    # اصلاح related_name
     container = models.ForeignKey(
         Container, 
         on_delete=models.SET_NULL, 
@@ -70,7 +64,6 @@ class Inventory_List(models.Model):
         blank=True, 
         related_name='inventory_items'
     )
-    
     date_added = models.DateField(default=timezone.now, db_index=True)
     code = models.CharField(max_length=64, blank=True, db_index=True)
     product_name = models.CharField(max_length=255)
@@ -95,8 +88,6 @@ class Inventory_List(models.Model):
     def __str__(self):
         return f"{self.code} – {self.product_name}" if self.code else self.product_name
 
-
-
 class SarafTransaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     saraf = models.ForeignKey(
@@ -105,7 +96,6 @@ class SarafTransaction(models.Model):
     container = models.ForeignKey(
         'Container', on_delete=models.SET_NULL, null=True, blank=True, related_name="Saraf_transactions"
     )
-
     received_from_saraf = models.DecimalField(max_digits=18, decimal_places=0, default=Decimal('0'))
     paid_by_company = models.DecimalField(max_digits=18, decimal_places=0, default=Decimal('0'))
 
@@ -199,7 +189,6 @@ class ContainerTransaction(models.Model):
         return f"{self.container.container_number} | {self.product} | {self.sale_status}"
 
     def save(self, *args, **kwargs):
-        # فقط وقتی که وضعیت فروش تغییر می‌کند
         if self.sale_status in ["sold_to_company", "sold_to_customer"]:
             try:
                 inventory_item = Inventory_List.objects.filter(container=self.container).first()
@@ -211,7 +200,6 @@ class ContainerTransaction(models.Model):
                     inventory_item.total_sold_count += 1
                     inventory_item.save()
             except Inventory_List.DoesNotExist:
-                # اگر آیتم موجودی وجود نداشت، کاری نکن
                 pass
 
         super().save(*args, **kwargs)

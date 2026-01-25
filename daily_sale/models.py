@@ -8,7 +8,6 @@ from accounts.models import UserProfile, Company
 from containers.models import Inventory_List, Container
 
 class DailySaleTransaction(models.Model):
-    """Core transaction record."""
     TRANSACTION_TYPES = [("sale", "Sale"), ("purchase", "Purchase")]
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -60,36 +59,29 @@ class DailySaleTransaction(models.Model):
         return f"{self.invoice_number or 'INV'} | {self.date} | {self.total_amount}"
 
     def save(self, *args, **kwargs):
-        """Override save to calculate with HIGH PRECISION"""
-        # 1. محاسبه Subtotal
         self.subtotal = (Decimal(self.quantity) * Decimal(self.unit_price)).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
-        
-        # 2. محاسبه مبلغ قابل مالیات (بعد از تخفیف)
+
         taxable_amount = (self.subtotal - Decimal(self.discount)).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
         if taxable_amount < Decimal("0"):
             taxable_amount = Decimal("0")
-        
-        # 3. محاسبه دقیق مالیات - روی مبلغ قابل مالیات
+
         tax_rate = Decimal(self.tax) / Decimal("100")
         self.tax_amount = (taxable_amount * tax_rate).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
-        
-        # 4. محاسبه مبلغ کل
+
         self.total_amount = (taxable_amount + self.tax_amount).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
-        
-        # 5. محاسبه باقیمانده
+
         self.balance = (
             self.total_amount - Decimal(self.advance) - Decimal(self.paid)
         ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-        # وضعیت پرداخت
         if self.balance <= Decimal("0"):
             self.payment_status = "paid"
         elif Decimal(self.advance) > Decimal("0") or Decimal(self.paid) > Decimal("0"):
@@ -98,9 +90,104 @@ class DailySaleTransaction(models.Model):
             self.payment_status = "unpaid"
 
         super().save(*args, **kwargs)
+        
+    def recalculate_totals(self):
+    
+        if self.items.exists():
+            self.subtotal = sum((i.subtotal for i in self.items.all()), Decimal("0"))
+            self.tax_amount = sum((i.tax_amount for i in self.items.all()), Decimal("0"))
+            self.total_amount = sum((i.total_amount for i in self.items.all()), Decimal("0"))
+
+            self.balance = (
+                self.total_amount - Decimal(self.advance) - Decimal(self.paid)
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+            if self.balance <= Decimal("0"):
+                self.payment_status = "paid"
+            elif self.advance > 0 or self.paid > 0:
+                self.payment_status = "partial"
+            else:
+                self.payment_status = "unpaid"
+
+            super().save(update_fields=[
+                "subtotal", "tax_amount", "total_amount",
+                "balance", "payment_status"
+            ])
+    @property
+    def taxable_amount(self):
+        return self.subtotal - self.total_discount
+    
+    @property
+    def paid_percentage(self):
+        if self.total_amount > 0:
+            return (self.advance / self.total_amount) * 100
+        return 0
+
+
+
+class DailySaleTransactionItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+
+    transaction = models.ForeignKey(
+        DailySaleTransaction,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    item = models.ForeignKey(
+        Inventory_List,
+        on_delete=models.PROTECT,
+        related_name="daily_sale_items"
+    )
+
+    container = models.ForeignKey(
+        Container,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True 
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.SET_NULL, null=True, 
+        blank=True
+        )
+
+    quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    unit_price = models.DecimalField(max_digits=18, decimal_places=2)
+    discount = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
+
+    subtotal = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    tax_amount = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    total_amount = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+
+    class Meta:
+        unique_together = ("transaction", "item")
+        ordering = ["id"]
+
+    def save(self, *args, **kwargs):
+        self.subtotal = (Decimal(self.quantity) * self.unit_price).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        taxable = (self.subtotal - self.discount).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        if taxable < Decimal("0"):
+            taxable = Decimal("0")
+
+        tax_rate = Decimal(self.transaction.tax) / Decimal("100")
+        self.tax_amount = (taxable * tax_rate).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        self.total_amount = (taxable + self.tax_amount).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        super().save(*args, **kwargs)
+
 
 class Payment(models.Model):
-    """Payments for a transaction (partial allowed)."""
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     transaction = models.ForeignKey(DailySaleTransaction, on_delete=models.CASCADE, related_name="payments")
     amount = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))

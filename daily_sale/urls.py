@@ -9,15 +9,22 @@ urlpatterns = [
     path("create/", views.transaction_create, name="transaction_create"),
     path("edit/<uuid:pk>/", views.transaction_edit, name="transaction_edit"),
     path("transactions/", views.transaction_list, name="transaction_list"),
+    path("old_transactions", views.transaction_list, name="old_transactions"),
     path("transactions/<uuid:pk>/", views.transaction_detail, name="transaction_detail"),
     path("daily-summary/", views.daily_summary, name="daily_summary"),
     path("outstanding/", views.outstanding_view, name="outstanding"),
     path('generate-report/', views.generate_daily_report, name='generate_daily_report'),
-    # اضافه کنید در urlpatterns
     path('customers/', views.customer_detail, name='customer_detail'),
+    path('ajax/items/', views.ajax_search_items, name='ajax_search_items'),
+    path('ajax/companies/', views.ajax_search_companies, name='ajax_search_companies'),
+    path('ajax/customers/', views.ajax_search_customers, name='ajax_search_customers'),
+    path('ajax/containers/', views.ajax_search_containers, name='ajax_search_containers'),
+    path('ajax/item-autofill/', views.ajax_item_autofill, name='ajax_item_autofill'),
+    path('transaction/<int:pk>/', views.transaction_detail, name='transaction_detail'),
+    path('transaction/<int:pk>/invoice/', views.invoice_view, name='invoice'),
+    path('transaction/<int:pk>/invoice/download/', views.download_invoice_pdf, name='download_invoice_pdf'),
+    
 
-    path("ajax/containers/", views.ajax_search_containers, name="ajax_containers"),
-    path("ajax/items/", views.ajax_search_items, name="ajax_items"),
-    path("ajax/companies/", views.ajax_search_companies, name="ajax_companies"),
-    path("ajax/customers/", views.ajax_search_customers, name="ajax_customers"),
 ]
+
+

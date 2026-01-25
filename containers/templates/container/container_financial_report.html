@@ -5,20 +5,18 @@
 <div class="financial-report">
     <div class="container">
         <div class="content-wrapper">
-            <!-- Header Section -->
             <div class="page-header">
                 <div class="title-section">
-                    <h4>گزارش مالی کانتینر — {{ container.container_number }}</h4>
+                    <h4> {{ container.container_number }}</h4>
                     <p class="text-muted">{{ container.name }}</p>
                 </div>
                 <div class="text-right">
                     <a class="btn-back" href="{% url 'containers:list' %}">
-                        ← بازگشت به لیست کانتینرها
+                       Back
                     </a>
                 </div>
             </div>
 
-            <!-- Stats Grid -->
             <div class="row stats-grid">
                 <div class="col-md-4">
                     <div class="stat-card income-card">

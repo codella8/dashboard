@@ -6,12 +6,10 @@
 <div class="container-list-page">
   <div class="container">
     <div class="content-wrapper">
-      <!-- Header Section -->
       <div class="page-header">
         <h1>Containers Management</h1>
       </div>
 
-      <!-- Table Section -->
       <div class="table-container">
         <table class="table table-hover">
           <thead class="table-header">
@@ -80,8 +78,6 @@
           </tbody>
         </table>
       </div>
-
-      <!-- Pagination -->
       {% if is_paginated %}
       <div class="pagination-container">
         <nav aria-label="Page navigation">
@@ -115,13 +111,9 @@
   </div>
 </div>
 
-<!-- JavaScript -->
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    // Performance optimization: Lazy loading for hover effects
     const tableRows = document.querySelectorAll('.table-body tr');
-
-    // Optimize hover effects with requestAnimationFrame
     tableRows.forEach(row => {
       row.addEventListener('mouseenter', function () {
         requestAnimationFrame(() => {
@@ -136,18 +128,15 @@
       });
     });
 
-    // Fast click handling for buttons
     document.querySelectorAll('.btn').forEach(btn => {
       btn.addEventListener('click', function (e) {
         if (this.getAttribute('href') === '#') {
           e.preventDefault();
-          // Add loading state
           const originalHTML = this.innerHTML;
           this.innerHTML = 'Loading...';
           this.style.opacity = '0.7';
           this.style.pointerEvents = 'none';
 
-          // Simulate loading (remove this in production)
           setTimeout(() => {
             this.innerHTML = originalHTML;
             this.style.opacity = '';
@@ -157,7 +146,6 @@
       });
     });
 
-    // Optimize table rendering
     if ('requestIdleCallback' in window) {
       requestIdleCallback(() => {
         const tableContainer = document.querySelector('.table-container');
@@ -166,8 +154,6 @@
         }
       });
     }
-
-    // Search functionality (optional enhancement)
     const addSearchIfNeeded = () => {
       const header = document.querySelector('.page-header');
       if (header && !document.querySelector('.search-box')) {
@@ -179,7 +165,6 @@
             `;
         header.insertAdjacentHTML('afterend', searchHTML);
 
-        // Add search functionality
         const searchInput = document.querySelector('.search-input');
         const searchBtn = document.querySelector('.search-btn');
 
@@ -203,11 +188,8 @@
         }
       });
     };
-
-    // Initialize search after a delay for better performance
     setTimeout(addSearchIfNeeded, 100);
 
-    // Sort functionality (optional enhancement)
     const addSortIfNeeded = () => {
       const headers = document.querySelectorAll('.table-header th');
       headers.forEach((header, index) => {
@@ -221,7 +203,6 @@
       const tbody = table.querySelector('tbody');
       const rows = Array.from(tbody.querySelectorAll('tr'));
 
-      // Skip if it's the actions column
       if (columnIndex === 6) return;
 
       const isAscending = !table.dataset.sortAsc || table.dataset.sortAsc === 'false';
@@ -230,29 +211,25 @@
         const aText = a.children[columnIndex].textContent.trim();
         const bText = b.children[columnIndex].textContent.trim();
 
-        // Handle numeric values
         if (columnIndex === 3 || columnIndex === 4 || columnIndex === 5) {
           const aNum = parseFloat(aText.replace(/[^0-9.-]+/g, "")) || 0;
           const bNum = parseFloat(bText.replace(/[^0-9.-]+/g, "")) || 0;
           return isAscending ? aNum - bNum : bNum - aNum;
         }
 
-        // Handle text values
         return isAscending
           ? aText.localeCompare(bText)
           : bText.localeCompare(aText);
       });
 
-      // Clear and re-append rows
       rows.forEach(row => tbody.appendChild(row));
       table.dataset.sortAsc = isAscending;
     };
 
-    // Initialize sort after a delay
+
     setTimeout(addSortIfNeeded, 100);
   });
 
-  // Export data functionality (optional)
   function exportToCSV() {
     const rows = document.querySelectorAll('.table-body tr');
     let csv = 'Container Number,Name,Company,Products,Stock Qty,Inventory Value\n';
@@ -263,11 +240,9 @@
         const rowData = [];
 
         cols.forEach((col, index) => {
-          if (index < 6) { // Exclude actions column
+          if (index < 6) { 
             let text = col.textContent.trim();
-            // Remove emojis and extra spaces
             text = text.replace(/[^\x00-\x7F]/g, '').trim();
-            // Escape commas
             if (text.includes(',')) text = `"${text}"`;
             rowData.push(text);
           }
@@ -276,8 +251,6 @@
         csv += rowData.join(',') + '\n';
       }
     });
-
-    // Create download link
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -289,7 +262,6 @@
     window.URL.revokeObjectURL(url);
   }
 
-  // Add export button dynamically
   document.addEventListener('DOMContentLoaded', function () {
     setTimeout(() => {
       const header = document.querySelector('.page-header');

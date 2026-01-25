@@ -1,0 +1,73 @@
+{% extends 'employee/employee_base.html' %}
+
+{% block title %}Payroll Report{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">Payroll Report - {{ report_date|date:"F Y" }}</h3>
+
+<form method="get" class="row g-3 mb-3">
+    <div class="col-md-2">
+        <select name="month" class="form-select">
+            {% for m in months %}
+            <option value="{{ m }}" {% if selected_month == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <select name="year" class="form-select">
+            {% for y in years %}
+            <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </div>
+</form>
+
+<h5 class="mt-4">Summary</h5>
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6>Total Paid</h6>
+            <p>${{ summary.total_paid|default:0 }}</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6>Total Pending</h6>
+            <p>${{ summary.total_pending|default:0 }}</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6>Total Payments</h6>
+            <p>{{ summary.total_count|default:0 }}</p>
+        </div>
+    </div>
+</div>
+
+<h5>Department Totals</h5>
+<table class="table table-hover mt-2">
+    <thead class="table-dark">
+        <tr>
+            <th>Department</th>
+            <th>Total Paid</th>
+            <th>Total Pending</th>
+            <th>Employee Count</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for dept, data in department_totals.items %}
+        <tr>
+            <td>{{ dept }}</td>
+            <td>${{ data.total_paid }}</td>
+            <td>${{ data.total_pending }}</td>
+            <td>{{ data.employee_count }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center">No data found</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

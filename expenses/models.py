@@ -1,58 +1,72 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from decimal import Decimal
+
 
 class ExpenseCategory(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="category name")
-    description = models.TextField(blank=True, verbose_name="description")
-    
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Expense Category"
+        verbose_name_plural = "Expense Categories"
+
     def __str__(self):
         return self.name
-    
 
-class ExpenseItem(models.Model):
-    name = models.CharField(max_length=100, verbose_name="Item name")
-    category = models.ForeignKey(ExpenseCategory, on_delete=models.CASCADE, verbose_name="category")
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="price")
-    
-    def __str__(self):
-        return f"{self.name} - {self.category.name}"
-    
 
-class ExpenseRecord(models.Model):
+class Expense(models.Model):
     PAYMENT_METHODS = [
-        ('cash', 'cash'),
-        ('bank', 'حواله بانکی'),
-        ('card', 'کارتخوان'),
+        ("cash", "Cash"),
+        ("bank", "Bank Transfer"),
+        ("card", "POS / Card"),
     ]
-    
-    date = models.DateField(verbose_name="تاریخ")
-    item = models.ForeignKey(ExpenseItem, on_delete=models.CASCADE, verbose_name="آیتم")
-    quantity = models.PositiveIntegerField(default=1, verbose_name="تعداد")
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="قیمت واحد")
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="مبلغ کل")
-    paid_by = models.CharField(max_length=100, verbose_name="پرداخت کننده")
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='cash', verbose_name="روش پرداخت")
-    description = models.TextField(blank=True, verbose_name="توضیحات")
-    
-    def __str__(self):
-        return f"{self.item.name} - {self.total_amount}"
-    
-    class Meta:
-        verbose_name = "سابقه هزینه"
-        verbose_name_plural = "سوابق هزینه‌ها"
-        ordering = ['-date']
 
-class DailyExpense(models.Model):
-    date = models.DateField(verbose_name="تاریخ")
-    category = models.ForeignKey(ExpenseCategory, on_delete=models.CASCADE, verbose_name="دسته‌بندی")
-    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="مبلغ")
-    description = models.TextField(blank=True, verbose_name="توضیحات")
-    paid_to = models.CharField(max_length=200, blank=True, verbose_name="پرداخت به")
-    
-    def __str__(self):
-        return f"{self.category.name} - {self.amount}"
-    
+    date = models.DateField()
+    category = models.ForeignKey(
+        ExpenseCategory,
+        on_delete=models.PROTECT,
+        related_name="expenses"
+    )
+
+    title = models.CharField(max_length=200)
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=1,
+        validators=[MinValueValidator(Decimal("0.01"))]
+    )
+    unit_price = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
+
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHODS,
+        default="cash"
+    )
+
+    paid_to = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
-        verbose_name = "هزینه روزانه"
-        verbose_name_plural = "هزینه‌های روزانه"
-        ordering = ['-date']
+        ordering = ["-date", "-id"]
+        indexes = [
+            models.Index(fields=["date"]),
+            models.Index(fields=["category"]),
+        ]
+        verbose_name = "Expense"
+        verbose_name_plural = "Expenses"
+
+    @property
+    def total_amount(self):
+        return self.quantity * self.unit_price
+
+    def __str__(self):
+        return f"{self.title} - {self.total_amount}"

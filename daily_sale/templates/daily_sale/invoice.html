@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %} Almuqbil | Invoice {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4 no-print">
+        <div class="col-md-12">
+            <div class="btn-group" role="group">
+                <a href="{% url 'daily_sale:transaction_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Transactions
+                </a>
+                <a href="{% url 'daily_sale:download_invoice_pdf' pk=transaction.pk %}" class="btn btn-success">
+                    <i class="fas fa-download me-2"></i>Download PDF
+                </a>
+                <a href="{% url 'daily_sale:transaction_detail' pk=transaction.pk %}" class="btn btn-info">
+                    <i class="fas fa-eye me-2"></i>View Details
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="card invoice-card shadow">
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center">
+                        {% if transaction.company.logo %}
+                        <img src="{{ transaction.company.logo.url }}" alt="Logo" class="company-logo me-3">
+                        {% else %}
+                        <div class="company-logo-placeholder me-3">
+                            <i class="fas fa-building fa-3x"></i>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <h1 class="company-name mb-1">{{ transaction.company.name|default:"ALMUQBIL TRADING LLC" }}
+                            </h1>
+                            <p class="company-details mb-0 text-muted">
+                                <i class="fas fa-map-marker-alt me-1"></i>
+                                {{ transaction.company.address|default:"Dubai, United Arab Emirates" }}
+                            </p>
+                            <p class="company-details mb-0 text-muted">
+                                <i class="fas fa-phone me-1"></i>
+                                {{ transaction.company.phone|default:"+971 4 XXX XXXX" }} |
+                                <i class="fas fa-envelope me-1"></i>
+                                {{ transaction.company.email|default:"info@almuqbil.com" }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <h2 class="invoice-title text-primary mb-0">TAX INVOICE</h2>
+                    <h1 class="invoice-number mb-3">#{{ transaction.invoice_number|default:transaction.id }}</h1>
+
+                    <table class="table table-sm table-borderless invoice-meta">
+                        <tr>
+                            <td class="text-end"><strong>Invoice Date:</strong></td>
+                            <td>{{ transaction.date|date:"d/m/Y" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-end"><strong>Due Date:</strong></td>
+                            <td>{{ transaction.due_date|date:"d/m/Y" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-end"><strong>Terms:</strong></td>
+                            <td>{{ days_passed }} Days</td>
+                        </tr>
+                        <tr>
+                            <td class="text-end"><strong>Status:</strong></td>
+                            <td>
+                                <span class="badge status-{{ transaction.payment_status }}">
+                                    {% if transaction.payment_status == 'paid' %}
+                                    <i class="fas fa-check-circle me-1"></i>PAID
+                                    {% elif transaction.payment_status == 'partial' %}
+                                    <i class="fas fa-clock me-1"></i>PARTIAL
+                                    {% else %}
+                                    <i class="fas fa-exclamation-circle me-1"></i>UNPAID
+                                    {% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% if transaction.company.tax_number %}
+                        <tr>
+                            <td class="text-end"><strong>TRN:</strong></td>
+                            <td>{{ transaction.company.tax_number }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="bill-from p-3 bg-light rounded">
+                        <h6 class="section-title mb-3">
+                            <i class="fas fa-building me-2"></i>FROM
+                        </h6>
+                        <h5 class="mb-2">{{ transaction.company.name|default:"ALMUQBIL TRADING LLC" }}</h5>
+                        <p class="mb-1">
+                            <i class="fas fa-map-marker-alt me-2"></i>
+                            {{ transaction.company.address|default:"Dubai, United Arab Emirates" }}
+                        </p>
+                        <p class="mb-1">
+                            <i class="fas fa-phone me-2"></i>
+                            {{ transaction.company.phone|default:"+971 4 XXX XXXX" }}
+                        </p>
+                        <p class="mb-1">
+                            <i class="fas fa-envelope me-2"></i>
+                            {{ transaction.company.email|default:"info@almuqbil.com" }}
+                        </p>
+                        {% if transaction.company.tax_number %}
+                        <p class="mb-0">
+                            <i class="fas fa-id-card me-2"></i>
+                            TRN: {{ transaction.company.tax_number }}
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="bill-to p-3 bg-light rounded">
+                        <h6 class="section-title mb-3">
+                            <i class="fas fa-user me-2"></i>BILL TO
+                        </h6>
+                        {% if transaction.customer %}
+                        <h5 class="mb-2">{{ transaction.customer.name }}</h5>
+                        {% if transaction.customer.address %}
+                        <p class="mb-1">
+                            <i class="fas fa-map-marker-alt me-2"></i>
+                            {{ transaction.customer.address }}
+                        </p>
+                        {% endif %}
+                        {% if transaction.customer.phone %}
+                        <p class="mb-1">
+                            <i class="fas fa-phone me-2"></i>
+                            {{ transaction.customer.phone }}
+                        </p>
+                        {% endif %}
+                        {% if transaction.customer.email %}
+                        <p class="mb-1">
+                            <i class="fas fa-envelope me-2"></i>
+                            {{ transaction.customer.email }}
+                        </p>
+                        {% endif %}
+                        {% if transaction.customer.tax_number %}
+                        <p class="mb-0">
+                            <i class="fas fa-id-card me-2"></i>
+                            TRN: {{ transaction.customer.tax_number }}
+                        </p>
+                        {% endif %}
+                        {% else %}
+                        <h5 class="mb-2">Walk-in Customer</h5>
+                        <p class="text-muted mb-0">No customer information provided</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="section-title mb-3">
+                <i class="fas fa-list-alt me-2"></i>ITEMS DETAILS
+            </h6>
+            <div class="table-responsive">
+                <table class="table table-bordered items-table">
+                    <thead class="table-dark">
+                        <tr>
+                            <th width="5%">#</th>
+                            <th width="30%">ITEM DESCRIPTION</th>
+                            <th width="15%">CONTAINER</th>
+                            <th width="8%">QTY</th>
+                            <th width="12%">UNIT PRICE (AED)</th>
+                            <th width="10%">DISCOUNT (AED)</th>
+                            <th width="10%">TAX ({{ transaction.tax }}%)</th>
+                            <th width="10%">AMOUNT (AED)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ item.item.product_name }}</strong>
+                                {% if item.item.code or item.item.model %}
+                                <br>
+                                <small class="text-muted">
+                                    {% if item.item.code %}Code: {{ item.item.code }}{% endif %}
+                                    {% if item.item.model %} | Model: {{ item.item.model }}{% endif %}
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.container %}
+                                {{ item.container.name }}
+                                {% if item.container.identifier %}
+                                <br><small class="text-muted">{{ item.container.identifier }}</small>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ item.quantity|floatformat:0 }}</td>
+                            <td class="text-end">{{ item.unit_price|floatformat:0|intcomma }}</td>
+                            <td class="text-end">{{ item.discount|floatformat:0|intcomma }}</td>
+                            <td class="text-end">{{ item.tax_amount|floatformat:0|intcomma }}</td>
+                            <td class="text-end">
+                                <strong>{{ item.total_amount|floatformat:0|intcomma }}</strong>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <i class="fas fa-exclamation-circle fa-2x mb-3"></i><br>
+                                No items found for this invoice
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- خلاصه مالی و QR Code -->
+            <div class="row mt-4">
+                <!-- خلاصه مالی -->
+                <div class="col-md-8">
+                    <div class="totals-section p-4 bg-light rounded">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6>Notes:</h6>
+                                    {% if transaction.note %}
+                                    <p class="text-muted">{{ transaction.note }}</p>
+                                    {% else %}
+                                    <p class="text-muted">No additional notes</p>
+                                    {% endif %}
+                                </div>
+
+                                <div class="payment-progress mt-4">
+                                    <h6>Payment Progress</h6>
+                                    <div class="progress" style="height: 25px;">
+                                        <div class="progress-bar bg-success" role="progressbar"
+                                            aria-valuemin="0" aria-valuemax="100">
+                                            {{ paid_percentage|floatformat:1 }}%
+                                        </div>
+                                    </div>
+                                    <small class="text-muted mt-2 d-block">
+                                        Paid: {{ advance|floatformat:0|intcomma }} AED |
+                                        Due: {{ balance|floatformat:0|intcomma }} AED
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <table class="table table-sm table-borderless totals-table">
+                                    <tr>
+                                        <td><strong>Subtotal:</strong></td>
+                                        <td class="text-end">{{ subtotal|floatformat:0|intcomma }} AED</td>
+                                    </tr>
+                                    {% if transaction.discount %}
+                                    <tr>
+                                        <td><strong>Discount:</strong></td>
+                                        <td class="text-end text-danger">-{{ transaction.discount|floatformat:0|intcomma
+                                            }} AED</td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <td><strong>Tax ({{ transaction.tax }}%):</strong></td>
+                                        <td class="text-end">{{ tax_amount|floatformat:0|intcomma }} AED</td>
+                                    </tr>
+                                    <tr class="table-active">
+                                        <td><strong>GRAND TOTAL:</strong></td>
+                                        <td class="text-end"><strong>{{ total_amount|floatformat:0|intcomma }}
+                                                AED</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Advance Paid:</strong></td>
+                                        <td class="text-end text-success">{{ advance|floatformat:0|intcomma }} AED</td>
+                                    </tr>
+                                    <tr class="table-warning">
+                                        <td><strong>BALANCE DUE:</strong></td>
+                                        <td class="text-end"><strong class="text-danger">{{
+                                                balance|floatformat:0|intcomma }} AED</strong></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QR Code -->
+                <div class="col-md-4">
+                    <div class="qr-section text-center p-4 border rounded">
+                        <h6 class="section-title mb-3">
+                            <i class="fas fa-qrcode me-2"></i>PAYMENT QR CODE
+                        </h6>
+                        {% if qr_code %}
+                        <img src="data:image/png;base64,{{ qr_code }}" alt="Invoice QR Code" class="qr-img mb-3"
+                            style="max-width: 200px;">
+                        {% else %}
+                        <div class="qr-placeholder mb-3">
+                            <i class="fas fa-qrcode fa-5x text-muted"></i>
+                        </div>
+                        {% endif %}
+                        <p class="text-muted small mb-0">Scan to view invoice details</p>
+                        <p class="text-muted small">Invoice: {{ transaction.invoice_number }}</p>
+                    </div>
+
+                    <!-- اطلاعات ایجاد کننده -->
+                    <div class="creator-info mt-3 p-3 border rounded">
+                        <h6 class="section-title mb-3">
+                            <i class="fas fa-user-cog me-2"></i>CREATED BY
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <div class="creator-avatar me-3">
+                                <i class="fas fa-user-circle fa-2x"></i>
+                            </div>
+                            <div>
+                                <strong>{{ created_by.get_full_name|default:created_by.username }}</strong>
+                                <p class="text-muted small mb-0">
+                                    Created on {{ transaction.created_at|date:"d/m/Y H:i" }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="payment-methods p-4 border rounded">
+                        <h6 class="section-title mb-3">
+                            <i class="fas fa-credit-card me-2"></i>PAYMENT METHODS
+                        </h6>
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="payment-method p-3">
+                                    <i class="fas fa-university fa-2x text-primary mb-3"></i>
+                                    <h6>Bank Transfer</h6>
+                                    <small class="text-muted">
+                                        ALMUQBIL TRADING LLC<br>
+                                        Emirates NBD<br>
+                                        Account: XXXX-XXXX-XXXX
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="payment-method p-3">
+                                    <i class="fab fa-cc-visa fa-2x text-info mb-3"></i>
+                                    <h6>Credit Card</h6>
+                                    <small class="text-muted">
+                                        Visa / MasterCard<br>
+                                        Accepted at counter
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="payment-method p-3">
+                                    <i class="fas fa-money-bill-wave fa-2x text-success mb-3"></i>
+                                    <h6>Cash</h6>
+                                    <small class="text-muted">
+                                        In-person payment<br>
+                                        AED currency only
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="payment-method p-3">
+                                    <i class="fas fa-file-invoice-dollar fa-2x text-warning mb-3"></i>
+                                    <h6>Cheque</h6>
+                                    <small class="text-muted">
+                                        Payable to:<br>
+                                        ALMUQBIL TRADING LLC
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="terms-conditions p-4 border rounded">
+                        <h6 class="section-title mb-3">
+                            <i class="fas fa-file-contract me-2"></i>TERMS & CONDITIONS
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check-circle text-success me-2"></i> Payment due within {{
+                                        days_passed }} days</li>
+                                    <li><i class="fas fa-check-circle text-success me-2"></i> Late fee: 2% monthly
+                                        interest</li>
+                                    <li><i class="fas fa-check-circle text-success me-2"></i> Prices in AED (UAE
+                                        Dirhams)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check-circle text-success me-2"></i> Returns within 7 days</li>
+                                    <li><i class="fas fa-check-circle text-success me-2"></i> Goods ownership until paid
+                                    </li>
+                                    <li><i class="fas fa-check-circle text-success me-2"></i> Contact accounts for
+                                        queries</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="signature-area p-4 border rounded">
+                        <h6 class="section-title mb-3">CUSTOMER SIGNATURE</h6>
+                        <div class="signature-line mb-2"></div>
+                        <p class="text-muted small mb-1">Name: _________________________</p>
+                        <p class="text-muted small mb-1">Date: _________________________</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="signature-area p-4 border rounded">
+                        <h6 class="section-title mb-3">AUTHORIZED SIGNATURE</h6>
+                        <div class="signature-line mb-2"></div>
+                        <p class="text-muted small mb-1">
+                            For: {{ transaction.company.name|default:"ALMUQBIL TRADING LLC" }}
+                        </p>
+                        <p class="text-muted small mb-1">
+                            Name: {{ created_by.get_full_name|default:created_by.username }}
+                        </p>
+                        <p class="text-muted small mb-1">
+                            Date: {{ today|date:"d/m/Y" }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="footer mt-4 pt-4 border-top text-center">
+                <p class="text-muted small mb-2">
+                    <strong>{{ transaction.company.name|default:"ALMUQBIL TRADING LLC" }}</strong> |
+                    {{ transaction.company.address|default:"Dubai, United Arab Emirates" }} |
+                    Tel: {{ transaction.company.phone|default:"+971 4 XXX XXXX" }} |
+                    Email: {{ transaction.company.email|default:"info@almuqbil.com" }}
+                </p>
+                <p class="text-muted small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Thank you for your business! This is a computer generated invoice, no signature required.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('Invoice loaded successfully');
+        console.log('Invoice Number:', '{{ transaction.invoice_number }}');
+        console.log('Total Amount:', '{{ total_amount }} AED');
+        console.log('Balance Due:', '{{ balance }} AED');
+
+        const forms = document.querySelectorAll('form');
+        forms.forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+            });
+        });
+    });
+</script>
+{% endblock %}

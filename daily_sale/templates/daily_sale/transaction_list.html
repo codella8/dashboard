@@ -5,7 +5,6 @@
 {% block title %}Almuqbil | transaction_list{% endblock %}
 {% block content %}
 
-<!-- Summary Cards -->
 <div class="row mb-4">
   <div class="col-xl-3 col-md-6 mb-4">
     <div class="card summary-card border-left-primary shadow-sm h-100 py-2">
@@ -64,7 +63,7 @@
         <div class="row no-gutters align-items-center">
           <div class="col mr-2">
             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-              Outstanding
+              Old Transactions
             </div>
             <div class="h6 mb-0 font-weight-bold text-gray-800">
               AED {{ stats.total_outstanding|floatformat:0|intcomma }}
@@ -107,7 +106,6 @@
   </div>
 </div>
 
-<!-- Transactions Table -->
 <div class="card shadow mb-4">
   <div class="card-header py-3 d-flex justify-content-between align-items-center">
     <h6 class="m-0 font-weight-bold text-primary">
@@ -166,7 +164,8 @@
             </td>
             <td>
               {% if transaction.customer %}
-              <div class="fw-medium">{{transaction.customer.user.get_full_name|default:transaction.customer.user.username|truncatechars:20 }}
+              <div class="fw-medium">
+                {{transaction.customer.user.get_full_name|default:transaction.customer.user.username|truncatechars:20 }}
               </div>
               <small class="text-muted">{{ transaction.customer.phone|default:""|truncatechars:15 }}</small>
               {% else %}
@@ -175,9 +174,9 @@
             </td>
             <td>
               <span class="badge-transaction badge 
-                                    {% if transaction.transaction_type == 'sale' %}bg-success
-                                    {% elif transaction.transaction_type == 'purchase' %}bg-primary
-                                    {% else %}bg-warning{% endif %}">
+                {% if transaction.transaction_type == 'sale' %}bg-success
+                {% elif transaction.transaction_type == 'purchase' %}bg-primary
+                {% else %}bg-warning{% endif %}">
                 {{ transaction.transaction_type|title }}
               </span>
             </td>
@@ -222,19 +221,16 @@
 
             <td class="text-center action-buttons">
               <div class="btn-group" role="group">
-                <!-- View Details -->
                 <a href="{% url 'daily_sale:transaction_detail' transaction.id %}"
                   class="btn btn-sm btn-outline-primary" title="View Details" data-bs-toggle="tooltip">
                   <i class="bi bi-eye"></i>
                 </a>
 
-                <!-- Edit -->
                 <a href="{% url 'daily_sale:transaction_edit' transaction.id %}" class="btn btn-sm btn-outline-warning"
                   title="Edit" data-bs-toggle="tooltip">
                   <i class="bi bi-pencil"></i>
                 </a>
 
-                <!-- Actions Dropdown -->
                 <div class="btn-group">
                   <button type="button" class="btn btn-sm btn-outline-info dropdown-toggle" data-bs-toggle="dropdown"
                     aria-expanded="false" title="More Actions">
@@ -267,7 +263,6 @@
             </td>
           </tr>
 
-          <!-- Payment Modal for each transaction -->
           <div class="modal fade" id="paymentModal{{ forloop.counter }}" tabindex="-1">
             <div class="modal-dialog">
               <div class="modal-content">
@@ -324,7 +319,6 @@
     </div>
     {% endif %}
 
-    <!-- Pagination -->
     {% if paginator.num_pages > 1 %}
     <nav aria-label="Page navigation" class="mt-4">
       <ul class="pagination justify-content-center">
@@ -410,7 +404,6 @@
 
 {% block extra_js %}
 <script>
-  // Initialize tooltips
   document.addEventListener('DOMContentLoaded', function () {
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -418,7 +411,6 @@
     });
   });
 
-  // Auto-refresh page every 60 seconds
   let refreshTimer = null;
 
   function startAutoRefresh() {
@@ -426,25 +418,19 @@
 
     refreshTimer = setTimeout(function () {
       window.location.reload();
-    }, 60000); // 60 seconds
+    }, 60000); 
   }
 
-  // Start auto-refresh
   startAutoRefresh();
-
-  // Reset timer on user activity
   document.addEventListener('mousemove', startAutoRefresh);
   document.addEventListener('keypress', startAutoRefresh);
   document.addEventListener('click', startAutoRefresh);
-
-  // Export functionality
   document.getElementById('exportBtn')?.addEventListener('click', function () {
     const url = new URL(window.location.href);
     url.searchParams.set('export', 'csv');
     window.open(url.toString(), '_blank');
   });
 
-  // Quick filter by status
   document.querySelectorAll('.quick-status-filter').forEach(button => {
     button.addEventListener('click', function () {
       const status = this.dataset.status;

@@ -6,7 +6,6 @@
 
 {% block content %}
 <div class="page-container">
-    <!-- Right Side - Login Form -->
     <div class="login-side">
         <div class="welcome-text">
             <h2>Hi, <span>Welcome to</span></h2>
@@ -14,7 +13,6 @@
         </div>
 
         <div class="form-container">
-            <!-- Messages -->
             {% if form.errors %}
             <div class="error-message">
                 Please enter a correct username and password.
@@ -29,13 +27,12 @@
             {% endfor %}
             {% endif %}
 
-            <!-- Login Form -->
             <form method="POST" id="loginForm">
                 {% csrf_token %}
 
                 <div class="form-group">
-                    <label class="form-label">Email address</label>
-                    <input type="text" name="username" class="form-input" placeholder="Enter your email" required
+                    <label class="form-label">username </label>
+                    <input type="text" name="username" class="form-input" placeholder="Enter your name" required
                         autofocus>
                 </div>
 
@@ -52,12 +49,10 @@
                 </div>
             </form>
 
-            <!-- OR Divider -->
             <div class="or-divider">
                 Or
             </div>
 
-            <!-- Additional Links -->
             <div class="additional-links">
                 <a href="{% url 'accounts:signup' %}">
                     Don't have an account? Sign up here
@@ -89,11 +84,6 @@
                 const originalText = this.textContent;
                 this.textContent = 'Starting...';
                 this.disabled = true;
-
-                // Add engine sound effect
-                const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-car-engine-starting-1667.mp3');
-                audio.volume = 0.3;
-                audio.play().catch(e => console.log("Audio play failed"));
 
                 // Reset button
                 setTimeout(() => {

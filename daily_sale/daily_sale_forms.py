@@ -1,11 +1,10 @@
 # daily_sale/forms.py
 from decimal import Decimal
 from django import forms
-from django.utils import timezone
 from .models import DailySaleTransaction
 from django.core.exceptions import ValidationError
 
-class DailySaleTransactionForm(forms.ModelForm):
+class DailySaleTransactionForm(forms.ModelForm): 
     class Meta:
         model = DailySaleTransaction
         fields = [
@@ -39,31 +38,23 @@ class DailySaleTransactionForm(forms.ModelForm):
         tax = cleaned.get("tax") or Decimal("0.00")
         advance = cleaned.get("advance") or Decimal("0.00")
         paid = cleaned.get("paid") or Decimal("0.00")
-
-        # پایه محاسبه: quantity * unit_price
         subtotal = (Decimal(qty) * unit_price).quantize(Decimal("0.01"))
-        # اعمال تخفیف (فرض ما: discount به‌عنوان مبلغ است نه درصد)
+
         after_discount = subtotal - discount
         if after_discount < 0:
             after_discount = Decimal("0.00")
-        # افزودن مالیات (مقداری ثابت)
         total_amount = (after_discount + tax).quantize(Decimal("0.01"))
 
-        # balance = total_amount - (advance + paid)
         balance = (total_amount - (advance + paid)).quantize(Decimal("0.01"))
         if balance < 0:
-            # اجازه بدهیم balance منفی باشد (بدهی معکوس) یا بخواهی آن را به صفر برسانیم
-            # اینجا هیچ اروری اضافه نمی‌کنیم، اما می‌توانیم هشدار دهیم
             pass
 
-        # مقدارها را در cleaned_data ذخیره کن تا در save هم باشند
         cleaned["total_amount"] = total_amount
         cleaned["balance"] = balance
         return cleaned
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        # اگر فرم clean مقدارها را محاسبه کرده، آن‌ها را روی instance بنویس
         cleaned = getattr(self, "cleaned_data", {})
         if "total_amount" in cleaned:
             instance.total_amount = cleaned["total_amount"]

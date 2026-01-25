@@ -4,165 +4,237 @@
 {% block title %}Almuqbil | transaction_create{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0 text-gray-800">
-            <i class="bi bi-plus-circle me-2"></i>Create New Transaction
+<div class="transaction-wrapper">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="bi bi-plus-circle"></i>Create New Transaction
         </h1>
-        <a href="{% url 'daily_sale:transaction_list' %}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left me-1"></i> Back
+        <a href="{% url 'daily_sale:transaction_list' %}" class="back-btn">
+            <i class="bi bi-arrow-left"></i> Back
         </a>
     </div>
 
     {% if messages %}
     {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4 fade-in-up">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     {% endfor %}
     {% endif %}
 
-    <div class="row">
-        <div class="col-lg-8">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 bg-primary text-white">
-                    <h6 class="m-0 font-weight-bold">
-                        <i class="bi bi-receipt me-2"></i>Transaction Information
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <form method="post" id="tx-form">
+    <div class="two-column-layout">
+        <div class="main-panel">
+            <div class="main-card fade-in-up">
+                <div class="form-section">
+                    <div class="section-header">
+                        <div class="section-icon">
+                            <i class="bi bi-receipt"></i>
+                        </div>
+                        <h2 class="section-title">Transaction Information</h2>
+                    </div>
+
+                    <form method="post" id="tx-form" novalidate>
                         {% csrf_token %}
-
-                        <div class="row g-3">
-                            <!-- Basic Fields -->
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Invoice Number</label>
-                                {{ form.invoice_number }}
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Date</label>
-                                {{ form.date }}
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Due Date</label>
-                                {{ form.due_date }}
+                        <input type="hidden" name="subtotal" id="id_subtotal_hidden" value="0">
+                        <input type="hidden" name="tax_amount" id="id_tax_amount_hidden" value="0">
+                        <input type="hidden" name="total_amount" id="id_total_amount_hidden" value="0">
+                        <input type="hidden" name="balance" id="id_balance_hidden" value="0">
+                        <input type="hidden" name="items_data" id="id_items_data">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label">Invoice Number</label>
+                                <input type="text" class="form-control" id="id_invoice_number" name="invoice_number"
+                                    placeholder="Auto-generated">
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Transaction Type</label>
-                                {{ form.transaction_type }}
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Company</label>
-                                {{ form.company }}
+                            <div class="form-group">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" id="id_date" name="date"
+                                    value="{{ form.date.value|default:'' }}">
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Customer</label>
-                                {{ form.customer }}
+                            <div class="form-group">
+                                <label class="form-label">Due Date</label>
+                                <input type="date" class="form-control" id="id_due_date" name="due_date"
+                                    value="{{ form.due_date.value|default:'' }}">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Container</label>
-                                {{ form.container }}
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Item</label>
-                                {{ form.item }}
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Description</label>
-                                {{ form.description }}
-                            </div>
-
-                            <!-- Numerical Values -->
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Quantity</label>
-                                {{ form.quantity }}
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Unit Price</label>
-                                {{ form.unit_price }}
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Advance Payment</label>
-                                {{ form.advance }}
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Discount</label>
-                                {{ form.discount }}
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Tax %</label>
-                                {{ form.tax }}
-                                <small class="text-muted"></small>
-                                {% if form.tax.errors %}
-                                <div class="text-danger">{{ form.tax.errors }}</div>
-                                {% endif %}
+                            <div class="form-group">
+                                <label class="form-label">Transaction Type</label>
+                                <select class="form-select" id="id_transaction_type" name="transaction_type" required>
+                                    <option value="">Select Type</option>
+                                    {% for value, label in form.transaction_type.field.choices %}
+                                    <option value="{{ value }}" {% if form.transaction_type.value == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
                             </div>
 
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Notes</label>
-                                {{ form.note }}
+                            <div class="form-group">
+                                <label class="form-label">Customer</label>
+                                <select class="form-select" id="id_customer" name="customer" required>
+                                    <option value="">Select Customer</option>
+                                </select>
                             </div>
 
-
-                            <!-- Action Buttons -->
-                            <div class="col-12 mt-4">
-                                <button type="submit" class="btn btn-primary btn-lg">
-                                    <i class="bi bi-save me-2"></i>Save Transaction
-                                </button>
-                                <a href="{% url 'daily_sale:transaction_list' %}"
-                                    class="btn btn-secondary ms-2">Cancel</a>
+                            <div class="form-group">
+                                <label class="form-label">Tax</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="id_tax" name="tax" value="5.00"
+                                        step="0.01" min="0" max="100">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                                <small class="text-muted mt-2 d-block">Applied after discount</small>
+                            </div>
+                            <div class="advance-section">
+                                <div class="advance-title">
+                                    <i class="bi bi-wallet2"></i> Advance (paid)
+                                </div>
+                                <div class="advance-input">
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="id_advance" name="advance"
+                                            value="0.00" step="0.01" min="0" placeholder="0.00">
+                                        <span class="input-group-text">AED</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </form>
                 </div>
             </div>
+            <div class="items-section fade-in-up" style="animation-delay: 0.1s">
+                <div class="items-header">
+                    <h2 class="items-title">
+                        <i class="bi bi-cart"></i>Items
+                    </h2>
+                    <button type="button" id="add-item-btn" class="btn-add-item">
+                        <i class="bi bi-plus-circle"></i> Add Item
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th>ITEM</th>
+                                <th>QTY</th>
+                                <th>PRICE</th>
+                                <th>CONTAINER</th>
+                                <th>COMPANY</th>
+                                <th>DISCOUNT</th>
+                                <th>SUBTOTAL</th>
+                                <th>ACTION</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="items-list">
+                            <tr data-item-index="0">
+                                <td>
+                                    <select class="form-select item-select" name="item_0" required></select>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control qty" name="qty_0" value="1" min="1"
+                                        step="1" required>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control unit-price" name="price_0" value="0"
+                                        min="0" step="0.01" required readonly>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control container" name="container_0" readonly>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control company" name="company_0" readonly>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control discount" name="discount_0" value="0"
+                                        min="0" step="0.01">
+                                </td>
+                                <td>
+                                    <span class="row-subtotal fw-bold text-success">0.00 AED</span>
+                                    <input type="hidden" class="row-subtotal-hidden" name="subtotal_0" value="0">
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn-remove" disabled>
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="notes-section">
+                    <h3 class="notes-title">Notes</h3>
+                    <textarea class="form-control" id="id_note" name="note" rows="3"
+                        placeholder="Optional notes about this transaction"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" form="tx-form" class="btn-save">
+                        <i class="bi bi-save"></i> Save Transaction
+                    </button>
+                    <a href="{% url 'daily_sale:transaction_list' %}" class="btn-cancel">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </a>
+                </div>
+            </div>
         </div>
 
-        <!-- Right Column - Preview -->
-        <div class="col-lg-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 bg-success text-white">
-                    <h6 class="m-0 font-weight-bold">
-                        <i class="bi bi-calculator me-2"></i>Amounts Preview
-                    </h6>
+        <div class="sidebar-panel">
+            <div class="calculations-card fade-in-up" style="animation-delay: 0.2s">
+                <div class="calculations-header">
+                    <h2 class="calculations-title">
+                        <i class="bi bi-calculator"></i> Amounts Preview
+                    </h2>
                 </div>
-                <div class="card-body">
-                    <div class="p-3 border rounded bg-light">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Subtotal:</span>
-                            <span id="preview-subtotal" class="fw-bold">0 AED</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Discount:</span>
-                            <span id="preview-discount" class="text-danger">0 AED</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Tax:</span>
-                            <span id="preview-tax" class="text-info">0 AED</span>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-between mb-3">
-                            <span class="fw-bold">Total Amount:</span>
-                            <span id="preview-total" class="fw-bold text-success fs-5">0 AED</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Advance:</span>
-                            <span id="preview-advance" class="text-warning">0 AED</span>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-bold">Balance:</span>
-                            <span id="preview-balance" class="fw-bold fs-5">0 AED</span>
-                        </div>
-                        <div class="mt-2 text-center">
-                            <span id="payment-status" class="badge bg-danger">Unpaid</span>
-                        </div>
+                <div class="calculation-list">
+                    <div class="calculation-item">
+                        <span class="calculation-label">
+                            <i class="bi bi-cart3"></i> Subtotal:
+                        </span>
+                        <span class="calculation-value" id="preview-subtotal">0.00 AED</span>
                     </div>
+
+                    <div class="calculation-item">
+                        <span class="calculation-label">
+                            <i class="bi bi-percent"></i> Total Discount:
+                        </span>
+                        <span class="calculation-value text-danger" id="preview-discount">0.00 AED</span>
+                    </div>
+
+                    <div class="calculation-item">
+                        <span class="calculation-label">
+                            <i class="bi bi-calculator-fill"></i> Tax (<span id="tax-rate-display">5</span>%):
+                        </span>
+                        <span class="calculation-value text-info" id="preview-tax">0.00 AED</span>
+                    </div>
+                </div>
+
+                <div class="calculation-item calculation-total">
+                    <span class="calculation-label">
+                        <i class="bi bi-cash-stack"></i> Total Amount:
+                    </span>
+                    <span class="calculation-value" id="preview-total">0.00 AED</span>
+                </div>
+
+                <div class="calculation-item">
+                    <span class="calculation-label">
+                        <i class="bi bi-check-circle"></i> Advance Paid:
+                    </span>
+                    <span class="calculation-value text-warning" id="preview-advance">0.00 AED</span>
+                </div>
+
+                <div class="balance-section">
+                    <div class="balance-label">
+                        <i class="bi bi-credit-card"></i> Balance:
+                    </div>
+                    <div class="balance-value" id="preview-balance">0.00 AED</div>
+                </div>
+
+                <div class="payment-status">
+                    <div class="status-label">Payment Status</div>
+                    <div id="payment-status" class="status-badge">UNPAID</div>
                 </div>
             </div>
         </div>
@@ -174,19 +246,22 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     $(document).ready(function () {
-        // AJAX URLs - Matching Your Views
-        const ajaxUrls = {
-            containers: "{% url 'daily_sale:ajax_containers' %}",
-            items: "{% url 'daily_sale:ajax_items' %}",
-            companies: "{% url 'daily_sale:ajax_companies' %}",
-            customers: "{% url 'daily_sale:ajax_customers' %}",
+        // AJAX URLs
+        const urls = {
+            items: "{% url 'daily_sale:ajax_search_items' %}",
+            itemAutofill: "{% url 'daily_sale:ajax_item_autofill' %}",
+            companies: "{% url 'daily_sale:ajax_search_companies' %}",
+            customers: "{% url 'daily_sale:ajax_search_customers' %}",
         };
 
-        // Main Select2 AJAX Function - Exactly Like Your Code
-        function initSelect2(fieldId, url, placeholder) {
-            $(fieldId).select2({
+        console.log("🔧 Starting form initialization");
+
+        let itemCounter = 0;
+
+        function setupSelect2(selector, url, placeholder) {
+            $(selector).select2({
                 theme: 'bootstrap-5',
-                placeholder: placeholder || 'Search...',
+                placeholder: placeholder,
                 allowClear: true,
                 width: '100%',
                 ajax: {
@@ -194,146 +269,371 @@
                     dataType: 'json',
                     delay: 250,
                     data: function (params) {
-                        return {
-                            q: params.term || '',
-                            page: params.page || 1
-                        };
+                        return { q: params.term || '' };
                     },
-                    processResults: function (data, params) {
+                    processResults: function (data) {
                         return {
-                            results: data.results || [],
-                            pagination: {
-                                more: (params.page * 30) < (data.count || 0)
-                            }
+                            results: data.results || []
                         };
-                    },
-                    cache: true
-                },
-                minimumInputLength: 0
-            });
-
-            // Show All Items When Select2 Opens with No Input
-            $(fieldId).on('select2:open', function () {
-                var $search = $('.select2-search__field');
-                if ($search.val() === '') {
-                    setTimeout(function () {
-                        $search.trigger('input');
-                    }, 100);
+                    }
                 }
             });
         }
 
-        // Initialize Select2 for All Fields
-        initSelect2('#id_company', ajaxUrls.companies, 'Search Company...');
-        initSelect2('#id_customer', ajaxUrls.customers, 'Search Customer...');
-        initSelect2('#id_container', ajaxUrls.containers, 'Search Container...');
-        initSelect2('#id_item', ajaxUrls.items, 'Search Item...');
+        setTimeout(() => {
+            setupSelect2('#id_company', urls.companies, 'Select Company');
+            setupSelect2('#id_customer', urls.customers, 'Select Customer');
+            setupSelect2('[name="item_0"]', urls.items, 'Select Item');
 
-        // Calculate Amounts
-        // در فایل transaction_create.html فقط تابع calculate را اصلاح کنید:
+            $('[name="item_0"]').on('change', function () {
+                loadItemDetails($(this));
+            });
 
-        // Calculate Amounts - FIXED TAX CALCULATION
-        window.calculate = function () {
-            var q = parseFloat($('#id_quantity').val()) || 1;
-            var unit = parseFloat($('#id_unit_price').val()) || 0;
-            var d = parseFloat($('#id_discount').val()) || 0;
-            var t = parseFloat($('#id_tax').val()) || 0; // درصد مالیات
-            var a = parseFloat($('#id_advance').val()) || 0;
+            console.log("✅ Main fields initialized");
+        }, 300);
 
-            // 1. محاسبه Subtotal
-            var subtotal = q * unit;
+        function loadItemDetails(selectElement) {
+            const itemId = selectElement.val();
+            const row = selectElement.closest('tr');
 
-            // 2. محاسبه مبلغ قابل مالیات (بعد از تخفیف)
-            var taxableAmount = subtotal - d;
-            if (taxableAmount < 0) taxableAmount = 0;
+            if (!itemId || itemId === "") {
+                row.find('.unit-price').val(0);
+                row.find('.container').val('');
+                row.find('.company').val('');
+                calculate();
+                return;
+            }
 
-            // 3. محاسبه مالیات روی مبلغ قابل مالیات - دقیق مثل ماشین حساب
-            var taxAmount = (taxableAmount * t) / 100;
+            const originalState = selectElement.prop('outerHTML');
+            selectElement.next('.select2-container').hide();
+            row.find('.unit-price').val('Loading...');
+            row.find('.container').val('Loading...');
+            row.find('.company').val('Loading...');
 
-            // 4. محاسبه مبلغ کل
-            var total = taxableAmount + taxAmount;
+            $.get(urls.itemAutofill, { item_id: itemId }, function (response) {
+                console.log("Item autofill response:", response);
 
-            // 5. محاسبه باقیمانده
-            var balance = total - a;
+                if (response && response.success) {
+                    const unitPrice = parseFloat(response.unit_price || 0);
+                    selectElement.val(itemId).trigger('change.select2');
+                    row.find('.unit-price').val(unitPrice.toFixed(2));
 
-            // نمایش با 2 رقم اعشار
+                    if (response.container) {
+                        const containerName = response.container.name || response.container.text || response.container_name || '';
+                        const containerIdentifier = response.container.identifier || response.container_identifier || '';
+                        const displayName = containerIdentifier ?
+                            `${containerName} (${containerIdentifier})` : containerName;
+
+                        row.find('.container').val(displayName);
+                    } else {
+                        row.find('.container').val('No container');
+                    }
+
+                    if (response.company) {
+                        const companyName = response.company.name || response.company.text || response.company_name || '';
+                        row.find('.company').val(companyName);
+                    } else {
+                        row.find('.company').val('No company');
+                    }
+                    const tooltipText =
+                        `Product: ${response.product_name || 'N/A'}\n` +
+                        `Model: ${response.model || 'N/A'}\n` +
+                        `Code: ${response.code || 'N/A'}\n` +
+                        `Available Qty: ${response.available_quantity || 0}\n` +
+                        `Price: ${unitPrice.toFixed(2)} AED`;
+
+                    selectElement.attr('title', tooltipText);
+
+                    showToast('Item details loaded successfully!', 'success');
+                } else {
+                    row.find('.unit-price').val(0);
+                    row.find('.container').val('Error loading data');
+                    row.find('.company').val('Error loading data');
+                    showToast('Failed to load item details from server', 'error');
+                }
+            }).fail(function (xhr, status, error) {
+                console.error('AJAX Error:', error);
+                row.find('.unit-price').val(0);
+                row.find('.container').val('Network error');
+                row.find('.company').val('Network error');
+                showToast('Network error loading item details', 'error');
+            }).always(function () {
+                calculate();
+            });
+        }
+
+        $('#add-item-btn').click(function () {
+            itemCounter++;
+
+            const newRow = `
+                <tr data-item-index="${itemCounter}">
+                    <td>
+                        <select class="form-select item-select" name="item_${itemCounter}" required
+                            title="Select an item to autofill details"></select>
+                    </td>
+                    <td>
+                        <input type="number" class="form-control qty" name="qty_${itemCounter}" value="1"
+                            min="1" step="1" required>
+                    </td>
+                    <td>
+                        <input type="number" class="form-control unit-price" name="price_${itemCounter}"
+                            value="0" min="0" step="0.01" required readonly
+                            title="Unit price auto-filled from inventory">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control container"
+                            name="container_${itemCounter}" value="" readonly
+                            title="Container auto-filled from item"
+                            placeholder="Auto-filled from item">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control company"
+                            name="company_${itemCounter}" value="" readonly
+                            title="Company auto-filled from container"
+                            placeholder="Auto-filled from container">
+                    </td>
+                    <td>
+                        <input type="number" class="form-control discount" name="discount_${itemCounter}"
+                            value="0" min="0" step="0.01" title="Enter discount amount manually">
+                    </td>
+                    <td>
+                        <span class="row-subtotal fw-bold text-success">0.00 AED</span>
+                        <input type="hidden" class="row-subtotal-hidden" name="subtotal_${itemCounter}"
+                            value="0">
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn-remove" title="Remove this item">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>`;
+
+            $('#items-list').append(newRow);
+
+            const newSelect = $(`[name="item_${itemCounter}"]`);
+            newSelect.select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Select Item',
+                width: '100%',
+                ajax: {
+                    url: urls.items,
+                    dataType: 'json',
+                    data: function (params) {
+                        return { q: params.term };
+                    },
+                    processResults: function (data) {
+                        return { results: data.results || [] };
+                    }
+                }
+            });
+
+            newSelect.on('change', function () {
+                loadItemDetails($(this));
+            });
+            $('.btn-remove').prop('disabled', false);
+
+            calculate();
+
+            showToast('New item row added', 'info');
+        });
+
+        $(document).on('click', '.btn-remove', function () {
+            const row = $(this).closest('tr');
+            const rowIndex = row.data('item-index');
+
+            if (rowIndex === 0 && $('#items-list tr').length === 1) {
+                showToast('Cannot remove the only item row', 'warning');
+                return;
+            }
+
+            row.fadeOut(300, function () {
+                $(this).remove();
+
+                if ($('#items-list tr').length === 1) {
+                    $('[name="item_0"]').closest('tr').find('.btn-remove').prop('disabled', true);
+                }
+
+                calculate();
+                showToast('Item row removed', 'info');
+            });
+        });
+
+        function showToast(message, type = 'success') {
+            if (!$('#successToast').length) {
+                const toastHTML = `
+                    <div id="successToast" class="toast position-fixed top-0 end-0 m-3" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header ${type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : type === 'warning' ? 'bg-warning' : 'bg-info'} text-white">
+                            <strong class="me-auto">Notification</strong>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                        </div>
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                    </div>`;
+                $('body').append(toastHTML);
+            } else {
+                const toastEl = $('#successToast');
+                const toastHeader = toastEl.find('.toast-header');
+                toastHeader.removeClass('bg-success bg-danger bg-warning bg-info')
+                    .addClass(type === 'success' ? 'bg-success' :
+                        type === 'error' ? 'bg-danger' :
+                            type === 'warning' ? 'bg-warning' : 'bg-info')
+                    .addClass('text-white');
+                $('#successToast .toast-body').text(message);
+            }
+
+            const toast = new bootstrap.Toast($('#successToast')[0]);
+            toast.show();
+        }
+
+        function calculate() {
+            let subtotal = 0;
+            let discountTotal = 0;
+
+            $('#items-list tr').each(function () {
+                const qty = parseFloat($(this).find('.qty').val()) || 0;
+                const price = parseFloat($(this).find('.unit-price').val()) || 0;
+                const discount = parseFloat($(this).find('.discount').val()) || 0;
+
+                const rowSubtotal = qty * price;
+
+                subtotal += rowSubtotal;
+                discountTotal += discount;
+
+                $(this).find('.row-subtotal')
+                    .text(rowSubtotal.toFixed(2) + ' AED');
+            });
+
+            const netAmount = Math.max(subtotal - discountTotal, 0);
+            const taxRate = parseFloat($('#id_tax').val()) || 0;
+            const tax = (netAmount * taxRate) / 100;
+            const total = netAmount + tax;
+            const advance = parseFloat($('#id_advance').val()) || 0;
+            const balance = Math.max(total - advance, 0);
+
+            $('#tax-rate-display').text(taxRate);
             $('#preview-subtotal').text(subtotal.toFixed(2) + ' AED');
-            $('#preview-discount').text(d.toFixed(2) + ' AED');
-            $('#preview-tax').text(taxAmount.toFixed(2) + ' AED');
+            $('#preview-discount').text(discountTotal.toFixed(2) + ' AED');
+            $('#preview-tax').text(tax.toFixed(2) + ' AED');
             $('#preview-total').text(total.toFixed(2) + ' AED');
-            $('#preview-advance').text(a.toFixed(2) + ' AED');
+            $('#preview-advance').text(advance.toFixed(2) + ' AED');
             $('#preview-balance').text(balance.toFixed(2) + ' AED');
 
-            // لاگ برای دیباگ
-            console.log("=== TAX CALCULATION DEBUG ===");
-            console.log("Quantity:", q, "Unit Price:", unit);
-            console.log("Subtotal:", q, "×", unit, "=", subtotal);
-            console.log("After Discount:", subtotal, "-", d, "=", taxableAmount);
-            console.log("Tax (" + t + "%):", taxableAmount, "×", t + "% =", taxAmount);
-            console.log("Total:", taxableAmount, "+", taxAmount, "=", total);
-            console.log("Balance:", total, "-", a, "=", balance);
+            $('#id_subtotal_hidden').val(subtotal.toFixed(2));
+            $('#id_tax_amount_hidden').val(tax.toFixed(2));
+            $('#id_total_amount_hidden').val(total.toFixed(2));
+            $('#id_balance_hidden').val(balance.toFixed(2));
 
-            // وضعیت پرداخت
-            var status = 'Unpaid';
-            var statusClass = 'bg-danger';
-
-            if (a >= total && total > 0) {
-                status = 'Paid';
-                statusClass = 'bg-success';
-            } else if (a > 0) {
-                status = 'Partial';
-                statusClass = 'bg-warning';
+            let status = 'UNPAID', statusClass = 'status-unpaid';
+            if (advance >= total && total > 0) {
+                status = 'PAID';
+                statusClass = 'status-paid';
+            } else if (advance > 0) {
+                status = 'PARTIAL';
+                statusClass = 'status-partial';
             }
 
             $('#payment-status')
-                .removeClass('bg-danger bg-warning bg-success')
+                .removeClass('status-unpaid status-paid status-partial')
                 .addClass(statusClass)
                 .text(status);
-        };
-
-        // Auto Calculation
-        $('#id_quantity, #id_unit_price, #id_discount, #id_tax, #id_advance').on('input', calculate);
-
-        // Today's Date
-        var today = new Date().toISOString().split('T')[0];
-        if (!$('#id_date').val()) {
-            $('#id_date').val(today);
         }
 
-        // Due Date 30 Days Later
-        var dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 30);
-        var dueDateStr = dueDate.toISOString().split('T')[0];
-        if (!$('#id_due_date').val()) {
-            $('#id_due_date').val(dueDateStr);
-        }
-
-        // Form Validation
+        $(document).on('input', '.qty, .unit-price, .discount', calculate);
+        $('#id_tax, #id_advance').on('input', calculate);
         $('#tx-form').on('submit', function (e) {
-            var isValid = true;
-            var errors = [];
+            e.preventDefault();
 
-            if (!$('#id_transaction_type').val()) {
-                errors.push('Transaction type is required');
-                isValid = false;
-            }
-            if (!$('#id_company').val()) {
-                errors.push('Company is required');
-                isValid = false;
-            }
-            if (!$('#id_item').val()) {
-                errors.push('Item is required');
-                isValid = false;
+            const items = [];
+            let hasValidItem = false;
+
+            $('#items-list tr').each(function () {
+                const sel = $(this).find('.item-select');
+                const itemId = sel.val(); // این UUID است
+                const qty = $(this).find('.qty').val();
+                const price = $(this).find('.unit-price').val();
+                const discount = $(this).find('.discount').val();
+
+                console.log(`Processing item: ID=${itemId}, Qty=${qty}, Price=${price}`);
+
+                if (!itemId || itemId === "") {
+                    showToast('Please select an item for all rows', 'warning');
+                    return false;
+                }
+
+                if (!qty || parseFloat(qty) <= 0) {
+                    showToast('Please enter valid quantity', 'warning');
+                    return false;
+                }
+
+                if (!price || parseFloat(price) <= 0) {
+                    showToast('Please select an item with valid price', 'warning');
+                    return false;
+                }
+
+                items.push({
+                    item_id: itemId, 
+                    quantity: parseFloat(qty),
+                    unit_price: parseFloat(price),
+                    discount: parseFloat(discount) || 0
+                });
+
+                hasValidItem = true;
+            });
+
+            if (!hasValidItem || items.length === 0) {
+                showToast('Please add at least one valid item', 'warning');
+                return false;
             }
 
-            if (!isValid) {
-                e.preventDefault();
-                alert('Please fill required fields:\n\n' + errors.join('\n'));
-            }
+            console.log('📦 Items to save (with UUIDs):', items);
+
+            $('#id_items_data').val(JSON.stringify(items));
+            showToast('Saving transaction...', 'info');
+
+            setTimeout(() => {
+                this.submit();
+            }, 1000);
         });
 
-        // Initial Calculation
-        calculate();
+        const today = new Date().toISOString().split('T')[0];
+        const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        if (!$('#id_date').val()) $('#id_date').val(today);
+        if (!$('#id_due_date').val()) $('#id_due_date').val(dueDate);
+
+        setTimeout(calculate, 500);
+        console.log("✅ Form ready!");
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const qtyInputs = document.querySelectorAll('.qty');
+        const priceInputs = document.querySelectorAll('.unit-price');
+
+        function checkFilled(input) {
+            if (input.value && input.value !== '0') {
+                input.classList.add('filled');
+            } else {
+                input.classList.remove('filled');
+            }
+        }
+
+        qtyInputs.forEach(input => {
+            checkFilled(input);
+            input.addEventListener('input', () => checkFilled(input));
+        });
+
+        priceInputs.forEach(input => {
+            checkFilled(input);
+            input.addEventListener('input', () => checkFilled(input));
+        });
+
+        function animateChange(element) {
+            element.style.transform = 'scale(1.05)';
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+            }, 300);
+        }
     });
 </script>
 {% endblock %}

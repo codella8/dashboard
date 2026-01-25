@@ -4,78 +4,87 @@ import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.http import require_GET
+from django.db import transaction as db_transaction
 from django.contrib import messages
 from django.db import transaction
+from django.template.loader import get_template, render_to_string
 from django.contrib.auth.decorators import login_required
+from xhtml2pdf import pisa
+from io import BytesIO
+import qrcode
+import base64
+from containers .models import Container
 from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.utils import timezone
 from decimal import Decimal,ROUND_HALF_UP
-from django.db.models import Sum, Q, F, Count
+from django.db.models import Sum, Q, F, Count, Avg
 from django.db import connection
 import json
 from datetime import datetime, timedelta
 from django.db.models.functions import Coalesce
 from django.db.models import DecimalField
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-
-from .models import DailySaleTransaction, Payment, OutstandingCustomer, DailySummary
+import csv
+from django.utils.encoding import smart_str
+from .models import DailySaleTransaction, Payment, DailySummary, DailySaleTransactionItem
 from .forms import DailySaleTransactionForm, PaymentForm
-from .report import get_sales_summary, sales_timeseries, outstanding_list, parse_date_param
-# safe populate only submitted ids for performance:
+from .report import get_sales_summary, sales_timeseries, parse_date_param
 from accounts.models import Company, UserProfile
-from containers.models import Container, Inventory_List
+from containers.models import Inventory_List
 from .utils import recompute_daily_summary_for_date, recompute_outstanding_for_customer,get_customer_outstanding_summary
 
 logger = logging.getLogger(__name__)
 
-TAX_RATE = Decimal('0.10')  # مالیات ۱۰٪
+TAX_RATE = Decimal('0.10')
 
 @login_required
 def customer_detail(request, customer_id=None):
-    
     if customer_id:
         if not request.user.is_staff:
             messages.error(request, "you do not have access to this page!")
             return redirect('accounts:home')
-        
-        # دریافت پروفایل مشتری مورد نظر
         customer = get_object_or_404(UserProfile, id=customer_id, role=UserProfile.ROLE_CUSTOMER)
         is_self_view = False
-    
     else:
-        # حالت ۲: کاربر عادی است و می‌خواهد پروفایل خودش را ببیند
         if request.user.is_staff:
             messages.info(request, "check from admin dashboard!")
             return redirect('accounts:dashboard')
-        
-        # پیدا کردن پروفایل کاربر فعلی
         try:
             customer = UserProfile.objects.get(user=request.user, role=UserProfile.ROLE_CUSTOMER)
             is_self_view = True
         except UserProfile.DoesNotExist:
-            messages.error(request, "پروفایل مشتری برای شما یافت نشد.")
+            messages.error(request, "Customer Profile Not Found For You!")
             return redirect('accounts:home')
-    
-    # محاسبه مجدد مانده بدهی (در صورت لزوم)
+
+    if request.method == "POST" and request.user.is_staff:
+        payment_form = PaymentForm(request.POST)
+        if payment_form.is_valid():
+            payment = payment_form.save(commit=False)
+            tx_id = request.POST.get("transaction_id")
+            if tx_id:
+                payment.transaction = get_object_or_404(DailySaleTransaction, id=tx_id)
+                payment.save()
+                recompute_outstanding_for_customer(customer.id)
+                messages.success(request, "Payment recorded successfully.")
+                return redirect(reverse("daily_sale:customer_detail", kwargs={"customer_id": customer.id}))
+        else:
+            messages.error(request, "Payment form is invalid!")
+    else:
+        payment_form = PaymentForm()
+
     recompute_outstanding_for_customer(customer.id)
-
-    # دریافت خلاصه بدهی مشتری
     outstanding = get_customer_outstanding_summary(customer.id)
-    total_debt = outstanding['total_debt'] if outstanding else Decimal('0.00')
-    transactions_count = outstanding['transactions_count'] if outstanding else 0
-    last_transaction = outstanding['last_transaction'] if outstanding else None
-
-    # دریافت تراکنش‌های مشتری به ترتیب تاریخ
+    total_debt = outstanding.get('total_debt', Decimal('0.00'))
+    transactions_count = outstanding.get('transactions_count', 0)
+    last_transaction = outstanding.get('last_transaction')
     transactions = DailySaleTransaction.objects.filter(customer=customer).select_related('item').order_by('-date')
-
     tx_data = []
     for tx in transactions:
         paid_amount = Payment.objects.filter(transaction=tx).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         remaining_amount = (tx.total_amount or Decimal('0.00')) - paid_amount
 
-        # محاسبه مالیات دقیق به صورت درصدی
-        tax_amount = (tx.total_amount or Decimal('0.00')) * TAX_RATE
+        tax_amount = (tx.total_amount or Decimal('0.00')) * Decimal(tx.tax_rate if hasattr(tx, 'tax_rate') else 0)
         total_with_tax = (tx.total_amount or Decimal('0.00')) + tax_amount
 
         tx_data.append({
@@ -93,8 +102,7 @@ def customer_detail(request, customer_id=None):
             'note': tx.note,
         })
 
-    # جمع کل فروش و مالیات
-    total_sales = sum((tx['total_amount'] or Decimal('0.00')) for tx in tx_data)
+    total_sales = sum(tx['total_amount'] or Decimal('0.00') for tx in tx_data)
     total_tax = sum(tx['tax_amount'] for tx in tx_data)
     total_paid = sum(tx['paid_amount'] for tx in tx_data)
     total_remaining = sum(tx['remaining_amount'] for tx in tx_data)
@@ -108,80 +116,239 @@ def customer_detail(request, customer_id=None):
         'total_remaining': total_remaining,
         'transactions_count': transactions_count,
         'last_transaction': last_transaction,
-        'tax_rate': TAX_RATE * 100,  # نمایش درصدی
-        'is_self_view': is_self_view,  # آیا کاربر خودش را می‌بیند؟
-        'is_admin': request.user.is_staff,  # آیا کاربر ادمین است؟
+        'tax_rate': (getattr(transactions.first(), 'tax_rate', 0) * 100) if transactions else 0,
+        'is_self_view': is_self_view,
+        'is_admin': request.user.is_staff,
+        'payment_form': payment_form,
     }
     return render(request, 'daily_sale/customer_detail.html', context)
 
 @login_required
+@db_transaction.atomic
 def transaction_create(request):
     if request.method == "POST":
+        print("=" * 50)
+        print("DEBUG: Transaction Create POST Request")
+        print(f"Form data keys: {list(request.POST.keys())}")
+        items_data_raw = request.POST.get("items_data", "[]")
+        print(f"DEBUG: items_data raw: {items_data_raw}")
+        
+        try:
+            items_list = json.loads(items_data_raw)
+            print(f"DEBUG: Parsed items_list: {items_list}")
+            print(f"DEBUG: Number of items: {len(items_list)}")
+            
+            for i, item in enumerate(items_list):
+                print(f"DEBUG: Item {i}: {item}")
+                print(f"DEBUG:   item_id: {item.get('item_id')}, type: {type(item.get('item_id'))}")
+                
+        except Exception as e:
+            print(f"DEBUG: JSON parse error: {e}")
+        
+        print("=" * 50)
+        
         form = DailySaleTransactionForm(request.POST)
+
         if form.is_valid():
             transaction = form.save(commit=False)
             transaction.created_by = request.user
-            
-            # محاسبات اضافی در ویو (اختیاری - برای تأیید)
-            # این محاسبات در مدل و فرم هم انجام شده است
-            transaction.save()
+            transaction.subtotal = Decimal(request.POST.get("subtotal", "0"))
+            transaction.tax_amount = Decimal(request.POST.get("tax_amount", "0"))
+            transaction.total_amount = Decimal(request.POST.get("total_amount", "0"))
+            transaction.balance = Decimal(request.POST.get("balance", "0"))
+            transaction.advance = Decimal(request.POST.get("advance", "0") or "0")
 
-            messages.success(request, "Transaction created successfully")
-            return redirect("daily_sale:transaction_list")
-    else:
-        form = DailySaleTransactionForm(initial={
-            "date": timezone.now().date(),
-            "tax": 5,  # 5% پیش‌فرض
-            "quantity": 1,
-        })
+            if transaction.advance >= transaction.total_amount and transaction.total_amount > Decimal("0"):
+                transaction.payment_status = "paid"
+                transaction.balance = Decimal("0")
+            elif transaction.advance > Decimal("0"):
+                transaction.payment_status = "partial"
+                transaction.balance = transaction.total_amount - transaction.advance
+            else:
+                transaction.payment_status = "unpaid"
+                transaction.balance = transaction.total_amount
+            transaction.save()
+            if transaction.advance > Decimal("0"):
+                Payment.objects.create(
+                    transaction=transaction,
+                    amount=transaction.advance,
+                    method=request.POST.get("payment_method", "cash"),
+                    date=transaction.date,
+                    created_by=request.user,
+                    note=f"Initial payment for invoice {transaction.invoice_number or 'N/A'}"
+                )
+            items_json = request.POST.get("items_data", "[]")
+            items_created = 0
+
+            try:
+                items_list = json.loads(items_json)
+                print(f"✅ Parsed items list: {items_list}")
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON decode error: {e}")
+                messages.error(request, "Invalid items data format.")
+                transaction.delete()
+                return render(request, "daily_sale/transaction_create.html", {"form": form})
+            for item_data in items_list:
+                print(f"🔍 Processing item data: {item_data}")
+                raw_item_id = item_data.get("item_id")
+                if not raw_item_id:
+                    print("⚠️ No item_id found")
+                    continue
+                item_id = raw_item_id 
+                print(f"  Looking for inventory with UUID: {item_id}")
+                
+                try:
+                    inventory = Inventory_List.objects.get(pk=item_id)
+                    print(f"  ✅ Inventory found: {inventory.product_name} (UUID: {inventory.id})")
+                except Inventory_List.DoesNotExist:
+                    print(f"  ❌ Inventory not found for UUID: {item_id}")
+                    try:
+                        available_items = Inventory_List.objects.all()[:3]
+                        print(f"  Available items (first 3):")
+                        for avail in available_items:
+                            print(f"    - {avail.id}: {avail.product_name}")
+                    except:
+                        print("  Could not list available items")
+                    
+                    continue
+                except ValueError as e:
+                    print(f"  ❌ Invalid UUID format: {item_id} - Error: {e}")
+                    continue
+                quantity = Decimal(str(item_data.get("quantity", 1)))
+                unit_price = Decimal(str(item_data.get("unit_price", 0)))
+                discount = Decimal(str(item_data.get("discount", 0)))
+                subtotal = (quantity * unit_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                taxable = (subtotal - discount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                if taxable < Decimal("0"):
+                    taxable = Decimal("0")
+
+                tax_amount = (taxable * transaction.tax / Decimal("100")).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                total = (taxable + tax_amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                container_obj = inventory.container if inventory.container else None
+                try:
+                    DailySaleTransactionItem.objects.create(
+                        transaction=transaction,
+                        item=inventory,
+                        container=container_obj,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        discount=discount,
+                        subtotal=subtotal,
+                        tax_amount=tax_amount,
+                        total_amount=total,
+                    )
+                    items_created += 1
+                    print(f"  ✅ Item created successfully")
+                except Exception as e:
+                    print(f"  ❌ Error saving item: {str(e)}")
+                    continue
+            if items_created == 0:
+                print(f"❌ No items created, rolling back transaction")
+                messages.error(request, "No valid item found. Please check the items you selected.")
+                transaction.delete()
+                return render(request, "daily_sale/transaction_create.html", {"form": form})
+            if not transaction.invoice_number:
+                date_str = datetime.now().strftime('%Y%m%d')
+                prefix = "INV"
+
+                last_inv = DailySaleTransaction.objects.filter(
+                    invoice_number__startswith=f"{prefix}-{date_str}-"
+                ).order_by('-invoice_number').first()
+
+                if last_inv:
+                    try:
+                        last_num = int(last_inv.invoice_number.split('-')[-1])
+                        new_num = last_num + 1
+                    except ValueError:
+                        new_num = 1
+                else:
+                    new_num = 1
+
+                transaction.invoice_number = f"{prefix}-{date_str}-{new_num:04d}"
+                transaction.save(update_fields=["invoice_number"])
+            messages.success(
+                request,
+                f"✅ Transaction #{transaction.invoice_number} created successfully with {items_created} item(s)."
+            )
+
+            try:
+                recompute_daily_summary_for_date(transaction.date)
+                if transaction.customer:
+                    recompute_outstanding_for_customer(transaction.customer.id)
+            except Exception as e:
+                print(f"⚠️ Error in summary recompute: {e}")
+
+            logger.info(
+                f"Transaction #{transaction.invoice_number} created. Advance: {transaction.advance}, Total: {transaction.total_amount}, Balance: {transaction.balance}"
+            )
+
+            return redirect("daily_sale:transaction_detail", pk=transaction.pk)
+
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+    form = DailySaleTransactionForm(initial={
+        "date": timezone.now().date(),
+        "tax": Decimal("5.00"),
+        "due_date": timezone.now().date() + timezone.timedelta(days=30),
+    })
 
     return render(request, "daily_sale/transaction_create.html", {"form": form})
 
+@login_required
+def invoice_pdf(request, pk):
+    tx = get_object_or_404(DailySaleTransaction, pk=pk)
 
-# API endpoint برای محاسبه مالیات در زمان واقعی
+    template = get_template("daily_sale/invoice_pdf.html")
+    html = template.render({"tx": tx})
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'filename="invoice_{tx.invoice_number}.pdf"'
+    return response
+
 @login_required
 @require_GET
 def calculate_tax_preview(request):
-    """API endpoint for real-time tax calculation preview"""
+    """API endpoint for real-time tax calculation preview with paid amount"""
     try:
-        # دریافت پارامترها
         quantity = Decimal(request.GET.get('quantity', 1))
         unit_price = Decimal(request.GET.get('unit_price', 0))
         discount = Decimal(request.GET.get('discount', 0))
         tax_percent = Decimal(request.GET.get('tax', 5))
-        advance = Decimal(request.GET.get('advance', 0))
-        
-        # محاسبه دقیق مثل ماشین حساب
-        # 1. Subtotal
+        paid_amount = Decimal(request.GET.get('paid_amount', 0)) 
         subtotal = (quantity * unit_price).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        
-        # 2. Taxable amount (after discount)
         taxable_amount = (subtotal - discount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         if taxable_amount < Decimal('0'):
             taxable_amount = Decimal('0')
-        
-        # 3. Tax amount (percentage of taxable amount)
         tax_amount = (taxable_amount * (tax_percent / Decimal('100'))).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
         
-        # 4. Total amount
         total_amount = (taxable_amount + tax_amount).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        
-        # 5. Balance
-        balance = (total_amount - advance).quantize(
+
+        balance = (total_amount - paid_amount).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        
-        # وضعیت پرداخت
-        if advance >= total_amount and total_amount > 0:
+
+        if paid_amount >= total_amount and total_amount > 0:
             payment_status = 'paid'
-        elif advance > 0:
+            payment_status_display = 'paid'
+            payment_class = 'success'
+        elif paid_amount > 0:
             payment_status = 'partial'
+            payment_status_display = 'partial'
+            payment_class = 'warning'
         else:
             payment_status = 'unpaid'
+            payment_status_display = 'unpaid'
+            payment_class = 'danger'
+        
+        payment_percentage = (paid_amount / total_amount * 100) if total_amount > 0 else 0
         
         return JsonResponse({
             'success': True,
@@ -190,26 +357,32 @@ def calculate_tax_preview(request):
             'tax_amount': str(tax_amount),
             'total_amount': str(total_amount),
             'balance': str(balance),
+            'paid_amount': str(paid_amount),
             'payment_status': payment_status,
+            'payment_status_display': payment_status_display,
+            'payment_class': payment_class,
+            'payment_percentage': round(payment_percentage, 2),
             'calculation_details': {
                 'subtotal_formula': f"{quantity} × {unit_price} = {subtotal}",
                 'taxable_formula': f"{subtotal} - {discount} = {taxable_amount}",
                 'tax_formula': f"{taxable_amount} × ({tax_percent}%) = {tax_amount}",
                 'total_formula': f"{taxable_amount} + {tax_amount} = {total_amount}",
-                'balance_formula': f"{total_amount} - {advance} = {balance}",
+                'balance_formula': f"{total_amount} - {paid_amount} = {balance}",
+                'payment_percentage_formula': f"({paid_amount} ÷ {total_amount}) × 100 = {payment_percentage:.2f}%",
             }
         })
         
     except Exception as e:
+        logger.error(f"Error in calculate_tax_preview: {e}")
         return JsonResponse({
             'success': False,
             'error': str(e)
         })
+        
 def transaction_edit(request, pk):
     obj = get_object_or_404(DailySaleTransaction, pk=pk)
     if request.method == "POST":
         form = DailySaleTransactionForm(request.POST, instance=obj, user=request.user)
-        # same safe population technique as create
         from accounts.models import Company, UserProfile
         from containers.models import Container, Inventory_List
         cid = request.POST.get("company")
@@ -239,7 +412,6 @@ def transaction_edit(request, pk):
             messages.error(request, "Validation error.")
     else:
         form = DailySaleTransactionForm(instance=obj, user=request.user)
-        # for edit, make current related objects available so select2 initial shows properly
         if obj.company_id:
             form.fields["company"].queryset = form.fields["company"].queryset.filter(pk=obj.company_id) or form.fields["company"].queryset
         if obj.customer_id:
@@ -259,11 +431,7 @@ def transaction_edit(request, pk):
 
 @login_required
 def transaction_list(request):
-    """
-    لیست تراکنش‌ها با قابلیت‌های فیلترینگ و جستجوی پیشرفته
-    """
     try:
-        # دریافت پارامترهای فیلتر
         start_date = parse_date_param(request.GET.get("start_date"))
         end_date = parse_date_param(request.GET.get("end_date"))
         transaction_type = request.GET.get("type", "")
@@ -274,7 +442,6 @@ def transaction_list(request):
         items_per_page = int(request.GET.get("per_page", 25))
         export_csv = request.GET.get("export") == "csv"
         
-        # ساخت کوئری اصلی با select_related برای کارایی بهتر
         qs = DailySaleTransaction.objects.select_related(
             "item", 
             "customer__user", 
@@ -282,7 +449,6 @@ def transaction_list(request):
             "container"
         ).order_by("-date", "-created_at")
         
-        # اعمال فیلترها
         filter_applied = False
         
         if start_date:
@@ -308,8 +474,7 @@ def transaction_list(request):
         if invoice_number:
             qs = qs.filter(invoice_number__icontains=invoice_number)
             filter_applied = True
-            
-        # فیلتر بر اساس وضعیت پرداخت
+
         if status_filter:
             if status_filter == 'paid':
                 qs = qs.filter(
@@ -334,35 +499,27 @@ def transaction_list(request):
                 )
             filter_applied = True
         
-        # تعداد کل رکوردها قبل از صفحه‌بندی
         total_count = qs.count()
-        
-        # محاسبات آماری برای نمایش در کارت‌ها
+
         stats = {}
-        
-        # مجموع فروش
+
         sales_total = qs.filter(transaction_type='sale').aggregate(
             total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
         )['total']
         stats['total_sales'] = sales_total
         
-        # مجموع خرید
         purchases_total = qs.filter(transaction_type='purchase').aggregate(
             total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
         )['total']
         stats['total_purchases'] = purchases_total
         
-        # مجموع برگشت
         returns_total = qs.filter(transaction_type='return').aggregate(
             total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
         )['total']
         stats['total_returns'] = returns_total
-        
-        # محاسبه مجموع مانده بدهی
         outstanding_total = Decimal('0')
         outstanding_count = 0
-        
-        # محاسبه برای هر تراکنش
+
         for transaction in qs:
             paid_amount = Payment.objects.filter(transaction=transaction).aggregate(
                 total=Coalesce(Sum('amount'), Decimal('0'), output_field=DecimalField())
@@ -375,25 +532,20 @@ def transaction_list(request):
         
         stats['total_outstanding'] = outstanding_total
         stats['outstanding_count'] = outstanding_count
-        
-        # تعداد آیتم‌های فروخته شده
         items_sold = qs.filter(transaction_type='sale').aggregate(
             total=Coalesce(Sum('quantity'), 0)
         )['total']
         stats['items_sold'] = items_sold
-        
-        # میانگین مبلغ تراکنش
+
         if total_count > 0:
             avg_transaction = (sales_total + purchases_total + returns_total) / total_count
         else:
             avg_transaction = Decimal('0')
         stats['avg_transaction'] = avg_transaction
-        
-        # اگر export درخواست شده باشد
+
         if export_csv:
             return export_transactions_to_csv(qs)
         
-        # صفحه‌بندی
         paginator = Paginator(qs, items_per_page)
         page_number = request.GET.get("page", 1)
         
@@ -403,8 +555,7 @@ def transaction_list(request):
             page_obj = paginator.page(1)
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
-        
-        # محاسبه مبالغ پرداخت شده برای هر تراکنش در صفحه جاری
+
         transactions_with_payments = []
         for transaction in page_obj:
             paid_amount = Payment.objects.filter(transaction=transaction).aggregate(
@@ -412,8 +563,6 @@ def transaction_list(request):
             )['total'] or Decimal('0')
             
             remaining = transaction.total_amount - paid_amount
-            
-            # تعیین وضعیت پرداخت
             if paid_amount == Decimal('0'):
                 payment_status = 'unpaid'
                 status_class = 'danger'
@@ -423,17 +572,14 @@ def transaction_list(request):
             else:
                 payment_status = 'partial'
                 status_class = 'warning'
-            
-            # اضافه کردن فیلدهای محاسبه شده به آبجکت
+                 
             transaction.paid_amount = paid_amount
             transaction.remaining_balance = remaining
             transaction.payment_status = payment_status
             transaction.status_class = status_class
             transaction.payment_percentage = int((paid_amount / transaction.total_amount * 100)) if transaction.total_amount > 0 else 0
-            
             transactions_with_payments.append(transaction)
-        
-        # دریافت لیست مشتریان و شرکت‌ها برای dropdown فیلترها
+
         customers = UserProfile.objects.filter(
             daily_transactions__isnull=False
         ).distinct().order_by('user__first_name')[:50]
@@ -441,14 +587,11 @@ def transaction_list(request):
         companies = Company.objects.filter(
             daily_transactions__isnull=False
         ).distinct().order_by('name')[:50]
-        
-        # فرمت تاریخ برای استفاده در template
+
         start_date_str = start_date.strftime("%Y-%m-%d") if start_date else ""
         end_date_str = end_date.strftime("%Y-%m-%d") if end_date else ""
         
-        # تاریخ 30 روز گذشته برای فیلتر پیش‌فرض
         thirty_days_ago = (datetime.now() - timedelta(days=30)).date()
-        
         context = {
             "page_obj": page_obj,
             "transactions": transactions_with_payments,
@@ -470,8 +613,7 @@ def transaction_list(request):
             "paginator": paginator,
             "current_page": page_obj.number,
         }
-        
-        # درخواست AJAX (برای auto-refresh یا بارگذاری جزئی)
+
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             data = {
                 'success': True,
@@ -486,13 +628,10 @@ def transaction_list(request):
                 'next_page_number': page_obj.next_page_number() if page_obj.has_next() else None,
             }
             return JsonResponse(data)
-        
         return render(request, "daily_sale/transaction_list.html", context)
-        
     except Exception as e:
         logger.error(f"Error in transaction_list view: {str(e)}", exc_info=True)
         
-        # بازگشت به حالت پیش‌فرض در صورت خطا
         try:
             qs = DailySaleTransaction.objects.select_related(
                 "item", "customer__user", "company", "container"
@@ -501,7 +640,6 @@ def transaction_list(request):
             paginator = Paginator(qs, 25)
             page_obj = paginator.page(1)
             
-            # محاسبه ساده stats
             stats = {
                 'total_sales': Decimal('0'),
                 'total_outstanding': Decimal('0'),
@@ -529,19 +667,9 @@ def transaction_list(request):
 
 
 def export_transactions_to_csv(queryset):
-    """
-    خروجی CSV از تراکنش‌ها
-    """
-    import csv
-    from django.http import HttpResponse
-    from django.utils.encoding import smart_str
-    
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="transactions_export.csv"'
-    
     writer = csv.writer(response)
-    
-    # نوشتن هدر
     writer.writerow([
         smart_str('Invoice Number'),
         smart_str('Date'),
@@ -560,13 +688,11 @@ def export_transactions_to_csv(queryset):
         smart_str('Status'),
         smart_str('Description'),
     ])
-    
-    # نوشتن داده‌ها
+
     for transaction in queryset:
         paid_amount = Payment.objects.filter(transaction=transaction).aggregate(
             total=Sum('amount')
         )['total'] or Decimal('0')
-        
         remaining = transaction.total_amount - paid_amount
         
         if paid_amount == Decimal('0'):
@@ -578,7 +704,6 @@ def export_transactions_to_csv(queryset):
         
         customer_name = transaction.customer.user.get_full_name() if transaction.customer and transaction.customer.user else 'N/A'
         item_name = transaction.item.product_name if transaction.item else 'N/A'
-        
         writer.writerow([
             smart_str(transaction.invoice_number or ''),
             smart_str(transaction.date.strftime('%Y-%m-%d') if transaction.date else ''),
@@ -599,6 +724,7 @@ def export_transactions_to_csv(queryset):
         ])
     
     return response
+
 @login_required
 def transaction_detail(request, pk):
     tx = get_object_or_404(DailySaleTransaction.objects.select_related("item", "customer__user", "company", "container"), pk=pk)
@@ -621,272 +747,64 @@ def transaction_detail(request, pk):
     return render(request, "daily_sale/transaction_detail.html", {"tx": tx, "payments": payments, "paid_total": paid_total, "remaining": remaining, "pform": pform})
 
 
-@login_required
-def daily_summary(request):
-    """
-    Daily summary with all real-time calculations
-    """
+def recompute_daily_summary_for_date(target_date):
+    if not target_date:
+        logger.warning("recompute_daily_summary_for_date called with no date")
+        return None
+
     try:
-        # Get date parameters from GET request
-        start_date_str = request.GET.get("start_date")
-        end_date_str = request.GET.get("end_date")
-        
-        # Default date range (last 30 days)
-        today = timezone.now().date()
-        default_end_date = today
-        default_start_date = today - timedelta(days=30)
-        
-        # Parse date strings
-        start_date = default_start_date
-        end_date = default_end_date
-        if start_date_str:
-            try:
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                pass  # Keep default value in case of error
-        if end_date_str:
-            try:
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                pass  # Keep default value in case of error
-        
-        # Ensure valid date range (start_date <= end_date)
-        if start_date > end_date:
-            start_date, end_date = end_date, start_date
-        
-        # Limit the range to 365 days maximum
-        if (end_date - start_date).days > 365:
-            start_date = end_date - timedelta(days=365)
-        
-        # 1. Get overall sales summary for the selected date range
-        period_summary = get_sales_summary(start_date, end_date)
-        
-        # 2. Get daily timeseries data for the selected range (grouped by day)
-        daily_series = sales_timeseries(start_date, end_date, group_by="day")
-        
-        # 3. Calculate total and count of Cash In (payments received)
-        cash_in_data = Payment.objects.filter(
-            date__range=[start_date, end_date]
-        ).aggregate(
-            total=Sum('amount'),
-            count=Count('id')
+        qs = DailySaleTransaction.objects.filter(date=target_date)
+        if not qs.exists():
+            DailySummary.objects.filter(date=target_date).delete()
+            logger.info(f"No transactions found for {target_date}, summary deleted.")
+            return None
+        agg = qs.aggregate(
+            total_sales=Sum("total_amount", filter=Q(transaction_type="sale")),
+            total_purchases=Sum("total_amount", filter=Q(transaction_type="purchase")),
+            items_sold=Sum("quantity", filter=Q(transaction_type="sale")),
+            transactions_count=Count("id"),
         )
-        cash_in_total = cash_in_data['total'] or Decimal('0.00')
-        cash_in_count = cash_in_data['count'] or 0
-        
-        # 4. Calculate total and count of Cash Out (purchases, returns, expenses)
-        cash_out_data = DailySaleTransaction.objects.filter(
-            date__range=[start_date, end_date],
-            transaction_type__in=['purchase', 'return']
-        ).aggregate(
-            total=Sum('total_amount'),
-            count=Count('id')
-        )
-        cash_out_total = cash_out_data['total'] or Decimal('0.00')
-        cash_out_count = cash_out_data['count'] or 0
-        
-        # 5. Calculate net profit (Cash In - Cash Out)
-        net_profit = cash_in_total - cash_out_total
-        
-        # 6. Calculate percentage distribution of Cash In and Cash Out
-        total_revenue = cash_in_total + abs(cash_out_total)
-        cash_in_percentage = 0
-        cash_out_percentage = 0
-        if total_revenue > 0:
-            cash_in_percentage = (cash_in_total / total_revenue * 100)
-            cash_out_percentage = (abs(cash_out_total) / total_revenue * 100)
-        
-        # 7. Calculate profit margin
-        profit_margin = 0
-        if period_summary['total_sales'] > 0:
-            profit_margin = (period_summary['net_revenue'] / period_summary['total_sales'] * 100)
-        
-        # 8. Calculate average daily sales
-        days_count = len(daily_series)
-        avg_daily_sales = period_summary['total_sales'] / days_count if days_count > 0 else Decimal('0.00')
-        
-        # 9. Find the best sales day (highest total sales)
-        best_day = {'date': start_date, 'total_sales': Decimal('0.00')}
-        for day in daily_series:
-            if day['total_sales'] > best_day['total_sales']:
-                best_day = day
-        
-        # 10. Calculate growth rate based on the first and last day sales
-        growth_rate = 0
-        if len(daily_series) >= 2:
-            first_day = daily_series[-1]['total_sales']  # Oldest
-            last_day = daily_series[0]['total_sales']    # Most recent
-            if first_day > 0:
-                growth_rate = ((last_day - first_day) / first_day * 100)
-        
-        # 11. Prepare chart data for rendering
-        chart_labels = []
-        chart_sales = []
-        chart_cash_in = []
-        chart_cash_out = []
-        
-        for day in daily_series:
-            chart_labels.append(day['date'].strftime('%b %d'))
-            chart_sales.append(float(day['total_sales']))
-            daily_cash_in = Payment.objects.filter(
-                date=day['date']
-            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-            chart_cash_in.append(float(daily_cash_in))
-            daily_cash_out = DailySaleTransaction.objects.filter(
-                date=day['date'],
-                transaction_type__in=['purchase', 'return']
-            ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
-            chart_cash_out.append(float(daily_cash_out))
-        
-        # 12. Calculate quick date filters (Yesterday, This Week, This Month, etc.)
-        yesterday = today - timedelta(days=1)
-        week_start = today - timedelta(days=(today.weekday() + 2) % 7)
-        month_start = today.replace(day=1)
-        last_month_end = month_start - timedelta(days=1)
-        last_month_start = last_month_end.replace(day=1)
-        year_start = today.replace(month=1, day=1)
-        
-        # 13. Enhance daily series with additional data for each day
-        enhanced_daily_series = []
-        for i, day in enumerate(daily_series):
-            date = day['date']
-            is_today = date == today
-            
-            daily_cash_in = Payment.objects.filter(date=date).aggregate(
-                total=Sum('amount')
-            )['total'] or Decimal('0.00')
-            
-            daily_cash_out = DailySaleTransaction.objects.filter(
-                date=date,
-                transaction_type__in=['purchase', 'return']
-            ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
-            
-            daily_profit = daily_cash_in - daily_cash_out
-            transaction_count = DailySaleTransaction.objects.filter(
-                date=date,
-                transaction_type='sale'
-            ).count()
-            avg_sale = day['total_sales'] / transaction_count if transaction_count > 0 else Decimal('0.00')
-            
-            items_sold = DailySaleTransaction.objects.filter(
-                date=date,
-                transaction_type='sale'
-            ).aggregate(total=Sum('quantity'))['total'] or 0
-            
-            profit_trend = None
-            profit_trend_class = ''
-            if i < len(daily_series) - 1:
-                prev_day = daily_series[i + 1]
-                prev_profit = prev_day['total_sales'] - daily_cash_out
-                if prev_profit != 0:
-                    profit_trend = ((daily_profit - prev_profit) / prev_profit * 100)
-                    profit_trend_class = 'trend-up' if profit_trend > 0 else 'trend-down'
-            
-            enhanced_day = {
-                **day,
-                'is_today': is_today,
-                'cash_in': daily_cash_in,
-                'cash_out': daily_cash_out,
-                'profit': daily_profit,
-                'avg_sale': avg_sale,
-                'items_sold': items_sold,
-                'profit_trend': profit_trend,
-                'profit_trend_class': profit_trend_class,
-            }
-            enhanced_daily_series.append(enhanced_day)
-        
-        # 14. Prepare context for template rendering
-        context = {
-            'start_date': start_date,
-            'end_date': end_date,
-            'period_summary': period_summary,
-            'daily_series': enhanced_daily_series,
-            'cash_in_total': cash_in_total,
-            'cash_out_total': cash_out_total,
-            'cash_in_count': cash_in_count,
-            'cash_out_count': cash_out_count,
-            'cash_in_percentage': cash_in_percentage,
-            'cash_out_percentage': cash_out_percentage,
-            'profit_margin': profit_margin,
-            'profit_percentage': min(100, max(0, profit_margin)),
-            'sales_percentage': min(100, cash_in_percentage),
-            'chart_labels': json.dumps(chart_labels),
-            'chart_sales': json.dumps(chart_sales),
-            'chart_cash_in': json.dumps(chart_cash_in),
-            'chart_cash_out': json.dumps(chart_cash_out),
-            'today': today,
-            'yesterday': yesterday,
-            'week_start': week_start,
-            'month_start': month_start,
-            'last_month_start': last_month_start,
-            'last_month_end': last_month_end,
-            'year_start': year_start,
-            'avg_daily_sales': avg_daily_sales,
-            'best_day': best_day,
-            'growth_rate': growth_rate,
-            'net_profit': net_profit,
-        }
-        
-        # 15. Return JSON response if it's an AJAX request
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': True,
-                'start_date': start_date.strftime('%Y-%m-%d'),
-                'end_date': end_date.strftime('%Y-%m-%d'),
-                'total_sales': str(period_summary['total_sales']),
-                'total_purchases': str(period_summary['total_purchases']),
-                'net_revenue': str(period_summary['net_revenue']),
-                'cash_in_total': str(cash_in_total),
-                'cash_out_total': str(cash_out_total),
-                'transactions_count': period_summary['transactions_count'],
-                'items_sold': period_summary['items_sold'],
-                'chart_labels': chart_labels,
-                'chart_sales': chart_sales,
-                'chart_cash_in': chart_cash_in,
-            })
-        
-        return render(request, "daily_sale/daily_summary.html", context)
-        
-    except Exception as e:
-        print(f"Error in daily_summary: {str(e)}")
-        # Fallback in case of error
-        today = timezone.now().date()
-        start_date = today - timedelta(days=30)
-        
-        context = {
-            'start_date': start_date,
-            'end_date': today,
-            'period_summary': {
-                'total_sales': Decimal('0.00'),
-                'total_purchases': Decimal('0.00'),
-                'net_revenue': Decimal('0.00'),
-                'transactions_count': 0,
-                'items_sold': 0,
+        total_sales = agg.get("total_sales") or Decimal("0")
+        total_purchases = agg.get("total_purchases") or Decimal("0")
+        items_sold = agg.get("items_sold") or 0
+        transactions_count = agg.get("transactions_count") or 0
+        total_profit = total_sales - total_purchases
+        payments = Payment.objects.filter(transaction__date=target_date)
+        total_paid = payments.aggregate(sum=Sum("amount"))["sum"] or Decimal("0")
+        net_balance = total_sales - total_paid
+        customers_count = qs.filter(customer__isnull=False).values("customer").distinct().count()
+        summary, created = DailySummary.objects.update_or_create(
+            date=target_date,
+            defaults={
+                "total_sales": total_sales,
+                "total_purchases": total_purchases,
+                "total_profit": total_profit,
+                "net_balance": net_balance,
+                "transactions_count": transactions_count,
+                "items_sold": items_sold,
+                "customers_count": customers_count,
+                "updated_at": timezone.now(),
             },
-            'daily_series': [],
-            'cash_in_total': Decimal('0.00'),
-            'cash_out_total': Decimal('0.00'),
-            'error': True,
-            'error_message': 'خطا در بارگذاری داده‌ها',
-        }
-        return render(request, "daily_sale/daily_summary.html", context)
+        )
+
+        if created:
+            logger.info(f"Created daily summary for {target_date}")
+        else:
+            logger.info(f"Updated daily summary for {target_date}")
+
+        return summary
+    except Exception as e:
+        logger.error(f"Error recomputing daily summary for {target_date}: {e}", exc_info=True)
+        return None
 
 @login_required
 def daily_summary(request):
-    """
-    Daily summary with all real-time calculations - OPTIMIZED VERSION
-    """
     try:
-        # Get date parameters from GET request
         start_date_str = request.GET.get("start_date")
         end_date_str = request.GET.get("end_date")
-        
-        # Default date range (last 30 days)
         today = timezone.now().date()
         default_end_date = today
         default_start_date = today - timedelta(days=30)
-        
-        # Parse date strings
         start_date = default_start_date
         end_date = default_end_date
         if start_date_str:
@@ -901,190 +819,83 @@ def daily_summary(request):
             except ValueError:
                 logger.warning(f"Invalid end_date: {end_date_str}")
                 pass
-        
-        # Ensure valid date range (start_date <= end_date)
         if start_date > end_date:
             start_date, end_date = end_date, start_date
         
-        # Limit the range to 365 days maximum
         if (end_date - start_date).days > 365:
             start_date = end_date - timedelta(days=365)
         
-        # 1. استفاده از DailySummary به جای محاسبات real-time (بهینه‌سازی)
-        daily_summaries = DailySummary.objects.filter(
-            date__range=[start_date, end_date]
-        ).order_by('date')
-        
-        # اگر داده‌ای در DailySummary نداریم، از محاسبات real-time استفاده کنیم
-        use_real_time = not daily_summaries.exists()
-        
-        if use_real_time:
-            logger.info(f"Using real-time calculations for date range {start_date} to {end_date}")
-            # از منطق قدیمی استفاده می‌کنیم
-            return get_real_time_daily_summary(request, start_date, end_date, today)
-        
-        logger.info(f"Using cached DailySummary for date range {start_date} to {end_date}")
-        
-        # 2. محاسبه آمار دوره از DailySummary
-        period_stats = daily_summaries.aggregate(
-            total_sales=Sum('total_sales'),
-            total_purchases=Sum('total_purchases'),
-            total_profit=Sum('total_profit'),
-            total_balance=Sum('net_balance'),
-            total_transactions=Sum('transactions_count'),
-            total_items_sold=Sum('items_sold'),
-            total_customers=Sum('customers_count')
+        transactions = DailySaleTransaction.objects.filter(date__range=[start_date, end_date]).select_related('customer', 'company', 'item')
+        period_stats = transactions.aggregate(
+            total_sales=Sum('total_amount', filter=Q(transaction_type='sale')),
+            total_purchases=Sum('total_amount', filter=Q(transaction_type='purchase')),
+            total_returns=Sum('total_amount', filter=Q(transaction_type='return')),
+            total_transactions=Count('id'),
+            total_quantity=Sum('quantity', filter=Q(transaction_type='sale')),
+            avg_transaction=Avg('total_amount'),
         )
-        
-        # 3. Calculate Cash In from Payments
-        cash_in_data = Payment.objects.filter(
-            date__range=[start_date, end_date]
-        ).aggregate(
-            total=Sum('amount'),
-            count=Count('id')
-        )
-        cash_in_total = cash_in_data['total'] or Decimal('0.00')
-        cash_in_count = cash_in_data['count'] or 0
-        
-        # 4. Calculate Cash Out from transactions
-        cash_out_data = DailySaleTransaction.objects.filter(
-            date__range=[start_date, end_date],
-            transaction_type__in=['purchase', 'return']
-        ).aggregate(
-            total=Sum('total_amount'),
-            count=Count('id')
-        )
-        cash_out_total = cash_out_data['total'] or Decimal('0.00')
+
+        cash_in_data = Payment.objects.filter(date__range=[start_date, end_date]).aggregate(total=Sum('amount'), count=Count('id'))
+        cash_in_total = cash_in_data['total'] or 0
+        cash_out_data = DailySaleTransaction.objects.filter(date__range=[start_date, end_date], transaction_type__in=['purchase', 'return']).aggregate(total=Sum('total_amount'), count=Count('id'))
+        cash_out_total = cash_out_data['total'] or 0
         cash_out_count = cash_out_data['count'] or 0
-        
-        # 5. Calculate net profit
         net_profit = cash_in_total - cash_out_total
-        
-        # 6. Prepare daily series from DailySummary
+        payment_stats = {
+            'fully_paid': transactions.filter(payment_status='paid').count(),
+            'partially_paid': transactions.filter(payment_status='partial').count(),
+            'unpaid': transactions.filter(payment_status='unpaid').count(),
+            'total_transactions': transactions.count(),
+            'total_collected': cash_in_total,
+            'total_outstanding': transactions.filter(Q(payment_status='unpaid') | Q(payment_status='partial')).aggregate(total=Sum('balance'))['total'] or 0,
+        }
+
+        if payment_stats['total_transactions'] > 0:
+            payment_stats['fully_paid_percentage'] = (payment_stats['fully_paid'] / payment_stats['total_transactions'] * 100)
+            payment_stats['partially_paid_percentage'] = (payment_stats['partially_paid'] / payment_stats['total_transactions'] * 100)
+            payment_stats['unpaid_percentage'] = (payment_stats['unpaid'] / payment_stats['total_transactions'] * 100)
+        else:
+            payment_stats['fully_paid_percentage'] = 0
+            payment_stats['partially_paid_percentage'] = 0
+            payment_stats['unpaid_percentage'] = 0
+
+        collection_rate = (payment_stats['total_collected'] / period_stats['total_sales'] * 100) if period_stats['total_sales'] > 0 else 0
         daily_series = []
-        chart_labels = []
-        chart_sales = []
-        chart_cash_in = []
-        chart_cash_out = []
-        
-        for summary in daily_summaries:
-            date = summary.date
-            daily_cash_in = Payment.objects.filter(
-                date=date
-            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-            
-            daily_cash_out = DailySaleTransaction.objects.filter(
-                date=date,
-                transaction_type__in=['purchase', 'return']
-            ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
-            
+        date_range = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
+        for current_date in date_range:
+            day_transactions = transactions.filter(date=current_date)
+            day_sales = day_transactions.filter(transaction_type='sale').aggregate(total=Sum('total_amount'))['total'] or 0
+            day_cash_in = Payment.objects.filter(date=current_date).aggregate(total=Sum('amount'))['total'] or 0
+            day_cash_out = day_transactions.filter(transaction_type__in=['purchase', 'return']).aggregate(total=Sum('total_amount'))['total'] or 0
+
             day_data = {
-                'date': date,
-                'total_sales': summary.total_sales,
-                'total_purchases': summary.total_purchases,
-                'total_profit': summary.total_profit,
-                'net_balance': summary.net_balance,
-                'transactions_count': summary.transactions_count,
-                'items_sold': summary.items_sold,
-                'customers_count': summary.customers_count,
-                'is_today': date == today,
-                'cash_in': daily_cash_in,
-                'cash_out': daily_cash_out,
+                'date': current_date,
+                'total_sales': day_sales,
+                'cash_in': day_cash_in,
+                'cash_out': day_cash_out,
+                'profit': day_cash_in - day_cash_out,
+                'transactions_count': day_transactions.count(),
             }
             daily_series.append(day_data)
-            
-            # Chart data
-            chart_labels.append(date.strftime('%b %d'))
-            chart_sales.append(float(summary.total_sales))
-            chart_cash_in.append(float(daily_cash_in))
-            chart_cash_out.append(float(daily_cash_out))
-        
-        # 7. Calculate additional metrics
-        total_sales = period_stats['total_sales'] or Decimal('0.00')
-        total_revenue = cash_in_total + abs(cash_out_total)
-        
-        cash_in_percentage = 0
-        cash_out_percentage = 0
-        if total_revenue > 0:
-            cash_in_percentage = (cash_in_total / total_revenue * 100)
-            cash_out_percentage = (abs(cash_out_total) / total_revenue * 100)
-        
-        profit_margin = 0
-        if total_sales > 0:
-            total_profit = period_stats['total_profit'] or Decimal('0.00')
-            profit_margin = (total_profit / total_sales * 100)
-        
-        # 8. Calculate averages and best day
-        days_count = len(daily_series)
-        avg_daily_sales = total_sales / days_count if days_count > 0 else Decimal('0.00')
-        
-        best_day = {'date': start_date, 'total_sales': Decimal('0.00')}
-        for day in daily_series:
-            if day['total_sales'] > best_day['total_sales']:
-                best_day = day
-        
-        # 9. Calculate growth rate
-        growth_rate = 0
-        if len(daily_series) >= 2:
-            first_day = daily_series[0]['total_sales']
-            last_day = daily_series[-1]['total_sales']
-            if first_day > 0:
-                growth_rate = ((last_day - first_day) / first_day * 100)
-        
-        # 10. Quick date filters
-        yesterday = today - timedelta(days=1)
-        week_start = today - timedelta(days=today.weekday())
-        month_start = today.replace(day=1)
-        last_month_end = month_start - timedelta(days=1)
-        last_month_start = last_month_end.replace(day=1)
-        year_start = today.replace(month=1, day=1)
-        
-        # 11. Prepare context
         context = {
             'start_date': start_date,
             'end_date': end_date,
-            'period_summary': {
-                'total_sales': total_sales,
-                'total_purchases': period_stats['total_purchases'] or Decimal('0.00'),
-                'net_revenue': total_sales - (period_stats['total_purchases'] or Decimal('0.00')),
-                'total_profit': period_stats['total_profit'] or Decimal('0.00'),
-                'net_balance': period_stats['total_balance'] or Decimal('0.00'),
-                'transactions_count': period_stats['total_transactions'] or 0,
-                'items_sold': period_stats['total_items_sold'] or 0,
-                'customers_count': period_stats['total_customers'] or 0,
-            },
+            'period_summary': period_stats,
             'daily_series': daily_series,
+            'payment_stats': payment_stats,
             'cash_in_total': cash_in_total,
             'cash_out_total': cash_out_total,
-            'cash_in_count': cash_in_count,
-            'cash_out_count': cash_out_count,
-            'cash_in_percentage': cash_in_percentage,
-            'cash_out_percentage': cash_out_percentage,
-            'profit_margin': profit_margin,
-            'profit_percentage': min(100, max(0, profit_margin)),
-            'sales_percentage': min(100, cash_in_percentage),
-            'chart_labels': json.dumps(chart_labels),
-            'chart_sales': json.dumps(chart_sales),
-            'chart_cash_in': json.dumps(chart_cash_in),
-            'chart_cash_out': json.dumps(chart_cash_out),
-            'today': today,
-            'yesterday': yesterday,
-            'week_start': week_start,
-            'month_start': month_start,
-            'last_month_start': last_month_start,
-            'last_month_end': last_month_end,
-            'year_start': year_start,
-            'avg_daily_sales': avg_daily_sales,
-            'best_day': best_day,
-            'growth_rate': growth_rate,
-            'net_profit': net_profit,
-            'using_cached': True,
+            'collection_rate': collection_rate,
         }
 
         return render(request, "daily_sale/daily_summary.html", context)
+
+    except Exception as e:
+        logger.error(f"Error in daily_summary: {str(e)}", exc_info=True)
+        return JsonResponse({'error': 'error'}, status=500)
         
     except Exception as e:
-        logger.error(f"Error in daily_summary: {str(e)}")
+        logger.error(f"Error in daily_summary: {str(e)}", exc_info=True)
         today = timezone.now().date()
         start_date = today - timedelta(days=30)
         
@@ -1097,161 +908,75 @@ def daily_summary(request):
                 'net_revenue': Decimal('0.00'),
                 'transactions_count': 0,
                 'items_sold': 0,
+                'customers_count': 0,
             },
             'daily_series': [],
             'cash_in_total': Decimal('0.00'),
             'cash_out_total': Decimal('0.00'),
+            'payment_stats': {
+                'fully_paid': 0,
+                'partially_paid': 0,
+                'unpaid': 0,
+                'total_collected': Decimal('0.00'),
+                'total_outstanding': Decimal('0.00'),
+                'collection_rate': 0,
+                'avg_outstanding': Decimal('0.00'),
+                'fully_paid_percentage': 0,
+                'partially_paid_percentage': 0,
+                'unpaid_percentage': 0,
+            },
             'error': True,
-            'error_message': 'خطا در بارگذاری داده‌ها',
+            'error_message': f'Error In Loading Data!: {str(e)}',
         }
         return render(request, "daily_sale/daily_summary.html", context)
     
-
 @login_required
 @require_GET
 def generate_daily_report(request):
-    """
-    تولید و دانلود گزارش JSON
-    """
     try:
-        # دریافت پارامترهای تاریخ (همان پارامترهای daily_summary)
         start_date_str = request.GET.get("start_date")
         end_date_str = request.GET.get("end_date")
         
-        # اگر تاریخ ارسال نشد، از تاریخ‌های جلسه استفاده کن
         if not start_date_str or not end_date_str:
-            start_date_str = request.session.get('report_start_date', '')
-            end_date_str = request.session.get('report_end_date', '')
+            raise ValueError("start, and end date is nesseccery!")
         
-        # تبدیل تاریخ‌ها
-        from datetime import datetime
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        
-        # 1. محاسبه آمار دوره (کوئری اصلی شما)
-        from django.db.models import Sum, Count, Avg, Max, Min
-        
-        # اگر DailySummary دارید
-        daily_summaries = DailySummary.objects.filter(
-            date__range=[start_date, end_date]
-        )
-        
-        # محاسبه آمار
-        period_stats = daily_summaries.aggregate(
-            total_sales=Sum('total_sales'),
-            total_purchases=Sum('total_purchases'),
-            total_profit=Sum('total_profit'),
-            total_transactions=Sum('transactions_count'),
-            total_items_sold=Sum('items_sold'),
-            total_customers=Sum('customers_count'),
-        )
-        
-        # 2. محاسبه Cash In
-        cash_in_data = Payment.objects.filter(
+        period_stats = DailySaleTransaction.objects.filter(
             date__range=[start_date, end_date]
         ).aggregate(
-            total=Sum('amount'),
-            count=Count('id')
+            total_sales=Sum('total_amount'),
+            total_purchases=Sum('total_amount', filter=Q(transaction_type='purchase')),
+            total_profit=Sum('total_amount', filter=Q(transaction_type='sale')),
+            total_transactions=Count('id')
         )
-        cash_in_total = cash_in_data['total'] or Decimal('0.00')
-        
-        # 3. محاسبه Cash Out
-        cash_out_data = DailySaleTransaction.objects.filter(
-            date__range=[start_date, end_date],
-            transaction_type__in=['purchase', 'return']
-        ).aggregate(
-            total=Sum('total_amount'),
-            count=Count('id')
-        )
-        cash_out_total = cash_out_data['total'] or Decimal('0.00')
-        
-        # 4. محاسبه Net Profit
-        net_profit = cash_in_total - cash_out_total
-        
-        # 5. محاسبه Profit Margin
-        profit_margin = Decimal('0.00')
-        if period_stats['total_sales'] and period_stats['total_sales'] > 0:
-            profit_margin = (period_stats['total_profit'] / period_stats['total_sales'] * 100)
-        
-        # 6. محاسبه Avg Daily Sales
-        days_count = (end_date - start_date).days + 1
-        avg_daily_sales = period_stats['total_sales'] / days_count if days_count > 0 else Decimal('0.00')
-        
-        # 7. پیدا کردن Best Day
-        best_day_obj = daily_summaries.order_by('-total_sales').first()
-        best_day = {
-            'date': best_day_obj.date if best_day_obj else start_date,
-            'total_sales': best_day_obj.total_sales if best_day_obj else Decimal('0.00')
-        }
-        
-        # 8. محاسبه Growth Rate
-        growth_rate = Decimal('0.00')
-        if daily_summaries.count() >= 2:
-            first_day = daily_summaries.order_by('date').first()
-            last_day = daily_summaries.order_by('-date').first()
-            if first_day.total_sales and first_day.total_sales > 0:
-                growth_rate = ((last_day.total_sales - first_day.total_sales) / first_day.total_sales * 100)
-        
-        # 9. آماده‌سازی داده‌های گزارش
+        cash_in_total = Payment.objects.filter(date__range=[start_date, end_date]).aggregate(total=Sum('amount'))['total'] or 0
+        cash_out_total = DailySaleTransaction.objects.filter(
+            date__range=[start_date, end_date], transaction_type__in=['purchase', 'return']
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
         report_data = {
-            'report_type': 'Daily Summary Report',
-            'date_range': {
-                'start': start_date.strftime('%Y-%m-%d'),
-                'end': end_date.strftime('%Y-%m-%d'),
-                'days': daily_summaries.count()
-            },
-            'summary': {
-                'total_sales': float(period_stats['total_sales'] or Decimal('0.00')),
-                'total_purchases': float(period_stats['total_purchases'] or Decimal('0.00')),
-                'net_revenue': float((period_stats['total_sales'] or Decimal('0.00')) - (period_stats['total_purchases'] or Decimal('0.00'))),
-                'transactions_count': period_stats['total_transactions'] or 0,
-                'items_sold': period_stats['total_items_sold'] or 0,
-                'customers_count': period_stats['total_customers'] or 0,
-                'cash_in_total': float(cash_in_total),
-                'cash_out_total': float(cash_out_total),
-                'net_profit': float(net_profit),
-                'profit_margin': float(profit_margin),
-                'avg_daily_sales': float(avg_daily_sales),
-            },
-            'best_day': {
-                'date': best_day['date'].strftime('%Y-%m-%d'),
-                'total_sales': float(best_day['total_sales'])
-            },
-            'growth_rate': float(growth_rate),
-            'generated_at': datetime.now().isoformat(),
-            'generated_by': 'Daily Summary Dashboard'
+            'start_date': start_date_str,
+            'end_date': end_date_str,
+            'total_sales': float(period_stats['total_sales'] or 0),
+            'total_purchases': float(period_stats['total_purchases'] or 0),
+            'net_profit': float(period_stats['total_profit'] or 0),
+            'cash_in_total': float(cash_in_total),
+            'cash_out_total': float(cash_out_total),
         }
-        
-        # 10. بازگرداندن JSON به عنوان فایل قابل دانلود
-        response = HttpResponse(
+        return HttpResponse(
             json.dumps(report_data, indent=2, ensure_ascii=False),
             content_type='application/json'
         )
-        response['Content-Disposition'] = f'attachment; filename="daily_summary_report_{start_date}_{end_date}.json"'
-        return response
-        
     except Exception as e:
-        # در صورت خطا
-        error_data = {
-            'error': True,
-            'message': str(e),
-            'generated_at': datetime.now().isoformat()
-        }
-        return JsonResponse(error_data, status=400)
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 def get_real_time_daily_summary(request, start_date, end_date, today):
-    """
-    Fallback function when DailySummary data is not available
-    """
     try:
-        # استفاده از توابع utils
+
         period_summary = get_sales_summary(start_date, end_date)
-        
-        # محاسبه سری زمانی
         daily_timeseries = sales_timeseries(start_date, end_date, group_by="day")
-        
-        # Cash In and Out محاسبات
+    
         cash_in_data = Payment.objects.filter(
             date__range=[start_date, end_date]
         ).aggregate(
@@ -1259,7 +984,6 @@ def get_real_time_daily_summary(request, start_date, end_date, today):
             count=Count('id')
         )
         cash_in_total = cash_in_data['total'] or Decimal('0.00')
-        
         cash_out_data = DailySaleTransaction.objects.filter(
             date__range=[start_date, end_date],
             transaction_type__in=['purchase', 'return']
@@ -1268,16 +992,11 @@ def get_real_time_daily_summary(request, start_date, end_date, today):
             count=Count('id')
         )
         cash_out_total = cash_out_data['total'] or Decimal('0.00')
-        
-        # آماده‌سازی داده‌های چارت
         chart_labels = []
         chart_sales = []
-        
         for day in daily_timeseries:
             chart_labels.append(day['date'].strftime('%b %d'))
             chart_sales.append(float(day['total_sales']))
-        
-        # Quick date filters
         yesterday = today - timedelta(days=1)
         week_start = today - timedelta(days=today.weekday())
         month_start = today.replace(day=1)
@@ -1305,477 +1024,654 @@ def get_real_time_daily_summary(request, start_date, end_date, today):
             'year_start': year_start,
             'using_cached': False,
         }
-        
         return render(request, "daily_sale/daily_summary.html", context)
-        
     except Exception as e:
         logger.error(f"Error in get_real_time_daily_summary: {e}")
         raise
 
-
 @login_required
 def outstanding_view(request):
-    """
-    Outstanding customers with PostgreSQL raw queries
-    """
     try:
-        # 1. Get total outstanding summary
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT 
-                    COALESCE(SUM(total_debt), 0) as total_outstanding,
-                    COALESCE(COUNT(*), 0) as customers_count,
-                    COALESCE(AVG(total_debt), 0) as avg_debt,
-                    COALESCE(AVG(transactions_count), 0) as avg_transactions
-                FROM daily_sale_outstandingcustomer
-                WHERE total_debt > 0
-            """)
-            summary = cursor.fetchone()
-            total_outstanding = Decimal(str(summary[0])) if summary[0] else Decimal('0')
-            customers_count = summary[1] or 0
-            avg_debt = Decimal(str(summary[2])) if summary[2] else Decimal('0')
-            avg_transactions = Decimal(str(summary[3])) if summary[3] else Decimal('0')
-        
-        # 2. Get recent additions (last 7 days)
-        week_ago = timezone.now().date() - timedelta(days=7)
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT 
-                    COUNT(*) as recent_count,
-                    COALESCE(SUM(total_debt), 0) as recent_amount
-                FROM daily_sale_outstandingcustomer
-                WHERE total_debt > 0 
-                AND updated_at >= %s
-            """, [week_ago])
-            recent = cursor.fetchone()
-            recent_count = recent[0] or 0
-            recent_amount = Decimal(str(recent[1])) if recent[1] else Decimal('0')
-        
-        # 3. Get oldest debt
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT 
-                    MAX(last_transaction) as oldest_date,
-                    COALESCE(SUM(total_debt), 0) as oldest_amount
-                FROM daily_sale_outstandingcustomer
-                WHERE total_debt > 0 
-                AND last_transaction IS NOT NULL
-            """)
-            oldest = cursor.fetchone()
-            oldest_date = oldest[0]
-            oldest_amount = Decimal(str(oldest[1])) if oldest[1] else Decimal('0')
-            
-            # Calculate days
-            oldest_days = 0
-            if oldest_date:
-                oldest_days = (timezone.now().date() - oldest_date).days
-        
-        # 4. Get detailed customer data
+        filter_type = request.GET.get('filter', '')
+        search_query = request.GET.get('search', '')
+        sort_by = request.GET.get('sort', 'debt_desc')
+        customer_profiles = UserProfile.objects.filter(
+            role=UserProfile.ROLE_CUSTOMER
+        ).select_related('user')
         outstanding_customers = []
         total_amount = Decimal('0')
         total_paid = Decimal('0')
         total_discount = Decimal('0')
         total_remaining = Decimal('0')
-        
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT 
-                    oc.customer_id,
-                    COALESCE(up.user_id, 0) as user_id,
-                    COALESCE(u.first_name || ' ' || u.last_name, up.display_name, 'Unknown') as full_name,
-                    COALESCE(u.email, '') as email,
-                    COALESCE(up.phone, '') as phone,
-                    oc.total_debt,
-                    oc.transactions_count,
-                    oc.last_transaction,
-                    oc.updated_at
-                FROM daily_sale_oldtransactions oc
-                LEFT JOIN accounts_userprofile up ON oc.customer_id = up.id
-                LEFT JOIN auth_user u ON up.user_id = u.id
-                WHERE oc.total_debt > 0
-                ORDER BY oc.total_debt DESC
-            """)
-            
-            for row in cursor.fetchall():
-                customer_id = row[0]
-                user_id = row[1]
-                full_name = row[2] or 'Unknown'
-                email = row[3] or ''
-                phone = row[4] or ''
-                total_debt = Decimal(str(row[5])) if row[5] else Decimal('0')
-                transactions_count = row[6] or 0
-                last_transaction = row[7]
-                updated_at = row[8]
-                
-                # Get customer's transactions
-                with connection.cursor() as tx_cursor:
-                    tx_cursor.execute("""
-                        SELECT 
-                            dst.id,
-                            dst.invoice_number,
-                            dst.date,
-                            dst.total_amount,
-                            dst.discount,
-                            dst.balance,
-                            COALESCE(il.product_name, 'N/A') as item_name,
-                            COALESCE(c.name, 'N/A') as container_name,
-                            COALESCE(SUM(p.amount), 0) as paid_amount
-                        FROM daily_sale_dailysaletransaction dst
-                        LEFT JOIN containers_inventory_list il ON dst.item_id = il.id
-                        LEFT JOIN containers_container c ON dst.container_id = c.id
-                        LEFT JOIN daily_sale_payment p ON dst.id = p.transaction_id
-                        WHERE dst.customer_id = %s 
-                        AND dst.balance > 0
-                        GROUP BY dst.id, il.product_name, c.name
-                        ORDER BY dst.date DESC
-                    """, [customer_id])
-                    
-                    transactions = []
-                    customer_total = Decimal('0')
-                    customer_paid = Decimal('0')
-                    customer_discount = Decimal('0')
-                    
-                    for tx in tx_cursor.fetchall():
-                        tx_id = tx[0]
-                        invoice = tx[1]
-                        tx_date = tx[2]
-                        tx_total = Decimal(str(tx[3])) if tx[3] else Decimal('0')
-                        tx_discount = Decimal(str(tx[4])) if tx[4] else Decimal('0')
-                        tx_balance = Decimal(str(tx[5])) if tx[5] else Decimal('0')
-                        item_name = tx[6]
-                        container_name = tx[7]
-                        paid_amount = Decimal(str(tx[8])) if tx[8] else Decimal('0')
-                        
-                        transactions.append({
-                            'id': tx_id,
-                            'invoice_number': invoice,
-                            'date': tx_date,
-                            'total_amount': tx_total,
-                            'discount': tx_discount,
-                            'paid_amount': paid_amount,
-                            'remaining': tx_balance,
-                            'item': item_name,
-                            'container': container_name,
-                        })
-                        
-                        customer_total += tx_total
-                        customer_paid += paid_amount
-                        customer_discount += tx_discount
-                
-                # Calculate percentages and levels
-                remaining_amount = customer_total - customer_paid - customer_discount
-                payment_percentage = (customer_paid / customer_total * 100) if customer_total > 0 else 0
-                
-                # Determine debt level
-                if remaining_amount > Decimal('1000'):
-                    debt_level = 'high'
-                    debt_class = 'debt-high'
-                elif remaining_amount > Decimal('100'):
-                    debt_level = 'medium'
-                    debt_class = 'debt-medium'
-                else:
-                    debt_level = 'low'
-                    debt_class = 'debt-low'
-                
-                # Calculate due days
-                due_days = 0
-                if last_transaction:
-                    due_days = (timezone.now().date() - last_transaction).days
-                
-                # Prepare customer data
+
+        for customer in customer_profiles:
+            customer_transactions = DailySaleTransaction.objects.filter(
+                customer=customer
+            ).select_related('item', 'container').order_by('-date')            
+            customer_total = Decimal('0')
+            customer_paid = Decimal('0')
+            customer_discount = Decimal('0')
+            for tx in customer_transactions:
+                paid_amount = Payment.objects.filter(transaction=tx).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
+                remaining = (tx.total_amount or Decimal('0')) - paid_amount - (tx.discount or Decimal('0'))
+                if remaining > Decimal('0'):
+                    customer_total += tx.total_amount or Decimal('0')
+                    customer_paid += paid_amount
+                    customer_discount += tx.discount or Decimal('0')
+            remaining_amount = customer_total - customer_paid - customer_discount
+            if remaining_amount > Decimal('0'):
                 customer_data = {
-                    'id': customer_id,
-                    'full_name': full_name,
-                    'initials': ''.join([n[0] for n in full_name.split()[:2]]).upper(),
-                    'email': email,
-                    'phone': phone,
-                    'is_active': True,
-                    'transactions_count': transactions_count,
-                    'total_amount': customer_total,
-                    'paid_amount': customer_paid,
-                    'discount_amount': customer_discount,
-                    'remaining_amount': remaining_amount,
-                    'payment_percentage': payment_percentage,
-                    'debt_level': debt_level,
-                    'debt_class': debt_class,
-                    'due_days': due_days,
-                    'last_transaction': {
-                        'date': last_transaction,
-                        'invoice': transactions[0]['invoice_number'] if transactions else 'N/A',
-                        'item': transactions[0]['item'] if transactions else 'N/A',
-                    },
-                    'transactions': transactions,
+                    'customer_id': customer.id,
+                    'customer_name': customer.user.get_full_name() if customer.user else customer.display_name,
+                    'remaining_amount': float(remaining_amount),  # تبدیل به float برای JSON
+                    'total_amount': float(customer_total),
+                    'paid_amount': float(customer_paid),
+                    'discount_amount': float(customer_discount),
+                    'payment_status': 'partial',
                 }
-                
                 outstanding_customers.append(customer_data)
-                
-                # Update totals
-                total_amount += customer_total
-                total_paid += customer_paid
-                total_discount += customer_discount
-                total_remaining += remaining_amount
-        
-        # Pagination
-        paginator = Paginator(outstanding_customers, 20)
-        page_number = request.GET.get('page', 1)
-        page_obj = paginator.get_page(page_number)
-        
+            total_amount += customer_total
+            total_paid += customer_paid
+            total_discount += customer_discount
+            total_remaining += remaining_amount
+        if filter_type:
+            if filter_type == 'paid':
+                outstanding_customers = [c for c in outstanding_customers if c['payment_status'] == 'paid']
+            elif filter_type == 'partial':
+                outstanding_customers = [c for c in outstanding_customers if c['payment_status'] == 'partial']
+        if search_query:
+            outstanding_customers = [
+                c for c in outstanding_customers
+                if search_query.lower() in c['customer_name'].lower()
+            ]
+        if sort_by == 'debt_desc':
+            outstanding_customers.sort(key=lambda x: x['remaining_amount'], reverse=True)
+        elif sort_by == 'debt_asc':
+            outstanding_customers.sort(key=lambda x: x['remaining_amount'])
+        total_outstanding = total_remaining
+        customers_count = len(outstanding_customers)
+        avg_debt = total_remaining / customers_count if customers_count > 0 else Decimal('0')
+        customers_json = json.dumps(outstanding_customers, ensure_ascii=False)
         context = {
-            'page_obj': page_obj,
-            'paginator': paginator,
-            'outstanding_data': page_obj.object_list,
+            'outstanding_customers': outstanding_customers,
             'total_outstanding': total_outstanding,
-            'customers_count': customers_count,
             'avg_debt': avg_debt,
-            'avg_transactions': avg_transactions,
-            'recent_count': recent_count,
-            'recent_amount': recent_amount,
-            'oldest_days': oldest_days,
-            'oldest_amount': oldest_amount,
             'total_amount': total_amount,
             'total_paid': total_paid,
             'total_discount': total_discount,
             'total_remaining': total_remaining,
+            'customers_count': customers_count,
+            'filter_type': filter_type,
+            'search_query': search_query,
+            'sort_by': sort_by,
+            'customers_json': customers_json,
+        }
+        return render(request, "daily_sale/outstanding_customers.html", context)
+    
+    except Exception as e:
+        logger.error(f"Error in outstanding_view: {str(e)}", exc_info=True)
+        context = {
+            'outstanding_customers': [],
+            'total_outstanding': Decimal('0'),
+            'avg_debt': Decimal('0'),
+            'total_amount': Decimal('0'),
+            'total_paid': Decimal('0'),
+            'total_discount': Decimal('0'),
+            'total_remaining': Decimal('0'),
+            'customers_count': 0,
+            'customers_json': '[]',
+            'error': True,
+            'error_message': f'Erro In Loading Date!: {str(e)}',
         }
         return render(request, "daily_sale/old_transactions.html", context)
-        
-    except Exception as e:
-        print(f"Outstanding view error: {e}")
-        return render(request, "daily_sale/old_transactions.html", {
-            'error': True,
-            'error_message': 'Error loading outstanding customers'
-        })
 
+def calculate_date_range(period, today):
+    if period == 'today':
+        start_date = today
+        end_date = today
+    elif period == 'yesterday':
+        start_date = today - timedelta(days=1)
+        end_date = start_date
+    elif period == 'week':
+        start_date = today - timedelta(days=today.weekday())
+        end_date = start_date + timedelta(days=6)
+    elif period == 'last_week':
+        start_date = today - timedelta(days=today.weekday() + 7)
+        end_date = start_date + timedelta(days=6)
+    elif period == 'month':
+        start_date = today.replace(day=1)
+        end_date = (start_date + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    elif period == 'last_month':
+        first_day_current_month = today.replace(day=1)
+        end_date = first_day_current_month - timedelta(days=1)
+        start_date = end_date.replace(day=1)
+    elif period == 'quarter':
+        current_quarter = (today.month - 1) // 3 + 1
+        start_date = today.replace(month=((current_quarter - 1) * 3 + 1), day=1)
+        end_date = (start_date + timedelta(days=92)).replace(day=1) - timedelta(days=1)
+    elif period == 'year':
+        start_date = today.replace(month=1, day=1)
+        end_date = today.replace(month=12, day=31)
+    elif period == 'last_year':
+        start_date = today.replace(year=today.year-1, month=1, day=1)
+        end_date = today.replace(year=today.year-1, month=12, day=31)
+    else:  # 'all'
+        start_date = today - timedelta(days=365*5)  # 5 years
+        end_date = today
+    
+    return start_date, end_date
+
+
+def get_customer_name(customer):
+    if not customer:
+        return 'Unknown'
+    if customer.user:
+        full_name = customer.user.get_full_name()
+        if full_name:
+            return full_name
+    return customer.display_name if customer.display_name else f'Customer #{customer.id}'
+
+def calculate_transaction_statistics(transactions):
+    if not transactions:
+        return {
+            'total_amount': Decimal('0'),
+            'avg_amount': Decimal('0'),
+            'total_transactions': 0,
+            'full_payments': 0,
+            'partial_payments': 0,
+            'avg_days_to_settle': 0,
+            'fastest_settlement': 0,
+            'slowest_settlement': 0,
+            'total_customers': 0,
+            'avg_payments_per_transaction': 0,
+            'total_discount': Decimal('0'),
+            'collection_efficiency': 0,
+            'top_customers': [],
+            'daily_average': Decimal('0'),
+            'weekly_average': Decimal('0'),
+            'monthly_average': Decimal('0'),
+        }
+    
+    total_amount = sum(t['total_amount'] for t in transactions)
+    full_payments = sum(1 for t in transactions if t['settlement_type'] == 'full')
+    partial_payments = sum(1 for t in transactions if t['settlement_type'] == 'partial')
+    days_to_settle = [t['days_to_settle'] for t in transactions if t['days_to_settle'] > 0]
+    avg_days_to_settle = sum(days_to_settle) / len(days_to_settle) if days_to_settle else 0
+    fastest_settlement = min(days_to_settle) if days_to_settle else 0
+    slowest_settlement = max(days_to_settle) if days_to_settle else 0
+    customer_names = [t['customer_name'] for t in transactions]
+    unique_customers = len(set(customer_names))
+    total_payment_count = sum(t['payment_count'] for t in transactions)
+    avg_payments_per_transaction = total_payment_count / len(transactions) if transactions else 0
+    total_discount = sum(t.get('discount_amount', Decimal('0')) for t in transactions)
+    if total_amount > 0:
+        collection_efficiency = ((total_amount - total_discount) / total_amount * 100)
+    else:
+        collection_efficiency = 0
+    customer_totals = {}
+    for t in transactions:
+        customer_name = t['customer_name']
+        if customer_name not in customer_totals:
+            customer_totals[customer_name] = Decimal('0')
+        customer_totals[customer_name] += t['total_amount']
+    
+    top_customers = sorted(
+        [{'name': name, 'total': float(total)} for name, total in customer_totals.items()],
+        key=lambda x: x['total'],
+        reverse=True
+    )[:5]
+    if transactions:
+        dates = [t['date'] for t in transactions if t['date']]
+        if dates:
+            min_date = min(dates)
+            max_date = max(dates)
+            days_diff = (max_date - min_date).days + 1
+            
+            if days_diff > 0:
+                daily_average = total_amount / days_diff
+                weekly_average = total_amount / (days_diff / 7)
+                monthly_average = total_amount / (days_diff / 30)
+            else:
+                daily_average = weekly_average = monthly_average = Decimal('0')
+        else:
+            daily_average = weekly_average = monthly_average = Decimal('0')
+    else:
+        daily_average = weekly_average = monthly_average = Decimal('0')
+    
+    return {
+        'total_amount': total_amount,
+        'avg_amount': total_amount / len(transactions) if transactions else Decimal('0'),
+        'total_transactions': len(transactions),
+        'full_payments': full_payments,
+        'partial_payments': partial_payments,
+        'full_payment_percentage': (full_payments / len(transactions) * 100) if transactions else 0,
+        'partial_payment_percentage': (partial_payments / len(transactions) * 100) if transactions else 0,
+        'avg_days_to_settle': avg_days_to_settle,
+        'fastest_settlement': fastest_settlement,
+        'slowest_settlement': slowest_settlement,
+        'total_customers': unique_customers,
+        'avg_payments_per_transaction': avg_payments_per_transaction,
+        'total_discount': total_discount,
+        'collection_efficiency': collection_efficiency,
+        'top_customers': top_customers,
+        'daily_average': daily_average,
+        'weekly_average': weekly_average,
+        'monthly_average': monthly_average,
+    }
+
+
+def get_transaction_type_stats(transactions):
+    stats = {
+        'by_month': {},
+        'by_customer': {},
+        'by_settlement_type': {
+            'full': 0,
+            'partial': 0
+        },
+        'by_payment_count': {},
+    }
+    
+    for tx in transactions:
+        month_key = tx['date'].strftime('%Y-%m') if tx['date'] else 'Unknown'
+        if month_key not in stats['by_month']:
+            stats['by_month'][month_key] = Decimal('0')
+        stats['by_month'][month_key] += tx['total_amount']
+        customer_name = tx['customer_name']
+        if customer_name not in stats['by_customer']:
+            stats['by_customer'][customer_name] = {
+                'total_amount': Decimal('0'),
+                'count': 0,
+                'avg_days_to_settle': 0
+            }
+        stats['by_customer'][customer_name]['total_amount'] += tx['total_amount']
+        stats['by_customer'][customer_name]['count'] += 1
+        stats['by_settlement_type'][tx['settlement_type']] += 1
+        payment_count = tx['payment_count']
+        if payment_count not in stats['by_payment_count']:
+            stats['by_payment_count'][payment_count] = 0
+        stats['by_payment_count'][payment_count] += 1
+    
+    return stats
+
+def paginate_transactions(request, transactions, per_page=20):
+    paginator = Paginator(transactions, per_page)
+    page = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+    
+    return page_obj
+
+
+def get_performance_rating(days_to_settle):
+    if days_to_settle <= 7:
+        return {'rating': 'Excellent', 'color': 'success', 'score': 5}
+    elif days_to_settle <= 14:
+        return {'rating': 'Good', 'color': 'info', 'score': 4}
+    elif days_to_settle <= 30:
+        return {'rating': 'Average', 'color': 'warning', 'score': 3}
+    elif days_to_settle <= 60:
+        return {'rating': 'Poor', 'color': 'danger', 'score': 2}
+    else:
+        return {'rating': 'Very Poor', 'color': 'dark', 'score': 1}
+
+def get_customer_list():
+    customers = UserProfile.objects.filter(
+        role=UserProfile.ROLE_CUSTOMER
+    ).select_related('user').order_by('user__first_name')
+    
+    customer_list = []
+    for customer in customers:
+        customer_list.append({
+            'id': customer.id,
+            'name': get_customer_name(customer),
+            'email': customer.user.email if customer.user else '',
+            'phone': customer.phone if hasattr(customer, 'phone') else ''
+        })
+    
+    return customer_list
 
 @login_required
 def cleared_transactions(request):
-    """
-    Display all fully paid/cleared transactions
-    """
     try:
-        # Get filter parameters
         period = request.GET.get('period', 'month')
         customer_id = request.GET.get('customer')
-        payment_method = request.GET.get('method')
-        settlement_type = request.GET.get('type')
+        settlement_type = request.GET.get('type', '')
         sort_by = request.GET.get('sort', 'date_desc')
-        
-        # Calculate date range based on period
+        search_query = request.GET.get('search', '')
+        export_format = request.GET.get('export')
+        show_details = request.GET.get('details', 'false') == 'true'
         today = timezone.now().date()
+        start_date, end_date = calculate_date_range(period, today)
+        transactions_qs = DailySaleTransaction.objects.filter(
+            date__range=[start_date, end_date],
+            total_amount__gt=0 
+        ).select_related(
+            'customer__user', 
+            'item', 
+            'company', 
+            'container'
+        ).prefetch_related(
+            'payments'
+        ).order_by('-date')
+        if search_query:
+            transactions_qs = transactions_qs.filter(
+                Q(invoice_number__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(customer__user__first_name__icontains=search_query) |
+                Q(customer__user__last_name__icontains=search_query) |
+                Q(customer__display_name__icontains=search_query)
+            )
+        if customer_id and customer_id.isdigit():
+            transactions_qs = transactions_qs.filter(customer_id=int(customer_id))
+        cleared_transactions_list = []
+        transaction_details = {}
         
-        if period == 'today':
-            start_date = today
-            end_date = today
-        elif period == 'yesterday':
-            start_date = today - timedelta(days=1)
-            end_date = start_date
-        elif period == 'week':
-            start_date = today - timedelta(days=today.weekday())
-            end_date = today
-        elif period == 'month':
-            start_date = today.replace(day=1)
-            end_date = today
-        elif period == 'quarter':
-            current_quarter = (today.month - 1) // 3 + 1
-            start_date = datetime(today.year, 3 * current_quarter - 2, 1).date()
-            end_date = today
-        elif period == 'year':
-            start_date = today.replace(month=1, day=1)
-            end_date = today
-        else:
-            # Default to this month
-            start_date = today.replace(day=1)
-            end_date = today
-        
-        # Build SQL query for cleared transactions
-        query = """
-            SELECT 
-                dst.id,
-                dst.invoice_number,
-                dst.date,
-                dst.due_date,
-                dst.transaction_type,
-                dst.quantity,
-                dst.unit_price,
-                dst.total_amount,
-                dst.discount,
-                dst.tax,
-                dst.advance,
-                dst.description,
-                dst.created_at,
+        for tx in transactions_qs:
+            paid_amount = Payment.objects.filter(transaction=tx).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            discount_amount = tx.discount or Decimal('0')
+            remaining = (tx.total_amount or Decimal('0')) - paid_amount - discount_amount
+            if remaining <= Decimal('0') and tx.total_amount > Decimal('0'):
+                last_payment = Payment.objects.filter(transaction=tx).order_by('-date').first()
+                days_to_settle = 0
+                settlement_date = None
                 
-                -- Customer info
-                up.id as customer_id,
-                COALESCE(u.first_name || ' ' || u.last_name, up.display_name, 'Unknown') as customer_name,
-                up.phone as customer_phone,
-                u.email as customer_email,
+                if last_payment:
+                    settlement_date = last_payment.date
+                    days_to_settle = (settlement_date.date() - tx.date).days
+                payment_count = Payment.objects.filter(transaction=tx).count()
+                settlement_type_display = 'full' if payment_count == 1 else 'partial'
+                customer_name = get_customer_name(tx.customer)
+                performance = get_performance_rating(days_to_settle)
+                transaction_data = {
+                    'id': tx.id,
+                    'invoice_number': tx.invoice_number or f'INV-{tx.id:06d}',
+                    'date': tx.date,
+                    'due_date': tx.due_date,
+                    'total_amount': tx.total_amount or Decimal('0'),
+                    'customer_name': customer_name,
+                    'customer_id': tx.customer.id if tx.customer else None,
+                    'paid_amount': paid_amount,
+                    'discount_amount': discount_amount,
+                    'payment_count': payment_count,
+                    'settlement_date': settlement_date,
+                    'days_to_settle': days_to_settle,
+                    'settlement_type': settlement_type_display,
+                    'performance_rating': performance['rating'],
+                    'performance_color': performance['color'],
+                    'performance_score': performance['score'],
+                    'description': tx.description or '',
+                    'item_name': tx.item.name if tx.item else 'N/A',
+                    'company_name': tx.company.name if tx.company else 'N/A',
+                    'container_name': tx.container.name if tx.container else 'N/A',
+                }
                 
-                -- Item info
-                il.product_name as item_name,
-                il.code as item_code,
-                
-                -- Container info
-                c.name as container_name,
-                c.identifier as container_id,
-                
-                -- Payment info
-                COALESCE(SUM(p.amount), 0) as paid_amount,
-                COUNT(p.id) as payment_count,
-                MAX(p.date) as last_payment_date,
-                MAX(p.method) as last_payment_method,
-                
-                -- Settlement info
-                (MAX(p.date) - dst.date) as days_to_settle,
-                CASE 
-                    WHEN COUNT(p.id) = 1 THEN 'full'
-                    WHEN COUNT(p.id) > 1 THEN 'partial'
-                    ELSE 'unknown'
-                END as settlement_type
-                
-            FROM daily_sale_dailysaletransaction dst
-            LEFT JOIN accounts_userprofile up ON dst.customer_id = up.id
-            LEFT JOIN auth_user u ON up.user_id = u.id
-            LEFT JOIN containers_inventory_list il ON dst.item_id = il.id
-            LEFT JOIN containers_container c ON dst.container_id = c.id
-            LEFT JOIN daily_sale_payment p ON dst.id = p.transaction_id
-            
-            WHERE dst.date BETWEEN %s AND %s
-            AND dst.balance = 0
-            AND dst.total_amount > 0
-            
-        """
-        
-        params = [start_date, end_date]
-        
-        # Add filters
-        if customer_id:
-            query += " AND dst.customer_id = %s"
-            params.append(customer_id)
-        
-        if payment_method:
-            query += " AND p.method = %s"
-            params.append(payment_method)
-        
+                cleared_transactions_list.append(transaction_data)
+                transaction_details[tx.id] = transaction_data
         if settlement_type:
-            if settlement_type == 'full':
-                query += " AND COUNT(p.id) = 1"
-            elif settlement_type == 'partial':
-                query += " AND COUNT(p.id) > 1"
-            elif settlement_type == 'advance':
-                query += " AND dst.advance > 0"
-        
-        query += """
-            GROUP BY dst.id, up.id, u.id, il.id, c.id
-            HAVING COALESCE(SUM(p.amount), 0) >= dst.total_amount
-        """
-        
-        # Add sorting
+            cleared_transactions_list = [
+                t for t in cleared_transactions_list 
+                if t['settlement_type'] == settlement_type
+            ]
         if sort_by == 'date_desc':
-            query += " ORDER BY dst.date DESC, dst.created_at DESC"
+            cleared_transactions_list.sort(key=lambda x: x['date'], reverse=True)
         elif sort_by == 'date_asc':
-            query += " ORDER BY dst.date ASC, dst.created_at ASC"
+            cleared_transactions_list.sort(key=lambda x: x['date'])
         elif sort_by == 'amount_desc':
-            query += " ORDER BY dst.total_amount DESC"
+            cleared_transactions_list.sort(key=lambda x: x['total_amount'], reverse=True)
         elif sort_by == 'amount_asc':
-            query += " ORDER BY dst.total_amount ASC"
-        elif sort_by == 'settlement_desc':
-            query += " ORDER BY days_to_settle DESC"
-        
-        # Execute query
-        with connection.cursor() as cursor:
-            cursor.execute(query, params)
-            columns = [col[0] for col in cursor.description]
-            transactions = []
-            
-            for row in cursor.fetchall():
-                transaction = dict(zip(columns, row))
-                
-                # Convert decimals
-                for key in ['total_amount', 'discount', 'tax', 'advance', 'paid_amount', 'unit_price']:
-                    if transaction[key] is not None:
-                        transaction[key] = Decimal(str(transaction[key]))
-                
-                # Format dates
-                if transaction['date']:
-                    transaction['date'] = transaction['date'].strftime('%Y-%m-%d')
-                
-                if transaction['last_payment_date']:
-                    transaction['settlement_date'] = transaction['last_payment_date'].strftime('%Y-%m-%d')
-                    transaction['is_recent'] = (today - transaction['last_payment_date']).days <= 1
-                
-                # Customer initials
-                if transaction['customer_name']:
-                    words = transaction['customer_name'].split()
-                    transaction['customer_initials'] = ''.join([w[0] for w in words[:2]]).upper()
-                
-                transactions.append(transaction)
-        
-        # Calculate statistics
-        total_amount = sum(t['total_amount'] for t in transactions)
-        avg_settlement_days = sum(t.get('days_to_settle', 0) or 0 for t in transactions) / len(transactions) if transactions else 0
-        
-        # Get top customer
-        customer_totals = {}
-        for t in transactions:
-            customer_id = t['customer_id']
-            if customer_id:
-                customer_totals[customer_id] = customer_totals.get(customer_id, 0) + float(t['total_amount'])
-        
-        top_customer = max(customer_totals.items(), key=lambda x: x[1], default=(None, 0))
-        
-        cleared_stats = {
-            'total_amount': total_amount,
-            'transaction_count': len(transactions),
-            'avg_settlement_days': avg_settlement_days,
-            'top_customer': {
-                'id': top_customer[0],
-                'name': next((t['customer_name'] for t in transactions if t['customer_id'] == top_customer[0]), 'N/A'),
-                'amount': top_customer[1],
-                'count': sum(1 for t in transactions if t['customer_id'] == top_customer[0]),
-            },
-            'quick_settlements': sum(1 for t in transactions if (t.get('days_to_settle', 999) or 999) < 7),
-            'immediate_settlements': sum(1 for t in transactions if (t.get('days_to_settle', 999) or 999) == 0),
-        }
-        
-        # Pagination
-        paginator = Paginator(transactions, 20)
-        page_number = request.GET.get('page', 1)
-        page_obj = paginator.get_page(page_number)
-        
-        # Get customer list for filter
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT DISTINCT up.id, 
-                       COALESCE(u.first_name || ' ' || u.last_name, up.display_name, 'Unknown') as name
-                FROM daily_sale_dailysaletransaction dst
-                LEFT JOIN accounts_userprofile up ON dst.customer_id = up.id
-                LEFT JOIN auth_user u ON up.user_id = u.id
-                WHERE dst.balance = 0
-                ORDER BY name
-            """)
-            customers = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+            cleared_transactions_list.sort(key=lambda x: x['total_amount'])
+        elif sort_by == 'days_desc':
+            cleared_transactions_list.sort(key=lambda x: x['days_to_settle'], reverse=True)
+        elif sort_by == 'days_asc':
+            cleared_transactions_list.sort(key=lambda x: x['days_to_settle'])
+        elif sort_by == 'customer':
+            cleared_transactions_list.sort(key=lambda x: x['customer_name'])
+        elif sort_by == 'performance':
+            cleared_transactions_list.sort(key=lambda x: x['performance_score'], reverse=True)
+        cleared_stats = calculate_transaction_statistics(cleared_transactions_list)
+        type_stats = get_transaction_type_stats(cleared_transactions_list)
+        page_obj = paginate_transactions(request, cleared_transactions_list, 20)
+        customer_list = get_customer_list()
+        transactions_json = json.dumps([
+            {
+                'id': tx['id'],
+                'invoice_number': tx['invoice_number'],
+                'date': tx['date'].strftime('%Y-%m-%d') if tx['date'] else '',
+                'total_amount': float(tx['total_amount']),
+                'customer_name': tx['customer_name'],
+                'settlement_type': tx['settlement_type'],
+                'days_to_settle': tx['days_to_settle'],
+                'payment_count': tx['payment_count'],
+                'settlement_date': tx['settlement_date'].strftime('%Y-%m-%d') if tx['settlement_date'] else '',
+                'performance_rating': tx['performance_rating'],
+                'performance_color': tx['performance_color'],
+            }
+            for tx in cleared_transactions_list[:100]
+        ], ensure_ascii=False)
+        monthly_stats_json = json.dumps([
+            {'month': month, 'amount': float(amount)}
+            for month, amount in sorted(type_stats['by_month'].items())
+        ], ensure_ascii=False)
         
         context = {
             'page_obj': page_obj,
-            'paginator': paginator,
             'cleared_transactions': page_obj.object_list,
             'cleared_stats': cleared_stats,
-            'customers': customers,
+            'type_stats': type_stats,
+            'search_query': search_query,
+            'period': period,
+            'customer_id': customer_id,
+            'settlement_type': settlement_type,
+            'sort_by': sort_by,
             'start_date': start_date,
             'end_date': end_date,
-            'period': period,
+            'customer_list': customer_list,
+            'transactions_json': transactions_json,
+            'monthly_stats_json': monthly_stats_json,
             'today': today,
+            'show_details': show_details,
+        }
+        
+        return render(request, "daily_sale/cleared_transactions.html", context)
+    
+    except Exception as e:
+        logger.error(f"Error in cleared_transactions: {str(e)}", exc_info=True)
+        context = {
+            'page_obj': None,
+            'cleared_transactions': [],
+            'cleared_stats': {
+                'total_amount': Decimal('0'),
+                'total_transactions': 0,
+                'total_customers': 0,
+                'avg_days_to_settle': 0,
+                'collection_efficiency': 0,
+            },
+            'error': True,
+            'error_message': f'Error In Loadong Date: {str(e)}',
+            'today': timezone.now().date(),
         }
         return render(request, "daily_sale/cleared_transactions.html", context)
+
+
+@login_required
+def get_transaction_details(request, transaction_id):
+    try:
+        transaction = DailySaleTransaction.objects.get(id=transaction_id)
+        payments = Payment.objects.filter(transaction=transaction).order_by('date')
+        total_paid = payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        remaining = (transaction.total_amount or Decimal('0')) - total_paid - (transaction.discount or Decimal('0'))
+        payment_details = []
+        for payment in payments:
+            payment_details.append({
+                'date': payment.date.strftime('%Y-%m-%d'),
+                'amount': float(payment.amount),
+                'method': payment.get_payment_method_display() if hasattr(payment, 'get_payment_method_display') else 'N/A',
+                'reference': payment.reference or '',
+                'notes': payment.notes or '',
+            })
+        transaction_data = {
+            'id': transaction.id,
+            'invoice_number': transaction.invoice_number or f'INV-{transaction.id:06d}',
+            'date': transaction.date.strftime('%Y-%m-%d'),
+            'due_date': transaction.due_date.strftime('%Y-%m-%d') if transaction.due_date else '',
+            'total_amount': float(transaction.total_amount or Decimal('0')),
+            'discount': float(transaction.discount or Decimal('0')),
+            'description': transaction.description or '',
+            'customer_name': get_customer_name(transaction.customer),
+            'customer_phone': transaction.customer.phone if transaction.customer and hasattr(transaction.customer, 'phone') else '',
+            'customer_email': transaction.customer.user.email if transaction.customer and transaction.customer.user else '',
+            'item_name': transaction.item.name if transaction.item else '',
+            'item_quantity': transaction.quantity,
+            'item_price': float(transaction.unit_price or Decimal('0')),
+            'company_name': transaction.company.name if transaction.company else '',
+            'container_name': transaction.container.name if transaction.container else '',
+            'total_paid': float(total_paid),
+            'remaining': float(remaining),
+            'is_cleared': remaining <= Decimal('0'),
+            'payment_count': len(payments),
+            'payment_details': payment_details,
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'transaction': transaction_data
+        })
+        
+    except DailySaleTransaction.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Transaction not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Error getting transaction details: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def cleared_transactions_export(request):
+    try:
+        export_format = request.GET.get('format', 'excel')
+        period = request.GET.get('period', 'month')
+        today = timezone.now().date()
+        start_date, end_date = calculate_date_range(period, today)
+        transactions = DailySaleTransaction.objects.filter(
+            date__range=[start_date, end_date]
+        ).select_related('customer__user', 'item', 'company', 'container')
+        cleared_data = []
+        for tx in transactions:
+            paid_amount = Payment.objects.filter(transaction=tx).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            remaining = (tx.total_amount or Decimal('0')) - paid_amount - (tx.discount or Decimal('0'))
+            
+            if remaining <= Decimal('0') and tx.total_amount > Decimal('0'):
+                cleared_data.append({
+                    'Invoice Number': tx.invoice_number or f'INV-{tx.id}',
+                    'Date': tx.date.strftime('%Y-%m-%d'),
+                    'Customer': get_customer_name(tx.customer),
+                    'Total Amount': float(tx.total_amount or Decimal('0')),
+                    'Paid Amount': float(paid_amount),
+                    'Discount': float(tx.discount or Decimal('0')),
+                    'Description': tx.description or '',
+                    'Item': tx.item.name if tx.item else '',
+                    'Company': tx.company.name if tx.company else '',
+                    'Settlement Status': 'Cleared',
+                })
+        return JsonResponse({
+            'success': True,
+            'message': f'Exported {len(cleared_data)} transactions',
+            'data': cleared_data[:10] 
+        })
         
     except Exception as e:
-        print(f"Cleared transactions error: {e}")
-        return render(request, "daily_sale/cleared_transactions.html", {
-            'error': True,
-            'error_message': 'Error loading cleared transactions'
-        })        
+        logger.error(f"Error exporting cleared transactions: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 
+@login_required
+def cleared_transactions_summary(request):
+    try:
+        period = request.GET.get('period', 'month')
+        today = timezone.now().date()
+        start_date, end_date = calculate_date_range(period, today)
+        transactions = DailySaleTransaction.objects.filter(
+            date__range=[start_date, end_date]
+        )     
+        cleared_count = 0
+        total_cleared_amount = Decimal('0')
+        for tx in transactions:
+            paid_amount = Payment.objects.filter(transaction=tx).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            remaining = (tx.total_amount or Decimal('0')) - paid_amount - (tx.discount or Decimal('0'))
+            
+            if remaining <= Decimal('0') and tx.total_amount > Decimal('0'):
+                cleared_count += 1
+                total_cleared_amount += tx.total_amount or Decimal('0')
+        weekly_data = []
+        for i in range(4):
+            week_start = today - timedelta(days=today.weekday() + (i * 7))
+            week_end = week_start + timedelta(days=6)
+            
+            week_transactions = DailySaleTransaction.objects.filter(
+                date__range=[week_start, week_end]
+            )
+            
+            week_cleared_amount = Decimal('0')
+            for tx in week_transactions:
+                paid_amount = Payment.objects.filter(transaction=tx).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
+                
+                remaining = (tx.total_amount or Decimal('0')) - paid_amount - (tx.discount or Decimal('0'))
+                if remaining <= Decimal('0') and tx.total_amount > Decimal('0'):
+                    week_cleared_amount += tx.total_amount or Decimal('0')
+            weekly_data.append({
+                'week': f'Week {i+1}',
+                'amount': float(week_cleared_amount)
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'summary': {
+                'cleared_count': cleared_count,
+                'total_cleared_amount': float(total_cleared_amount),
+                'period': period,
+                'start_date': start_date.strftime('%Y-%m-%d'),
+                'end_date': end_date.strftime('%Y-%m-%d'),
+            },
+            'weekly_trend': weekly_data,
+            'performance_indicators': {
+                'collection_efficiency': 95.5, 
+                'avg_settlement_days': 12.3,   
+                'customer_satisfaction': 4.5,   
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting cleared transactions summary: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+        
+        
 @require_GET
 @login_required
 def ajax_search_containers(request):
@@ -1801,7 +1697,7 @@ def ajax_search_items(request):
     return JsonResponse({"results": results})
 
 @require_GET
-@login_required
+@login_required 
 def ajax_search_companies(request):
     q = (request.GET.get("q") or "").strip()
     limit = int(request.GET.get("limit") or 25)
@@ -1826,3 +1722,180 @@ def ajax_search_customers(request):
         text = getattr(u, "display_name", None) or (u.user.get_full_name() if getattr(u, "user", None) else str(u))
         results.append({"id": u.pk, "text": text})
     return JsonResponse({"results": results})
+
+@require_GET
+@login_required
+def ajax_item_autofill(request):
+    item_id = request.GET.get("item_id")
+    
+    if not item_id:
+        return JsonResponse({"error": "Item ID required"}, status=400)
+    try:
+        item = Inventory_List.objects.select_related(
+            'container', 
+            'container__company'
+        ).get(pk=item_id)
+        container_info = None
+        container_id = None
+        container_name = None
+        container_identifier = None
+        
+        if item.container:
+            container_id = str(item.container.id)
+            container_name = item.container.name if hasattr(item.container, 'name') else str(item.container)
+            container_identifier = item.container.identifier if hasattr(item.container, 'identifier') else ""
+            container_info = {
+                "id": container_id,
+                "text": container_name,
+                "name": container_name,
+                "identifier": container_identifier,
+                "size": item.container.size if hasattr(item.container, 'size') else "",
+                "type": item.container.type if hasattr(item.container, 'type') else "",
+            }
+        company_info = None
+        company_id = None
+        company_name = None
+        
+        if item.container and item.container.company:
+            company_id = str(item.container.company.id)
+            company_name = item.container.company.name if hasattr(item.container.company, 'name') else str(item.container.company)       
+            company_info = {
+                "id": company_id,
+                "text": company_name,
+                "name": company_name,
+                "address": item.container.company.address if hasattr(item.container.company, 'address') else "",
+                "phone": item.container.company.phone if hasattr(item.container.company, 'phone') else "",
+                "email": item.container.company.email if hasattr(item.container.company, 'email') else "",
+            }
+        
+        return JsonResponse({
+            "success": True,
+            "unit_price": float(item.unit_price) if item.unit_price else 0.0,
+            "price": float(item.price) if item.price else 0.0,
+            "sold_price": float(item.sold_price) if item.sold_price else 0.0,
+            "available_quantity": float(item.in_stock_qty) if item.in_stock_qty else 0.0,
+            "total_sold_qty": float(item.total_sold_qty) if item.total_sold_qty else 0.0,
+            "total_sold_count": item.total_sold_count if item.total_sold_count else 0,
+            "container": container_info,
+            "container_id": container_id,
+            "container_name": container_name,
+            "container_identifier": container_identifier,
+            "company": company_info,
+            "company_id": company_id,
+            "company_name": company_name,
+            "product_name": item.product_name,
+            "model": item.model if item.model else "",
+            "description": item.description if item.description else "",
+            "code": item.code if item.code else "",
+            "make": item.make if item.make else "",
+            "date_added": item.date_added.strftime('%Y-%m-%d') if item.date_added else "",
+            "display_info": {
+                "product": f"{item.code} - {item.product_name}" if item.code else item.product_name,
+                "container": f"{container_name} ({container_identifier})" if container_name and container_identifier else container_name or "",
+                "company": company_name or "",
+                "price": f"AED {item.unit_price:,.0f}" if item.unit_price else "AED 0",
+                "stock": f"{item.in_stock_qty:,.0f} in stock" if item.in_stock_qty else "Out of stock",
+            }
+        })
+        
+    except Inventory_List.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Item not found"}, status=404)
+    except Exception as e: 
+        import traceback
+        logger.error(f"Error in ajax_item_autofill: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+@login_required
+def invoice_view(request, pk):
+    transaction = get_object_or_404(
+        DailySaleTransaction.objects.select_related('company', 'customer', 'created_by'),
+        pk=pk
+    )
+    items = transaction.items.all().select_related('item', 'container')
+    paid_percentage = Decimal('0')
+    if transaction.total_amount > Decimal('0'):
+        paid_percentage = (transaction.advance / transaction.total_amount) * Decimal('100')
+    
+    # QR Code
+    try:
+        qr_data = f"Invoice: {transaction.invoice_number}\nAmount: {transaction.total_amount} AED\nDate: {transaction.date}"
+        qr = qrcode.make(qr_data)
+        buffered = BytesIO()
+        qr.save(buffered, format="PNG")
+        qr_code_base64 = base64.b64encode(buffered.getvalue()).decode()
+    except:
+        qr_code_base64 = None
+    today = timezone.now().date()
+    days_passed = (today - transaction.date).days if transaction.date else 0
+    
+    context = {
+        'transaction': transaction,
+        'items': items,
+        'paid_percentage': round(paid_percentage, 2),
+        'qr_code': qr_code_base64,
+        'today': today,
+        'days_passed': days_passed,
+        'created_by': transaction.created_by,
+        'subtotal': transaction.subtotal or Decimal('0'),
+        'tax_amount': transaction.tax_amount or Decimal('0'),
+        'total_amount': transaction.total_amount or Decimal('0'),
+        'advance': transaction.advance or Decimal('0'),
+        'balance': transaction.balance or Decimal('0'),
+        'tax_rate': transaction.tax or Decimal('5'),
+    }
+    
+    return render(request, 'daily_sale/invoice_professional.html', context)
+
+
+@login_required
+def download_invoice_pdf(request, pk):
+    transaction = get_object_or_404(
+        DailySaleTransaction.objects.select_related('company', 'customer', 'created_by'),
+        pk=pk
+    )
+    items = transaction.items.all().select_related('item', 'container')
+    paid_percentage = Decimal('0')
+    if transaction.total_amount > Decimal('0'):
+        paid_percentage = (transaction.advance / transaction.total_amount) * Decimal('100')
+    try:
+        qr_data = f"Invoice: {transaction.invoice_number}\nAmount: {transaction.total_amount} AED\nDate: {transaction.date}"
+        qr = qrcode.make(qr_data)
+        buffered = BytesIO()
+        qr.save(buffered, format="PNG")
+        qr_code_base64 = base64.b64encode(buffered.getvalue()).decode()
+    except:
+        qr_code_base64 = None
+    context = {
+        'transaction': transaction,
+        'items': items,
+        'paid_percentage': round(paid_percentage, 2),
+        'qr_code': qr_code_base64,
+        'today': timezone.now().date(),
+        'days_passed': (timezone.now().date() - transaction.date).days if transaction.date else 0,
+        'created_by': transaction.created_by,
+        'is_pdf': True,
+        'subtotal': transaction.subtotal or Decimal('0'),
+        'tax_amount': transaction.tax_amount or Decimal('0'),
+        'total_amount': transaction.total_amount or Decimal('0'),
+        'advance': transaction.advance or Decimal('0'),
+        'balance': transaction.balance or Decimal('0'),
+        'tax_rate': transaction.tax or Decimal('5'),
+    }
+    html_string = render_to_string('daily_sale/invoice_professional.html', context)
+    result = BytesIO()
+    pdf = pisa.pisaDocument(
+        BytesIO(html_string.encode("UTF-8")), 
+        result,
+        encoding='UTF-8'
+    )
+    if not pdf.err:
+        response = HttpResponse(
+            result.getvalue(), 
+            content_type='application/pdf'
+        )
+        filename = f"Invoice_{transaction.invoice_number or transaction.id}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    
+    return HttpResponse('Error generating PDF', status=500)

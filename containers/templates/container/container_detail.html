@@ -7,7 +7,6 @@
 <div class="container-detail">
     <div class="container">
         <div class="content-wrapper">
-            <!-- Header Section -->
             <div class="page-header">
                 <h1>{{ container.container_number }}</h1>
                 <p class="description">{{ container.name }}</p>
@@ -16,7 +15,6 @@
                 {% endif %}
             </div>
 
-            <!-- Information Section -->
             <div class="info-section">
                 <div class="row">
                     <div class="col-lg-8 mb-4">
@@ -60,7 +58,6 @@
 
             <div class="divider"></div>
 
-            <!-- Products Section -->
             <div class="products-section">
                 <h4 class="section-title">Products in this Container</h4>
 
@@ -101,8 +98,7 @@
                             {% empty %}
                             <tr>
                                 <td colspan="6">
-                                    <div class="empty-state">
-                                        <i>📦</i>
+                                    <div class="empty-state"> 
                                         <p>No products found in this container</p>
                                     </div>
                                 </td>

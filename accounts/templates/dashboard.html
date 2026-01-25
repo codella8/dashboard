@@ -4,21 +4,16 @@
 
 {% block content %}
 <div class="dashboard-layout">
-    <!-- Navigation Sidebar - Fixed to Left -->
     <nav class="sidebar">
         <div class="sidebar-inner">
-            <!-- Logo -->
             <div class="sidebar-logo">
-                <div class="logo-icon">🚀</div>
                 <div class="logo-text">
-                    <h2>COMPANYNAME</h2>
+                    <h2>ALMUQBIL</h2>
                 </div>
             </div>
-
-            <!-- Navigation Menu -->
             <div class="sidebar-menu">
                 <div class="menu-section">
-                    <h3 class="section-title">MAIN</h3>
+                    <h3 class="section-title">APPS</h3>
                     <ul class="menu-list">
                         <li class="menu-item">
                             <a href="{% url 'daily_sale:transaction_list' %}" class="menu-link" data-app="sales">
@@ -32,22 +27,16 @@
                                 <span class="menu-label">Containers</span>
                             </a>
                         </li>
-                    </ul>
-                </div>
-
-                <div class="menu-section">
-                    <h3 class="section-title">BUSINESS</h3>
-                    <ul class="menu-list">
+                        <li class="menu-item">
+                            <a href="{% url 'employee:employee_list' %}" class="menu-link" data-app="employees">
+                                <i class="menu-icon fas fa-users"></i>
+                                <span class="menu-label">Employees</span>
+                            </a>
+                        </li>
                         <li class="menu-item">
                             <a href="{% url 'expenses:expense_dashboard' %}" class="menu-link" data-app="expenses">
                                 <i class="menu-icon fas fa-money-bill-wave"></i>
                                 <span class="menu-label">Expenses</span>
-                            </a>
-                        </li>
-                        <li class="menu-item">
-                            <a href="{% url 'employee:dashboard' %}" class="menu-link" data-app="employees">
-                                <i class="menu-icon fas fa-users"></i>
-                                <span class="menu-label">Employees</span>
                             </a>
                         </li>
                         <a href="#" class="menu-link" data-app="reports">
@@ -55,25 +44,22 @@
                             <span class="menu-label">Reports</span>
                         </a>
                     </ul>
-                </div>
 
+                </div>
             </div>
         </div>
     </nav>
-
-    <!-- Main Content - Takes Full Desktop Width -->
     <main class="main-content">
-        <!-- Stats Overview -->
         <div class="stats-overview">
             <div class="stat-card">
                 <div class="stat-icon">
                     <i class="fas fa-dollar-sign"></i>
                 </div>
                 <div class="stat-content">
-                    <h3>$12.8M</h3>
+                    <h3>1</h3>
                     <p>Quarterly Revenue</p>
                     <span class="stat-trend positive">
-                        <i class="fas fa-arrow-up"></i> 12.4%
+                        <i class="fas fa-arrow-up"></i> 2%
                     </span>
                 </div>
             </div>
@@ -82,10 +68,10 @@
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-content">
-                    <h3>247</h3>
+                    <h3>2</h3>
                     <p>Active Clients</p>
                     <span class="stat-trend positive">
-                        <i class="fas fa-arrow-up"></i> 8.2%
+                        <i class="fas fa-arrow-up"></i> 4%
                     </span>
                 </div>
             </div>
@@ -94,10 +80,10 @@
                     <i class="fas fa-chart-line"></i>
                 </div>
                 <div class="stat-content">
-                    <h3>98.3%</h3>
+                    <h3>9%</h3>
                     <p>Performance</p>
                     <span class="stat-trend negative">
-                        <i class="fas fa-arrow-down"></i> 2.1%
+                        <i class="fas fa-arrow-down"></i> 6%
                     </span>
                 </div>
             </div>
@@ -106,18 +92,14 @@
                     <i class="fas fa-shopping-cart"></i>
                 </div>
                 <div class="stat-content">
-                    <h3>87</h3>
+                    <h3>8</h3>
                     <p>Today's Sales</p>
                     <span class="stat-trend positive">
-                        <i class="fas fa-arrow-up"></i> 24.5%
+                        <i class="fas fa-arrow-up"></i> 4%
                     </span>
                 </div>
             </div>
         </div>
-
-
-
-        <!-- Quick Actions -->
         <div class="quick-actions-section">
             <div class="section-header">
                 <h2>Quick Access</h2>
@@ -153,7 +135,7 @@
                     </div>
                     <i class="action-arrow fas fa-arrow-right"></i>
                 </a>
-                <a href="{% url 'employee:dashboard' %}" class="action-card">
+                <a href="{% url 'employee:employee_list' %}" class="action-card">
                     <div class="action-icon">
                         <i class="fas fa-users"></i>
                     </div>
@@ -162,7 +144,7 @@
                         <p>HR and employee management</p>
                     </div>
                     <i class="action-arrow fas fa-arrow-right"></i>
-                </a>
+                </a> 
             </div>
         </div>
     </main>
@@ -170,17 +152,12 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Navigation functionality
         const menuLinks = document.querySelectorAll('.menu-link');
         const sidebar = document.querySelector('.sidebar');
 
-        // Set active menu item
         menuLinks.forEach(link => {
             link.addEventListener('click', function (e) {
-                // Remove active class from all links
                 menuLinks.forEach(l => l.classList.remove('active'));
-
-                // Add active class to clicked link
                 this.classList.add('active');
 
                 // Update page title based on app
@@ -244,20 +221,6 @@
                 }
             });
         }
-
-
-        // View all link
-        const viewAllLink = document.querySelector('.view-all-link');
-        if (viewAllLink) {
-            viewAllLink.addEventListener('click', function (e) {
-                e.preventDefault();
-                const carsLink = document.querySelector('.menu-link[data-app="cars"]');
-                if (carsLink) {
-                    carsLink.click();
-                }
-            });
-        }
-
         // Animate elements on scroll
         const observerOptions = {
             threshold: 0.1,
@@ -299,30 +262,7 @@
             animation: slideIn 0.8s ease;
         }
     `;
-        document.head.appendChild(style);
-
-        // Mobile menu toggle
-        const mobileMenuBtn = document.createElement('button');
-        mobileMenuBtn.className = 'mobile-menu-btn';
-        mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
-        mobileMenuBtn.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 1001;
-        width: 48px;
-        height: 48px;
-        background: var(--accent);
-        color: white;
-        border: none;
-        border-radius: 12px;
-        font-size: 20px;
-        cursor: pointer;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        box-shadow: var(--shadow-lg);
-    `;
+        
 
         document.body.appendChild(mobileMenuBtn);
 

@@ -4,11 +4,8 @@ from . import views
 app_name = 'employee'
 
 urlpatterns = [
-    path('', views.employee_dashboard, name='dashboard'),
-    path('employees/', views.employee_list, name='employee_list'),
-    path('employees/<uuid:employee_id>/', views.employee_detail, name='employee_detail'),
-    path('payroll/', views.payroll_report, name='payroll_report'),
-    path('expenses/', views.expense_report, name='expense_report'),
-    path('financial-status/', views.financial_status, name='financial_status'),
-    path('department-analysis/', views.department_analysis, name='department_analysis'),
+    path('list/', views.employee_list, name='employee_list'),
+    path('salary-payment/', views.process_salary_payment, name='salary_payment'),
+    path('report/payroll/', views.payroll_report, name='payroll_report'),
+    path('<uuid:employee_id>/', views.employee_detail, name='employee_detail'),
 ]

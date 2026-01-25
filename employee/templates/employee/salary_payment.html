@@ -1,0 +1,234 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Process Salary Payments{% endblock %}
+
+{% block content %}
+<div class="payment-container">
+    <!-- هدر -->
+    <div class="page-header">
+        <h1>
+            <i class="fas fa-money-bill-wave"></i>
+            Process Salary Payment
+        </h1>
+        <p class="subtitle">Select an employee and enter payment details</p>
+    </div>
+
+    <!-- پیام‌های سیستم -->
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- فیلتر جستجو -->
+    <div class="filter-section">
+        <form method="get" class="search-box">
+            <input type="text" 
+                   name="search" 
+                   placeholder="Search employees by name or email..."
+                   value="{{ filters.search }}">
+            <button type="submit">
+                <i class="fas fa-search"></i>
+                Search
+            </button>
+            {% if filters.search %}
+            <a href="{% url 'employee:process_salary_payment' %}" style="color: #64748b; text-decoration: none;">
+                Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- لیست کارمندان -->
+    <div class="employees-list">
+        <div class="list-header">
+            <h2>Select Employee</h2>
+            <span class="employee-count">{{ employees_data|length }} employees</span>
+        </div>
+        
+        <div class="list-body">
+            {% for emp in employees_data %}
+            <a href="?employee={{ emp.id }}{% if filters.search %}&search={{ filters.search }}{% endif %}" 
+               class="employee-card {% if emp.is_selected %}selected{% endif %}">
+                <div class="employee-content">
+                    <div class="employee-avatar">
+                        {% if emp.user_profile.user %}
+                            {{ emp.user_profile.user.first_name|first|upper }}{{ emp.user_profile.user.last_name|first|upper }}
+                        {% else %}
+                            ?
+                        {% endif %}
+                    </div>
+                    
+                    <div class="employee-info">
+                        <div class="employee-name">
+                            {% if emp.user_profile.user %}
+                                {{ emp.user_profile.user.get_full_name }}
+                            {% else %}
+                                Unknown Employee
+                            {% endif %}
+                        </div>
+                        <div class="employee-details">
+                            <span>{{ emp.position }}</span>
+                            <span>{{ emp.department }}</span>
+                            <span>{{ emp.user_profile.user.email }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="salary-info">
+                        <div class="monthly-salary">
+                            ${{ emp.salary_due|floatformat:0|intcomma }} monthly
+                        </div>
+                        <div class="remaining-balance">
+                            ${{ emp.remaining|floatformat:0|intcomma }} remaining
+                        </div>
+                        <span class="status-badge status-{{ emp.status }}">
+                            {{ emp.status_label }}
+                        </span>
+                    </div>
+                </div>
+            </a>
+            {% empty %}
+            <div style="padding: 2rem; text-align: center; color: #64748b;">
+                <i class="fas fa-user-slash" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                <h3>No employees found</h3>
+                <p>Try adjusting your search</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- فرم پرداخت -->
+    <div class="payment-form-section">
+        <h2>
+            <i class="fas fa-credit-card"></i>
+            Payment Details
+        </h2>
+        
+        {% if selected_employee %}
+        <!-- اطلاعات کارمند انتخاب شده -->
+        <div class="selected-employee-info">
+            <div class="employee-avatar">
+                {% if selected_employee.employee.user %}
+                    {{ selected_employee.employee.user.first_name|first|upper }}{{ selected_employee.employee.user.last_name|first|upper }}
+                {% else %}
+                    ?
+                {% endif %}
+            </div>
+            
+            <div class="selected-employee-details">
+                <h3>
+                    {% if selected_employee.employee.user %}
+                        {{ selected_employee.employee.user.get_full_name }}
+                    {% else %}
+                        Unknown Employee
+                    {% endif %}
+                </h3>
+                <p>{{ selected_employee.position|default:"No position" }}</p>
+                <p>{{ selected_employee.department.name|default:"No department" }}</p>
+            </div>
+            
+            <div class="balance-info">
+                <span class="label">Remaining Balance</span>
+                <span class="amount">${{ remaining_balance|floatformat:0|intcomma }}</span>
+            </div>
+        </div>
+        
+        <!-- فرم -->
+        <form method="post">
+            {% csrf_token %}
+            
+            <!-- فیلدهای مخفی -->
+            <input type="hidden" name="employee" value="{{ selected_employee.id }}">
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="id_date">
+                        <i class="fas fa-calendar"></i>
+                        Payment Date
+                    </label>
+                    <input type="date" 
+                           name="date" 
+                           id="id_date" 
+                           value="{{ today }}"
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_salary_amount">
+                        <i class="fas fa-dollar-sign"></i>
+                        Amount
+                    </label>
+                    <input type="number" 
+                           name="salary_amount" 
+                           id="id_salary_amount" 
+                           value="{{ remaining_balance|floatformat:2 }}" 
+                           step="0.01" 
+                           min="0" 
+                           max="{{ remaining_balance }}"
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_payment_method">
+                        <i class="fas fa-credit-card"></i>
+                        Payment Method
+                    </label>
+                    <select name="payment_method" id="id_payment_method" required>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cash">Cash</option>
+                        <option value="check">Check</option>
+                        <option value="digital">Digital Payment</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="id_reference_number">
+                    <i class="fas fa-hashtag"></i>
+                    Reference Number (Optional)
+                </label>
+                <input type="text" 
+                       name="reference_number" 
+                       id="id_reference_number" 
+                       placeholder="e.g., PAY-2023-001">
+            </div>
+            
+            <div class="form-group">
+                <label for="id_note">
+                    <i class="fas fa-sticky-note"></i>
+                    Notes (Optional)
+                </label>
+                <textarea name="note" 
+                          id="id_note" 
+                          rows="3" 
+                          placeholder="Add any notes about this payment..."></textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn-submit">
+                    <i class="fas fa-check"></i>
+                    Process Payment
+                </button>
+                <a href="{% url 'employee:process_salary_payment' %}" class="btn-cancel">
+                    Cancel
+                </a>
+            </div>
+        </form>
+        
+        {% else %}
+        <!-- وقتی کارمندی انتخاب نشده -->
+        <div class="no-selection">
+            <i class="fas fa-hand-pointer"></i>
+            <h3>Select an Employee</h3>
+            <p>Click on an employee from the list above to process their payment</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
