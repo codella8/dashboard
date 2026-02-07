@@ -1,229 +1,354 @@
 {% extends 'container/container_base.html' %}
+{% load static %}
 {% load humanize %}
 
-{% block title %} Almuqbil | saraf_list {% endblock %}
+{% block title %}Almuqbil | Saraf Management{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h1 class="h2 mb-2 text-dark">{{ page_title }}</h1>
-      <p class="text-muted mb-0">{{ page_subtitle }}</p>
-    </div>
-    <div class="top-bar">
-      <div class="top-actions">
-        <button class="export-btn" onclick="exportToCSV()">
-          <i class="fas fa-file-export"></i> Export CSV
-        </button>
+<div class="saraf-manager">
+  <!-- Header Section -->
+  <header class="manager-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>
+          <span class="title-main">Saraf Management</span>
+          <span class="title-sub">Financial accounts and transactions overview</span>
+        </h1>
       </div>
-    </div>
-  </div>
-  <div class="row g-3 mb-4">
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="bg-primary bg-opacity-10 rounded-3 p-3 me-3">
-              <i class="fas fa-users text-primary fs-3"></i>
-            </div>
-            <div>
-              <h3 class="mb-1">{{ total_count }}</h3>
-              <p class="text-muted mb-0">Total Sarafs</p>
-            </div>
-          </div>
 
-        </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="bg-success bg-opacity-10 rounded-3 p-3 me-3">
-              <i class="fas fa-arrow-down text-success fs-3"></i>
-            </div>
-            <div>
-              <h3 class="mb-1 text-success">AED{{ total_received_sum|floatformat:0|intcomma }}</h3>
-              <p class="text-muted mb-0">Total Received</p>
-            </div>
-          </div>
-          <div class="mt-3">
-            <small class="text-success">
-              <i class="fas fa-chart-line me-1"></i> All-time total
-            </small>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="bg-danger bg-opacity-10 rounded-3 p-3 me-3">
-              <i class="fas fa-arrow-up text-danger fs-3"></i>
-            </div>
-            <div>
-              <h3 class="mb-1 text-danger">AED{{ total_paid_sum|floatformat:0|intcomma }}</h3>
-              <p class="text-muted mb-0">Total Paid</p>
-            </div>
-          </div>
-          <div class="mt-3">
-            <small class="text-danger">
-              <i class="fas fa-chart-line me-1"></i> All-time total
-            </small>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="bg-info bg-opacity-10 rounded-3 p-3 me-3">
-              <i class="fas fa-scale-balanced text-info fs-3"></i>
-            </div>
-            <div>
-              <h3
-                class="mb-1 {% if net_balance_sum > 0 %}text-success{% elif net_balance_sum < 0 %}text-danger{% else %}text-secondary{% endif %}">
-                AED{{ net_balance_sum|floatformat:0|intcomma }}
-              </h3>
-              <p class="text-muted mb-0">Net Balance</p>
-            </div>
-          </div>
-          <div class="mt-3">
-            <small
-              class="{% if net_balance_sum > 0 %}text-success{% elif net_balance_sum < 0 %}text-danger{% else %}text-secondary{% endif %}">
-              <i
-                class="fas fa-{% if net_balance_sum > 0 %}arrow-up{% elif net_balance_sum < 0 %}arrow-down{% else %}equals{% endif %} me-1"></i>
-              {% if net_balance_sum > 0 %}Company is Creditor{% elif net_balance_sum < 0 %}Company is Debtor{% else%}Perfectly Balanced{% endif %} </small>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <a href="{% url 'admin:containers_saraf_add' %}" class="btn btn-primary">
-        <i class="fas fa-plus-circle me-2"></i> Add New Saraf
-      </a>
-    </div>
-
-  </div>
-  <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white border-0 py-3">
-      <div class="d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Sarafs List</h5>
-        <div class="text-muted small">
-          {{ sarafs.start_index|default:1 }} - {{ sarafs.end_index|default:sarafs|length }} {{sarafs.paginator.count }}
-        </div>
-      </div>
-    </div>
-
-    <div class="card-body p-0">
-      {% if sarafs %}
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th class="ps-4 py-3">Saraf Information</th>
-              <th class="text-center py-3">Received</th>
-              <th class="text-center py-3">Paid</th>
-              <th class="text-center py-3">Balance</th>
-              <th class="text-center py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for saraf in sarafs %}
-            <tr class="data-row" data-id="{{ saraf.id }}" data-name="{{ saraf.user.get_full_name|default:saraf.user }}"
-              data-received="{{ saraf.total_received }}" data-paid="{{ saraf.total_paid }}"
-              data-balance="{{ saraf.balance }}"
-              data-status="{% if saraf.balance > 0 %}creditor{% elif saraf.balance < 0 %}debtor{% else %}balanced{% endif %}">
-              <td>
-                <div class="user-cell">
-                  <div class="user-info">
-                    <div class="user-name">{{ saraf.user.get_full_name|default:saraf.user }}</div>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <div class="amount-cell positive">
-                  <span class="amount-value">{{ saraf.total_received|floatformat:0 }}</span>
-                </div>
-              </td>
-              <td>
-                <div class="amount-cell negative">
-                  <span class="amount-value">{{ saraf.total_paid|floatformat:0 }}</span>
-                </div>
-              </td>
-              <td>
-                {% if saraf.balance > 0 %}
-                <div class="amount-cell positive">
-                  <span class="amount-value">{{ saraf.balance|floatformat:0 }}</span>
-                </div>
-                {% elif saraf.balance < 0 %} <div class="amount-cell negative">
-                  <span class="amount-value">{{ saraf.balance|floatformat:0 }}</span>
-      </div>
-      {% else %}
-      <div class="amount-cell neutral">
-        <span class="amount-value">{{ saraf.balance|floatformat:0 }}</span>
-      </div>
-      {% endif %}
-      </td>
-      <td>
-        <div class="actions-cell align-items-center">
-          <a href="{% url 'containers:saraf_detail' saraf.id %}" class="action-link view-link" title="View">
-            <svg width="16" height="16" viewBox="0 0 24 24">
-              <path
-                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+      <div class="header-actions">
+        <div class="action-group">
+          <a href="{% url 'admin:containers_saraf_add' %}" class="action-btn primary-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" />
             </svg>
+            Add Saraf
           </a>
         </div>
-      </td>
-      </tr>
-      {% empty %}
-      <tr class="empty-row">
-        <td colspan="5">
-          <div class="empty-state">
-            <svg class="empty-icon" width="48" height="48" viewBox="0 0 24 24">
-              <path
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-            </svg>
-            <h3>No Sarafs Found</h3>
-            <p>Start by adding your first saraf</p>
-          </div>
-        </td>
-
-      </tr>
-      {% endfor %}
-      </tbody>
-      </table>
-    </div>
-    {% else %}
-
-    <!-- Empty State -->
-    <div class="text-center py-5">
-      <div class="mb-4">
-        <i class="fas fa-user-friends fa-4x text-light"></i>
       </div>
-      <h4 class="text-muted mb-3">No Sarafs Found</h4>
-      <p class="text-muted mb-4">Start by adding your first saraf account to the system.</p>
-      <a href="{% url 'admin:containers_saraf_add' %}" class="btn btn-primary px-4 py-2">
-        <i class="fas fa-plus-circle me-2"></i> Add First Saraf
-      </a>
+    </div>
+  </header>
+
+  <!-- Statistics Grid -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon total">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" />
+          <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2" />
+        </svg>
+      </div>
+      <div class="stat-details">
+        <span class="stat-value">{{ total_count }}</span>
+        <span class="stat-label">Total Sarafs</span>
+      </div>
+    </div>
+
+    <div class="stat-card highlight">
+      <div class="stat-icon revenue">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" stroke="currentColor" stroke-width="2" />
+        </svg>
+      </div>
+      <div class="stat-details">
+        <span class="stat-value">AED {{ total_received_sum|floatformat:0|intcomma }}</span>
+        <span class="stat-label">Total Received</span>
+      </div>
+    </div>
+
+    <div class="stat-card highlight">
+      <div class="stat-icon expenses">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" stroke="currentColor" stroke-width="2" />
+        </svg>
+      </div>
+      <div class="stat-details">
+        <span class="stat-value">AED {{ total_paid_sum|floatformat:0|intcomma }}</span>
+        <span class="stat-label">Total Paid</span>
+      </div>
+    </div>
+
+    <div class="stat-card highlight">
+      <div class="stat-icon balance">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" stroke="currentColor" stroke-width="2" />
+        </svg>
+      </div>
+      <div class="stat-details">
+        <span class="stat-value {% if net_balance_sum > 0 %}positive{% elif net_balance_sum < 0 %}negative{% endif %}">
+          AED {{ net_balance_sum|floatformat:0|intcomma }}
+        </span>
+        <span class="stat-label">Net Balance</span>
+        <span
+          class="stat-status {% if net_balance_sum > 0 %}positive{% elif net_balance_sum < 0 %}negative{% else %}neutral{% endif %}">
+          {% if net_balance_sum > 0 %}Company is Creditor{% elif net_balance_sum < 0 %}Company is Debtor{% else%}Perfectly Balanced{% endif %} </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search and Filter Section -->
+  <div class="controls-section">
+    <div class="search-container">
+      <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" />
+        <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" />
+      </svg>
+      <input type="text" class="search-input" id="saraf-search" placeholder="Search sarafs by name, phone, or email..."
+        aria-label="Search sarafs" value="{{ request.GET.search|default:'' }}">
+    </div>
+  </div>
+
+  <!-- Sarafs Table -->
+  <div class="sarafs-table">
+    <div class="table-header">
+      <div class="header-content">
+        <h3 class="table-title">Sarafs List</h3>
+        <div class="table-info">
+          <span class="items-count">
+            Showing {{ sarafs.start_index|default:1 }}-{{ sarafs.end_index|default:sarafs|length }} of {{sarafs.paginator.count }} sarafs
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      {% if sarafs %}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="sarafs-info">Saraf Information</th>
+            <th class="financial-info">Financial Summary</th>
+            <th class="status-info">Status</th>
+            <th class="actions-header">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for saraf in sarafs %}
+          <tr class="saraf-row" data-id="{{ saraf.id }}">
+            <!-- Saraf Information Column -->
+            <td class="saraf-info-cell">
+              <div class="saraf-identity">
+                <div class="avatar">
+                  {% if saraf.user and saraf.user.user %}
+                  <span class="avatar-initials">
+                    {{ saraf.user.user.first_name|first }}{{ saraf.user.user.last_name|first }}
+                  </span>
+                  {% endif %}
+                </div>
+                <div class="saraf-details">
+                  <h4 class="saraf-name">
+                    {{ saraf.user.get_full_name|default:saraf.user|default:"Unknown Saraf" }}
+                  </h4>
+                  <div class="saraf-meta">
+                    {% if saraf.user and saraf.user.company %}
+                    <span class="company-badge">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor"
+                          stroke-width="2" />
+                      </svg>
+                      {{ saraf.user.company.name }}
+                    </span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Financial Summary Column -->
+            <td class="financial-cell">
+              <div class="financial-summary">
+                <div class="amount-group">
+                  <div class="amount-item">
+                    <span class="amount-label">Received</span>
+                    <span class="amount-value positive">
+                      AED {{ saraf.total_received|floatformat:0|intcomma }}
+                    </span>
+                  </div>
+                  <div class="amount-item">
+                    <span class="amount-label">Paid</span>
+                    <span class="amount-value negative">
+                      AED {{ saraf.total_paid|floatformat:0|intcomma }}
+                    </span>
+                  </div>
+                  <div class="amount-item highlight">
+                    <span class="amount-label">Balance</span>
+                    <span
+                      class="amount-value {% if saraf.balance > 0 %}positive{% elif saraf.balance < 0 %}negative{% else %}neutral{% endif %}">
+                      AED {{ saraf.balance|floatformat:0|intcomma }}
+                    </span>
+                  </div>
+                </div>
+                <div class="transaction-meta">
+                  {% if saraf.transactions.exists %}
+                  <span class="transaction-count">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                    {{ saraf.transactions.count }} transactions
+                  </span>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+
+            <!-- Status Column -->
+            <td class="status-cell">
+              <div class="status-info">
+                <div class="status-badge {% if saraf.is_active %}active{% else %}inactive{% endif %}">
+                  {% if saraf.is_active %}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" />
+                  </svg>
+                  Active
+                  {% else %}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6l12 18" stroke="currentColor" stroke-width="2" />
+                  </svg>
+                  Inactive
+                  {% endif %}
+                </div>
+
+                <div class="date-info">
+                  <small class="created-date">
+                    Created: {{ saraf.created_at|date:"M d, Y" }}
+                  </small>
+                </div>
+              </div>
+            </td>
+
+            <!-- Actions Column -->
+            <td class="actions-cell">
+              <div class="action-buttons">
+                <a href="{% url 'containers:saraf_detail' saraf.id %}" class="action-btn view-btn" title="View Details">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" />
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
+                  </svg>
+                  <span>Details</span>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <!-- Empty State -->
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.5" />
+            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </div>
+        <h3 class="empty-title">No Sarafs Found</h3>
+        <p class="empty-message">
+          You haven't added any sarafs yet. Start by creating your first saraf account.
+        </p>
+        <a href="{% url 'admin:containers_saraf_add' %}" class="empty-action-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" />
+          </svg>
+          Add First Saraf
+        </a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if sarafs.has_other_pages %}
+    <div class="pagination-container">
+      <div class="pagination-info">
+        <span>Page {{ sarafs.number }} of {{ sarafs.paginator.num_pages }}</span>
+      </div>
+
+      <div class="pagination-controls">
+        {% if sarafs.has_previous %}
+        <a href="?page={{ sarafs.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+          class="page-nav prev">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" />
+          </svg>
+          Previous
+        </a>
+        {% endif %}
+
+        <div class="page-numbers">
+          {% for num in sarafs.paginator.page_range %}
+          {% if sarafs.number == num %}
+          <span class="page-number active">{{ num }}</span>
+          {% elif num > sarafs.number|add:'-3' and num < sarafs.number|add:'3' %} <a
+            href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+            class="page-number">{{ num }}</a>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        {% if sarafs.has_next %}
+        <a href="?page={{ sarafs.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+          class="page-nav next">
+          Next
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </a>
+        {% endif %}
+      </div>
     </div>
     {% endif %}
   </div>
 </div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" hidden>
+  <div class="spinner"></div>
+  <span>Loading sarafs...</span>
 </div>
+
+<!-- Confirmation Modal Template -->
+<template id="confirmation-modal">
+  <div class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="modal-title">Confirm Action</h3>
+      <p class="modal-message">Are you sure you want to perform this action?</p>
+      <div class="modal-actions">
+        <button class="modal-btn cancel">Cancel</button>
+        <button class="modal-btn confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
+    // Search functionality
+    const searchInput = document.getElementById('saraf-search');
+    const searchForm = document.createElement('form');
+    searchForm.method = 'GET';
+    searchForm.style.display = 'none';
+
+    // Add search parameter to form
+    if (searchInput) {
+      searchInput.addEventListener('input', function (e) {
+        clearTimeout(this.searchTimeout);
+        this.searchTimeout = setTimeout(() => {
+          const searchValue = this.value.trim();
+          const url = new URL(window.location.href);
+
+          if (searchValue) {
+            url.searchParams.set('search', searchValue);
+          } else {
+            url.searchParams.delete('search');
+          }
+
+          // Reset to page 1 when searching
+          url.searchParams.delete('page');
+          window.location.href = url.toString();
+        }, 500); // 500ms debounce
+      });
+    }
   });
 </script>
 {% endblock %}

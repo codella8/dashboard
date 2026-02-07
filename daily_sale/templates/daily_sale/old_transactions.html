@@ -2,220 +2,286 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Almuqbil | Old Transactions{% endblock %}
+{% block title %}Oldtransactions | Almuqbil{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4">
-  <!-- Header -->
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h1 class="h3 mb-2 text-gray-800">
-        <i class="fas fa-exclamation-triangle text-danger me-2"></i>
-        Old Transactions
-      </h1>
-      <p class="text-muted mb-0">
-        <i class="fas fa-info-circle me-1"></i>
-        Customers with pending payments
-      </p>
-    </div>
-    <div class="d-flex gap-2">
-      <button class="btn btn-primary" onclick="exportToExcel()">
-        <i class="fas fa-file-excel me-1"></i> Export
-      </button>
-      <button class="btn btn-danger" id="refreshBtn">
-        <i class="fas fa-sync-alt me-1"></i> Refresh
-      </button>
-    </div>
-  </div>
-
-  <div class="row mb-4">
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-danger h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-danger text-uppercase mb-2">Total Old transactions</h6>
-              <h2 class="mb-2">AED {{ total_outstanding|floatformat:0|intcomma }}</h2>
-              <div class="d-flex align-items-center">
-                <span class="badge bg-danger me-2">{{ customers_count }}</span>
-                <small class="text-muted">Customers</small>
-              </div>
-            </div>
-            <div class="text-danger opacity-25">
-              <i class="fas fa-money-bill-wave fa-2x"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-warning h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-warning text-uppercase mb-2">Average Debt</h6>
-              <h2 class="mb-2">AED {{ avg_debt|floatformat:0|intcomma }}</h2>
-              <div class="d-flex align-items-center">
-                <span class="badge bg-warning me-2">{{ customers_count }}</span>
-                <small class="text-muted">Active Debts</small>
-              </div>
-            </div>
-            <div class="text-warning opacity-25">
-              <i class="fas fa-chart-line fa-2x"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-info h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-info text-uppercase mb-2">Total Amount</h6>
-              <h2 class="mb-2">AED {{ total_amount|floatformat:0|intcomma }}</h2>
-              <div class="d-flex align-items-center">
-                <span class="badge bg-info me-2">{{ customers_count }}</span>
-                <small class="text-muted">All Transactions</small>
-              </div>
-            </div>
-            <div class="text-info opacity-25">
-              <i class="fas fa-calculator fa-2x"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-success h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-success text-uppercase mb-2">Paid Amount</h6>
-              <h2 class="mb-2">AED {{ total_paid|floatformat:0|intcomma }}</h2>
-              <div class="d-flex align-items-center">
-                <span class="badge bg-success me-2">{{ customers_count }}</span>
-                <small class="text-muted">Collected</small>
-              </div>
-            </div>
-            <div class="text-success opacity-25">
-              <i class="fas fa-check-circle fa-2x"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
+<div class="container-fluid py-4">
+  <!-- Page Header -->
   <div class="card shadow mb-4">
+    <div class="card-header bg-danger text-white">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h4 class="mb-0">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Old transactions List
+          </h4>
+          <p class="mb-0 mt-2">Customers with unpaid balances</p>
+        </div>
+        <div class="text-end">
+          <h3 class="mb-0">{{ customers_count }} Customers</h3>
+          <small>Total Count</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search -->
     <div class="card-body">
-      <div class="row">
-        <div class="col-md-4">
-          <form method="get" class="d-flex">
-            <input type="text" class="form-control me-2" name="search" placeholder="Search customer..."
-              value="{{ search_query }}">
-            <button type="submit" class="btn btn-primary">
+      <form method="get" class="row g-3">
+        <div class="col-md-10">
+          <div class="input-group">
+            <span class="input-group-text">
               <i class="fas fa-search"></i>
-            </button>
-          </form>
+            </span>
+            <input type="text" name="search" class="form-control" placeholder="Search customer (name, phone, email)..."
+              value="{{ search_query }}">
+          </div>
         </div>
-        <div class="col-md-4">
-          <select class="form-select" id="statusFilter" onchange="filterByStatus(this.value)">
-            <option value="">All Status</option>
-            <option value="partial" {% if filter_type=='partial' %}selected{% endif %}>Partial Paid</option>
-            <option value="paid" {% if filter_type=='paid' %}selected{% endif %}>Fully Paid</option>
-          </select>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="fas fa-filter me-1"></i> Search
+          </button>
         </div>
-        <div class="col-md-4">
-          <select class="form-select" id="sortSelect" onchange="sortByDebt(this.value)">
-            <option value="debt_desc" {% if sort_by=='debt_desc' %}selected{% endif %}>Highest Debt First</option>
-            <option value="debt_asc" {% if sort_by=='debt_asc' %}selected{% endif %}>Lowest Debt First</option>
-          </select>
+      </form>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card border-start-danger border-start-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+              <h6 class="text-muted mb-1">Total Debt</h6>
+              <h4 class="mb-0 text-danger">
+                AED {{ total_summary.total_debt|floatformat:0|intcomma }}
+              </h4>
+            </div>
+            <div class="ms-3">
+              <i class="fas fa-money-bill-wave fa-2x text-danger"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card border-start-success border-start-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+              <h6 class="text-muted mb-1">Total Paid</h6>
+              <h4 class="mb-0 text-success">
+                AED {{ total_summary.total_paid|floatformat:0|intcomma }}
+              </h4>
+            </div>
+            <div class="ms-3">
+              <i class="fas fa-check-circle fa-2x text-success"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card border-start-warning border-start-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+              <h6 class="text-muted mb-1">Transactions</h6>
+              <h4 class="mb-0 text-warning">
+                {{ total_summary.total_transactions }}
+              </h4>
+            </div>
+            <div class="ms-3">
+              <i class="fas fa-receipt fa-2x text-warning"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card border-start-info border-start-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+              <h6 class="text-muted mb-1">Outstanding Customers</h6>
+              <h4 class="mb-0 text-info">
+                {{ total_summary.total_customers }}
+              </h4>
+            </div>
+            <div class="ms-3">
+              <i class="fas fa-users fa-2x text-info"></i>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-
+  <!-- Customers List -->
   <div class="card shadow">
-    <div class="card-header">
+    <div class="card-header bg-white">
       <h5 class="mb-0">
-        <i class="fas fa-users me-2"></i>
-        Old Transactions List
+        <i class="fas fa-list me-2"></i>
+        Customers with Outstanding Balances
       </h5>
     </div>
-    <div class="card-body">
+
+    <div class="card-body p-0">
+      {% if outstanding_customers %}
       <div class="table-responsive">
-        <table class="table table-hover">
+        <table class="table table-hover mb-0">
           <thead class="table-light">
             <tr>
               <th>#</th>
-              <th>Customer Name</th>
-              <th class="text-end">Total Amount</th>
+              <th>Customer</th>
+              <th>Contact</th>
+              <th class="text-end">Total Debt</th>
               <th class="text-end">Paid Amount</th>
-              <th class="text-end">Discount</th>
-              <th class="text-end">Remaining</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th class="text-end">Balance</th>
+              <th>Transactions</th>
+              <th class="text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for customer in outstanding_customers %}
             <tr
-              class="{% if customer.remaining_amount > 10000 %}table-danger{% elif customer.remaining_amount > 5000 %}table-warning{% endif %}">
+              class="{% if customer.total_debt > 10000 %}table-danger{% elif customer.total_debt > 5000 %}table-warning{% endif %}">
               <td>{{ forloop.counter }}</td>
               <td>
-                <strong>{{ customer.customer_name }}</strong><br>
-                <small class="text-muted">ID: {{ customer.customer_id }}</small>
-              </td>
-              <td class="text-end">
-                AED {{ customer.total_amount|floatformat:2|intcomma }}
-              </td>
-              <td class="text-end text-success">
-                AED {{ customer.paid_amount|floatformat:2|intcomma }}
-              </td>
-              <td class="text-end text-warning">
-                AED {{ customer.discount_amount|floatformat:2|intcomma }}
-              </td>
-              <td class="text-end text-danger fw-bold">
-                AED {{ customer.remaining_amount|floatformat:2|intcomma }}
-              </td>
-              <td>
-                {% if customer.payment_status == 'paid' %}
-                <span class="badge bg-success">Paid</span>
-                {% elif customer.payment_status == 'partial' %}
-                <span class="badge bg-warning">Partial</span>
-                {% else %}
-                <span class="badge bg-danger">Unpaid</span>
+                <strong>{{ customer.customer_name }}</strong>
+                {% if customer.customer_email %}
+                <br>
+                <small class="text-muted">{{ customer.customer_email }}</small>
                 {% endif %}
               </td>
+              <td class="text-end">
+                <span class="text-danger fw-bold">
+                  AED {{ customer.total_debt|floatformat:0|intcomma }}
+                </span>
+              </td>
+              <td class="text-end text-success">
+                AED {{ customer.total_paid|floatformat:0|intcomma }}
+              </td>
+              <td class="text-end">
+                <span class="fw-bold">
+                  AED {{ customer.remaining_balance|floatformat:0|intcomma }}
+                </span>
+              </td>
               <td>
-                <div class="btn-group">
-                  <button class="btn btn-sm btn-outline-primary view-customer-btn"
-                    data-customer-id="{{ customer.customer_id }}">
+                <span class="badge bg-info">
+                  {{ customer.debt_transactions_count }} Transaction{{ customer.debt_transactions_count|pluralize }}
+                </span>
+              </td>
+              <td class="text-center">
+                <div class="btn-group btn-group-sm">
+                  <button type="button" class="btn btn-outline-primary"
+                    onclick="viewCustomerDetails('{{ customer.customer_id }}')" title="View Details">
                     <i class="fas fa-eye"></i>
                   </button>
-                  <button class="btn btn-sm btn-outline-success add-payment-btn"
-                    data-customer-id="{{ customer.customer_id }}">
-                    <i class="fas fa-money-bill"></i>
-                  </button>
+                  
                   <a href="{% url 'daily_sale:transaction_list' %}?customer={{ customer.customer_id }}"
-                    class="btn btn-sm btn-outline-info">
+                    class="btn btn-outline-info" title="View Transactions">
                     <i class="fas fa-receipt"></i>
                   </a>
                 </div>
               </td>
             </tr>
-            {% empty %}
-            <tr>
-              <td colspan="8" class="text-center py-4">
-                <div class="text-muted">
-                  <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
-                  <h5>No Old Transactions</h5>
-                  <p>All customers have cleared their payments!</p>
+
+            <!-- Customer Details Row (Collapsible) -->
+            <tr class="customer-details-row" id="details-{{ customer.customer_id }}" style="display: none;">
+              <td colspan="8" class="bg-light">
+                <div class="p-3">
+                  <h6 class="mb-3">
+                    <i class="fas fa-file-invoice-dollar me-2"></i>
+                    Outstanding Transaction Details
+                  </h6>
+
+                  {% if customer.transactions %}
+                  <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                      <thead>
+                        <tr class="table-secondary text-dark">
+                          <th>Invoice #</th>
+                          <th>Date</th>
+                          <th>Total Amount</th>
+                          <th>Paid</th>
+                          <th>Balance</th>
+                          <th>Products</th>
+                          <th>Payments</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for transaction in customer.transactions %}
+                        <tr>
+                          <td>
+                            <strong>{{ transaction.invoice_number }}</strong>
+                          </td>
+                          <td>{{ transaction.transaction_date|date:"Y-m-d" }}</td>
+                          <td class="text-end">
+                            AED {{ transaction.total_amount|floatformat:0|intcomma }}
+                          </td>
+                          <td class="text-end text-success">
+                            AED {{ transaction.total_paid|floatformat:0|intcomma }}
+                          </td>
+                          <td class="text-end text-danger fw-bold">
+                            AED {{ transaction.remaining_debt|floatformat:0|intcomma }}
+                          </td>
+                          <td>
+                            {% if transaction.products %}
+                            <div class="products-list">
+                              {% for product in transaction.products %}
+                              <div class="product-item mb-1">
+                                <span class="badge bg-light text-dark">
+                                  {{ product.product_name }}
+                                  {% if product.product_code %}
+                                  ({{ product.product_code }})
+                                  {% endif %}
+                                </span>
+                                <small class="text-muted ms-2">
+                                  Qty: {{ product.quantity }} ×
+                                  AED {{ product.unit_price|floatformat:0|intcomma }}
+                                  = AED {{ product.total_amount|floatformat:0|intcomma }}
+                                </small>
+                              </div>
+                              {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="text-muted">No products</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            {% if transaction.payments %}
+                            <div class="payments-list">
+                              {% for payment in transaction.payments %}
+                              <div class="payment-item mb-1">
+                                <span class="badge bg-success">
+                                  {{ payment.date|date:"Y-m-d" }}
+                                </span>
+                                <small class="text-muted ms-2">
+                                  {{ payment.method }}:
+                                  AED {{ payment.amount|floatformat:0|intcomma }}
+                                </small>
+                              </div>
+                              {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="text-muted">No payments</span>
+                            {% endif %}
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                  {% else %}
+                  <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No outstanding transactions found for this customer.
+                  </div>
+                  {% endif %}
                 </div>
               </td>
             </tr>
@@ -223,73 +289,87 @@
           </tbody>
           <tfoot class="table-light">
             <tr>
-              <th colspan="2" class="text-end">TOTALS:</th>
-              <th class="text-end">AED {{ total_amount|floatformat:0|intcomma }}</th>
-              <th class="text-end text-success">AED {{ total_paid|floatformat:0|intcomma }}</th>
-              <th class="text-end text-warning">AED {{ total_discount|floatformat:0|intcomma }}</th>
-              <th class="text-end text-danger fw-bold">AED {{ total_remaining|floatformat:0|intcomma }}</th>
-              <th colspan="2"></th>
+              <th colspan="3" class="text-end">TOTALS:</th>
+              <th class="text-end text-danger">
+                AED {{ total_summary.total_debt|floatformat:0|intcomma }}
+              </th>
+              <th class="text-end text-success">
+                AED {{ total_summary.total_paid|floatformat:0|intcomma }}
+              </th>
+              <th class="text-end">
+                AED {{ total_summary.total_debt|floatformat:0|intcomma }}
+              </th>
+              <th>{{ total_summary.total_transactions }}</th>
+              <th></th>
             </tr>
           </tfoot>
         </table>
       </div>
+      {% else %}
+      <div class="text-center py-5">
+        <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+        <h4 class="text-success">No Outstanding Customers</h4>
+        <p class="text-muted">All customers have cleared their payments.</p>
+        <button type="button" class="btn btn-primary" onclick="window.location.reload()">
+          <i class="fas fa-sync-alt me-1"></i> Refresh
+        </button>
+      </div>
+      {% endif %}
     </div>
-  </div>
 
-  {% if outstanding_customers %}
-  <div id="chart-data" data-customers='{{ customers_json|safe }}' style="display: none;"></div>
-  <div class="row mt-4">
-    <div class="col-lg-6 mb-4">
-      <div class="card shadow">
-        <div class="card-header">
-          <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Debt Distribution</h5>
+    {% if outstanding_customers %}
+    <div class="card-footer">
+      <div class="row">
+        <div class="col-md-6">
+          <small class="text-muted">
+            Showing {{ outstanding_customers|length }} customer{{ outstanding_customers|length|pluralize }}
+          </small>
         </div>
-        <div class="card-body">
-          <div class="chart-container" style="height: 300px;">
-            <canvas id="debtChart"></canvas>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-6 mb-4">
-      <div class="card shadow">
-        <div class="card-header">
-          <h5 class="mb-0"><i class="fas fa-percentage me-2"></i>Payment Status</h5>
-        </div>
-        <div class="card-body">
-          <div class="chart-container" style="height: 300px;">
-            <canvas id="statusChart"></canvas>
-          </div>
+        <div class="col-md-6 text-end">
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="exportToExcel()">
+            <i class="fas fa-file-excel me-1"></i> Export to Excel
+          </button>
+          <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="sendReminders()">
+            <i class="fas fa-bell me-1"></i> Send Reminders
+          </button>
         </div>
       </div>
     </div>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 
+<!-- Customer Details Modal -->
 <div class="modal fade" id="customerModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Customer Details</h5>
+        <h5 class="modal-title">
+          <i class="fas fa-user-circle me-2"></i>
+          Customer Details
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" id="customerDetails">
-        <!-- Details will be loaded via AJAX -->
+      <div class="modal-body" id="customerModalBody">
+        <!-- Content loaded via AJAX -->
       </div>
     </div>
   </div>
 </div>
 
+<!-- Add Payment Modal -->
 <div class="modal fade" id="paymentModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Add Payment</h5>
+        <h5 class="modal-title">
+          <i class="fas fa-money-bill-wave me-2"></i>
+          Add Payment
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" id="paymentForm">
-        <!-- Payment form will be loaded via AJAX -->
+      <div class="modal-body" id="paymentModalBody">
+        <!-- Form loaded via AJAX -->
       </div>
     </div>
   </div>
@@ -297,211 +377,45 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
+  // Global variables
+  let currentOpenDetails = null;
 
-    let refreshInterval = setInterval(refreshData, 120000);
-    let autoRefreshEnabled = false;
-    initializeCharts();
-
-    document.getElementById('refreshBtn').addEventListener('click', function () {
-      window.location.reload();
-    });      
-  });
-
-  function refreshData() {
-    if (!autoRefreshEnabled) return;
-
-    const refreshBtn = document.getElementById('refreshBtn');
-    if (refreshBtn) {
-      const originalHTML = refreshBtn.innerHTML;
-      refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Refreshing...';
-      refreshBtn.disabled = true;
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    }
-  }
-
-  function filterByStatus(status) {
-    const url = new URL(window.location.href);
-    if (status) {
-      url.searchParams.set('filter', status);
-    } else {
-      url.searchParams.delete('filter');
-    }
-    window.location.href = url.toString();
-  }
-
-  function sortByDebt(sortBy) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('sort', sortBy);
-    window.location.href = url.toString();
-  }
-
-  function initializeCharts() {
-    const chartDataElement = document.getElementById('chart-data');
-    if (!chartDataElement) return;
-
-    try {
-      const customers = JSON.parse(chartDataElement.dataset.customers);
-
-      const debtCtx = document.getElementById('debtChart');
-      if (debtCtx && customers.length > 0) {
-        const debtRanges = {
-          '0-1,000': 0,
-          '1,001-5,000': 0,
-          '5,001-10,000': 0,
-          '10,001-20,000': 0,
-          '20,000+': 0
-        };
-
-        customers.forEach(customer => {
-          const amount = customer.remaining_amount || 0;
-          if (amount <= 1000) debtRanges['0-1,000']++;
-          else if (amount <= 5000) debtRanges['1,001-5,000']++;
-          else if (amount <= 10000) debtRanges['5,001-10,000']++;
-          else if (amount <= 20000) debtRanges['10,001-20,000']++;
-          else debtRanges['20,000+']++;
-        });
-
-        new Chart(debtCtx, {
-          type: 'bar',
-          data: {
-            labels: Object.keys(debtRanges),
-            datasets: [{
-              label: 'Number of Customers',
-              data: Object.values(debtRanges),
-              backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b']
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                display: false
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  stepSize: 1
-                }
-              }
-            }
-          }
-        });
-      }
-
-      const statusCtx = document.getElementById('statusChart');
-      if (statusCtx && customers.length > 0) {
-        let paidCount = 0;
-        let partialCount = 0;
-        let unpaidCount = 0;
-
-        customers.forEach(customer => {
-          if (customer.payment_status === 'paid') paidCount++;
-          else if (customer.payment_status === 'partial') partialCount++;
-          else unpaidCount++;
-        });
-
-        new Chart(statusCtx, {
-          type: 'doughnut',
-          data: {
-            labels: ['Paid', 'Partial', 'Unpaid'],
-            datasets: [{
-              data: [paidCount, partialCount, unpaidCount],
-              backgroundColor: ['#1cc88a', '#f6c23e', '#e74a3b'],
-              borderWidth: 2,
-              borderColor: '#fff'
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'bottom'
-              }
-            },
-            cutout: '70%'
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error initializing charts:', error);
-    }
-  }
-
+  // View customer details
   function viewCustomerDetails(customerId) {
-    fetch(`/api/customers/${customerId}/details/`)
-      .then(response => response.json())
-      .then(data => {
-        const modalBody = document.getElementById('customerDetails');
-        modalBody.innerHTML = `
-          <div class="row">
-            <div class="col-md-6">
-              <h6>Customer Information</h6>
-              <p><strong>Name:</strong> ${data.name}</p>
-              <p><strong>Phone:</strong> ${data.phone || 'N/A'}</p>
-              <p><strong>Email:</strong> ${data.email || 'N/A'}</p>
-            </div>
-            <div class="col-md-6">
-              <h6>Financial Summary</h6>
-              <p><strong>Total Transactions:</strong> ${data.total_transactions}</p>
-              <p><strong>Total Amount:</strong> AED ${data.total_amount}</p>
-              <p><strong>Total Paid:</strong> AED ${data.total_paid}</p>
-              <p><strong>Remaining:</strong> <span class="text-danger">AED ${data.remaining}</span></p>
-            </div>
-          </div>
-          <hr>
-          <h6>Recent Transactions</h6>
-          <div class="table-responsive">
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Invoice</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${data.recent_transactions.map(tx => `
-                  <tr>
-                    <td>${tx.date}</td>
-                    <td>${tx.invoice}</td>
-                    <td>AED ${tx.amount}</td>
-                    <td><span class="badge ${tx.status === 'paid' ? 'bg-success' : tx.status === 'partial' ? 'bg-warning' : 'bg-danger'}">${tx.status}</span></td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        `;
-        new bootstrap.Modal(document.getElementById('customerModal')).show();
-      })
-      .catch(error => {
-        console.error('Error loading customer details:', error);
-        alert('Error loading customer details');
-      });
+    // Toggle details row
+    const detailsRow = document.getElementById(`details-${customerId}`);
+
+    if (currentOpenDetails && currentOpenDetails !== detailsRow) {
+      currentOpenDetails.style.display = 'none';
+    }
+
+    if (detailsRow.style.display === 'none') {
+      detailsRow.style.display = 'table-row';
+      currentOpenDetails = detailsRow;
+    } else {
+      detailsRow.style.display = 'none';
+      currentOpenDetails = null;
+    }
   }
 
+  // Add payment
   function addPayment(customerId) {
     fetch(`/api/customers/${customerId}/payment-form/`)
       .then(response => response.text())
       .then(html => {
-        document.getElementById('paymentForm').innerHTML = html;
-        new bootstrap.Modal(document.getElementById('paymentModal')).show();
+        document.getElementById('paymentModalBody').innerHTML = html;
+        const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal'));
+        paymentModal.show();
 
-        document.getElementById('paymentForm').addEventListener('submit', function (e) {
-          e.preventDefault();
-          processPayment(customerId);
-        });
+        // Setup form submission
+        const form = document.getElementById('paymentModalBody').querySelector('form');
+        if (form) {
+          form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            processPayment(customerId, new FormData(form));
+          });
+        }
       })
       .catch(error => {
         console.error('Error loading payment form:', error);
@@ -509,9 +423,8 @@
       });
   }
 
-  function processPayment(customerId) {
-    const formData = new FormData(document.getElementById('paymentForm'));
-
+  // Process payment
+  function processPayment(customerId, formData) {
     fetch(`/api/customers/${customerId}/add-payment/`, {
       method: 'POST',
       body: formData,
@@ -526,7 +439,7 @@
           bootstrap.Modal.getInstance(document.getElementById('paymentModal')).hide();
           window.location.reload();
         } else {
-          alert('Error: ' + data.error);
+          alert('Error: ' + (data.error || 'Payment failed'));
         }
       })
       .catch(error => {
@@ -535,12 +448,48 @@
       });
   }
 
-  function exportToPDF() {
-    const url = new URL(window.location.href);
-    url.searchParams.set('export', 'pdf');
-    window.open(url.toString(), '_blank');
+  // Export to Excel
+  function exportToExcel() {
+    // Create a simple export
+    let csv = 'Customer Name,Phone,Email,Total Debt,Paid Amount,Balance,Transactions\n';
+
+    document.querySelectorAll('tbody tr:not(.customer-details-row)').forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length >= 7) {
+        const customerName = cells[1].querySelector('strong')?.textContent || '';
+        const phone = cells[2].textContent.trim();
+        const email = cells[1].querySelector('small')?.textContent || '';
+        const totalDebt = cells[3].textContent.replace('AED', '').trim();
+        const paid = cells[4].textContent.replace('AED', '').trim();
+        const balance = cells[5].textContent.replace('AED', '').trim();
+        const transactions = cells[6].textContent.trim();
+
+        csv += `"${customerName}","${phone}","${email}","${totalDebt}","${paid}","${balance}","${transactions}"\n`;
+      }
+    });
+
+    // Add totals
+    const totalRow = document.querySelector('tfoot tr');
+    if (totalRow) {
+      const totalCells = totalRow.querySelectorAll('th');
+      csv += `\nTOTALS,,,,${totalCells[3]?.textContent.replace('AED', '').trim()},${totalCells[4]?.textContent.replace('AED', '').trim()},${totalCells[5]?.textContent.replace('AED', '').trim()},${totalCells[6]?.textContent.trim()}\n`;
+    }
+
+    // Download CSV
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `outstanding_customers_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    alert('Export completed! File downloaded as CSV.');
   }
 
+  // Send reminders
   function sendReminders() {
     if (confirm('Send payment reminders to all customers with outstanding balances?')) {
       fetch('/api/send-reminders/', {
@@ -555,7 +504,7 @@
           if (data.success) {
             alert(`Reminders sent to ${data.count} customers`);
           } else {
-            alert('Error sending reminders');
+            alert('Error sending reminders: ' + (data.error || 'Unknown error'));
           }
         })
         .catch(error => {
@@ -565,19 +514,91 @@
     }
   }
 
-  function showNotification(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast align-items-center text-bg-${type} border-0 position-fixed bottom-0 end-0 m-3`;
-    toast.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body">${message}</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-      </div>
-    `;
-    document.body.appendChild(toast);
-    const bsToast = new bootstrap.Toast(toast);
-    bsToast.show();
-    setTimeout(() => toast.remove(), 3000);
+  // Utility function to get CSRF token
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
   }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function (e) {
+    // Ctrl + E to export
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+      e.preventDefault();
+      exportToExcel();
+    }
+    // Esc to close details
+    if (e.key === 'Escape' && currentOpenDetails) {
+      currentOpenDetails.style.display = 'none';
+      currentOpenDetails = null;
+    }
+  });
 </script>
+
+<style>
+  .customer-details-row {
+    background-color: #f8f9fa !important;
+  }
+
+  .customer-details-row td {
+    padding: 0 !important;
+    border-top: 2px solid #dee2e6;
+  }
+
+  .products-list .product-item {
+    border-bottom: 1px dashed #dee2e6;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+  }
+
+  .products-list .product-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+
+  .payments-list .payment-item {
+    border-bottom: 1px dashed #dee2e6;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+  }
+
+  .payments-list .payment-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+
+  /* Hover effects */
+  .table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+  }
+
+  .table-danger {
+    background-color: rgba(220, 53, 69, 0.05) !important;
+  }
+
+  .table-warning {
+    background-color: rgba(255, 193, 7, 0.05) !important;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .table-responsive {
+      font-size: 0.9rem;
+    }
+
+    .btn-group-sm .btn {
+      padding: 0.25rem 0.5rem;
+    }
+  }
+</style>
 {% endblock %}

@@ -1,76 +1,223 @@
 {% extends 'container/container_base.html' %}
 {% load static %}
-{% block title %}Almuqbil | container_list{% endblock %}
+{% load humanize %}
+
+{% block title %}Almuqbil | Container Management{% endblock %}
 
 {% block content %}
-<div class="container-list-page">
-  <div class="container">
-    <div class="content-wrapper">
-      <div class="page-header">
-        <h1>Containers Management</h1>
+<div class="container-list-minimal">
+  <!-- Header Section -->
+  <header class="page-header">
+    <div class="header-main">
+      <div class="header-title-section">
+        <h1 class="page-title">
+          <span class="title-main text-dark ">Container Management</span>
+          <span class="title-counter">{{ containers|length }} containers</span>
+        </h1>
+        <p class="page-subtitle">Efficient management of all container operations and inventory</p>
       </div>
+    </div>
 
-      <div class="table-container">
-        <table class="table table-hover">
-          <thead class="table-header">
+    <!-- Search and Filter Bar -->
+    <div class="controls-bar">
+      <form method="GET" action="" class="search-form" id="searchForm">
+        <div class="search-wrapper">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" />
+            <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" />
+          </svg>
+          <input type="text" name="q" class="search-input" placeholder="Search by name, company, or product..."
+            aria-label="Search containers" value="{{ request.GET.q|default:'' }}" autocomplete="off">
+          {% if request.GET.q %}
+          <button type="button" class="clear-search" onclick="clearSearch()" aria-label="Clear search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M18 6L6 18M6 6l12 18" stroke="currentColor" stroke-width="2" />
+            </svg>
+          </button>
+          {% endif %}
+        </div>
+
+        <div class="filter-actions">
+          <button type="submit" class="search-btn">
+            Search
+          </button>
+          {% if request.GET.q %}
+          <a href="{% url 'containers:list' %}" class="reset-btn">
+            Clear All
+          </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="content-main">
+    <!-- Table Container -->
+    <div class="table-wrapper">
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
             <tr>
-              <th>Container Number</th>
-              <th>Name</th>
-              <th>Company</th>
-              <th>Products</th>
-              <th>Stock Qty</th>
-              <th>Inventory Value</th>
-              <th>Actions</th>
+              <th class="column-header">
+                <div class="header-content">
+                  <span>Container</span>
+                  <button class="sort-btn" data-sort="name" aria-label="Sort by name">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                  </button>
+                </div>
+              </th>
+              <th class="column-header">
+                <div class="header-content">
+                  <span>Company</span>
+                  <button class="sort-btn" data-sort="company" aria-label="Sort by company">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                  </button>
+                </div>
+              </th>
+              <th class="column-header">
+                <div class="header-content">
+                  <span>UnitPrice</span>
+                  <button class="sort-btn" data-sort="company" aria-label="Sort by company">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                  </button>
+                </div>
+              </th>
+              <th class="column-header">
+                <div class="header-content">
+                  <span>Products</span>
+                  <button class="sort-btn" data-sort="products" aria-label="Sort by product count">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                  </button>
+                </div>
+              </th>
+              <th class="column-header">
+                <div class="header-content">
+                  <span>Stock Qty</span>
+                  <button class="sort-btn" data-sort="stock" aria-label="Sort by stock quantity">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                  </button>
+                </div>
+              </th>
+              <th class="column-header">
+                <div class="header-content">
+                  <span>Inventory Value</span>
+                  <button class="sort-btn" data-sort="value" aria-label="Sort by inventory value">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                  </button>
+                </div>
+              </th>
             </tr>
           </thead>
-          <tbody class="table-body">
+
+          <tbody>
             {% for container in containers %}
-            <tr>
-              <td>
-                <a href="{% url 'containers:total_container_transactions_report' %}" class="container-number-link">
-                  {{ container.container_number|default:container.id }}
-                </a>
+            <tr class="data-row" data-container-id="{{ container.id }}">
+              <td class="data-cell">
+                <div class="container-info">
+                  <div class="container-name-wrapper">
+                    <strong class="container-name">
+                      <a href="{% url 'containers:detail' container.id %}" class="container-link">
+                        {{ container.name|default:"Unnamed Container" }}
+                      </a>
+                    </strong>
+                    <span class="container-id">#{{ container.id|stringformat:"06d" }}</span>
+                  </div>
+                  {% if container.description %}
+                  <div class="description-hint" title="{{ container.description }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" />
+                      <path d="M12 16v-4M12 8h.01" stroke="currentColor" stroke-width="1.5" />
+                    </svg>
+                  </div>
+                  {% endif %}
+                </div>
               </td>
-              <td>
-                <strong>{{ container.name }}</strong>
+
+              <td class="data-cell">
+                <div class="company-info">
+                  {% if container.company %}
+                  <span class="company-name">{{ container.company.name }}</span>
+                  {% else %}
+                  <span class="no-company">—</span>
+                  {% endif %}
+                </div>
               </td>
-              <td>
-                <span>{{ container.company.name|default:"-" }}</span>
+
+              <td class="data-cell">
+                <div class="company-info">
+                  {% if container.price %}
+                  <span class="company-name">{{ container.price }}</span>
+                  {% else %}
+                  <span class="no-company">—</span>
+                  {% endif %}
+                </div>
               </td>
-              <td>
-                <span class="value-badge products-count">
-                  {{ container.products_count|default:0 }}
-                </span>
+
+              <td class="data-cell">
+                <div class="metric-display">
+                  <span class="metric-value">{{ container.products_count|default:0 }}</span>
+                  <span class="metric-label">items</span>
+                </div>
               </td>
-              <td>
-                <span class="value-badge stock-qty">
-                  {{ container.total_in_stock_qty|default:0 }}
-                </span>
+
+              <td class="data-cell">
+                <div class="metric-display stock-metric">
+                  <span class="metric-value">{{ container.total_in_stock_qty|default:0|intcomma }}</span>
+                  <span class="metric-label">units</span>
+                </div>
               </td>
-              <td>
-                <span class="value-badge inventory-value">
-                  ${{ container.total_inventory_value|default:0 }}
-                </span>
-              </td>
-              <td>
-                <div class="action-buttons-cell">
-                  <a class="btn btn-sm btn-outline-secondary"
-                    href="{% url 'containers:container_financial_report' container_id=container.id %}">
-                    💰 Financial
-                  </a>
-                  <a class="btn btn-sm btn-outline-info" href="{% url 'containers:detail' container.id %}">
-                    👁️ Details
-                  </a>
+
+              <td class="data-cell">
+                <div class="metric-display value-metric">
+                  <span class="metric-value">${{ container.total_inventory_value|default:0|intcomma }}</span>
                 </div>
               </td>
             </tr>
             {% empty %}
-            <tr>
-              <td colspan="7">
+            <tr class="empty-row">
+              <td colspan="5">
                 <div class="empty-state">
-                  <span class="empty-state-icon">📭</span>
-                  <p>No containers found</p>
-                  <small class="text-muted">Start by adding your first container</small>
+                  <div class="empty-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5" />
+                      <path d="M8 8h8M8 12h8M8 16h8" stroke="currentColor" stroke-width="1.5" />
+                    </svg>
+                  </div>
+                  <h3 class="empty-title">
+                    {% if request.GET.q %}
+                    No Containers Found
+                    {% else %}
+                    No Containers Available
+                    {% endif %}
+                  </h3>
+                  <p class="empty-message">
+                    {% if request.GET.q %}
+                    No containers match your search "{{ request.GET.q }}". Try different keywords.
+                    {% else %}
+                    Start by adding your first container to the system.
+                    {% endif %}
+                  </p>
+                  {% if not request.GET.q %}
+                  <a href="{% url 'admin:containers_container_add' %}" class="empty-action">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                    Add Container
+                  </a>
+                  {% endif %}
                 </div>
               </td>
             </tr>
@@ -78,216 +225,98 @@
           </tbody>
         </table>
       </div>
-      {% if is_paginated %}
-      <div class="pagination-container">
-        <nav aria-label="Page navigation">
-          <ul class="pagination">
-            {% if page_obj.has_previous %}
-            <li class="page-item">
-              <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
-                ← Previous
-              </a>
-            </li>
-            {% endif %}
-
-            <li class="page-item active">
-              <span class="page-link">
-                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-              </span>
-            </li>
-
-            {% if page_obj.has_next %}
-            <li class="page-item">
-              <a class="page-link" href="?page={{ page_obj.next_page_number }}">
-                Next →
-              </a>
-            </li>
-            {% endif %}
-          </ul>
-        </nav>
-      </div>
-      {% endif %}
     </div>
-  </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="pagination">
+      <div class="pagination-info">
+        <span class="current-page">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        <span class="total-items">{{ paginator.count }} total containers</span>
+      </div>
+
+      <div class="pagination-controls">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+          class="page-nav prev">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" />
+          </svg>
+          Previous
+        </a>
+        {% endif %}
+
+        <div class="page-numbers">
+          {% for num in page_obj.paginator.page_range %}
+          {% if page_obj.number == num %}
+          <span class="page-number active">{{ num }}</span>
+          {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+            href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="page-number">{{ num
+            }}</a>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+          class="page-nav next">
+          Next
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </main>
 </div>
 
 <script>
+  // Auto-submit form on Enter key in search input
   document.addEventListener('DOMContentLoaded', function () {
-    const tableRows = document.querySelectorAll('.table-body tr');
-    tableRows.forEach(row => {
-      row.addEventListener('mouseenter', function () {
-        requestAnimationFrame(() => {
-          this.style.backgroundColor = '#f8fafc';
-        });
-      });
+    const searchInput = document.querySelector('.search-input');
+    const searchForm = document.getElementById('searchForm');
 
-      row.addEventListener('mouseleave', function () {
-        requestAnimationFrame(() => {
-          this.style.backgroundColor = '';
-        });
-      });
-    });
-
-    document.querySelectorAll('.btn').forEach(btn => {
-      btn.addEventListener('click', function (e) {
-        if (this.getAttribute('href') === '#') {
+    if (searchInput) {
+      searchInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
           e.preventDefault();
-          const originalHTML = this.innerHTML;
-          this.innerHTML = 'Loading...';
-          this.style.opacity = '0.7';
-          this.style.pointerEvents = 'none';
-
-          setTimeout(() => {
-            this.innerHTML = originalHTML;
-            this.style.opacity = '';
-            this.style.pointerEvents = '';
-          }, 1000);
-        }
-      });
-    });
-
-    if ('requestIdleCallback' in window) {
-      requestIdleCallback(() => {
-        const tableContainer = document.querySelector('.table-container');
-        if (tableContainer) {
-          tableContainer.style.willChange = 'transform';
+          searchForm.submit();
         }
       });
     }
-    const addSearchIfNeeded = () => {
-      const header = document.querySelector('.page-header');
-      if (header && !document.querySelector('.search-box')) {
-        const searchHTML = `
-                <div class="search-box">
-                    <input type="text" placeholder="Search containers..." class="search-input">
-                    <button class="search-btn">Search</button>
-                </div>
-            `;
-        header.insertAdjacentHTML('afterend', searchHTML);
 
-        const searchInput = document.querySelector('.search-input');
-        const searchBtn = document.querySelector('.search-btn');
-
-        searchBtn.addEventListener('click', performSearch);
-        searchInput.addEventListener('keyup', (e) => {
-          if (e.key === 'Enter') performSearch();
-        });
-      }
-    };
-
-    const performSearch = () => {
-      const searchTerm = document.querySelector('.search-input').value.toLowerCase();
-      const rows = document.querySelectorAll('.table-body tr');
-
-      rows.forEach(row => {
-        const rowText = row.textContent.toLowerCase();
-        if (rowText.includes(searchTerm)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
+    // Add loading state to search form
+    if (searchForm) {
+      searchForm.addEventListener('submit', function () {
+        const searchBtn = this.querySelector('.search-btn');
+        if (searchBtn) {
+          searchBtn.innerHTML = '<span class="spinner-small"></span> Searching...';
+          searchBtn.disabled = true;
         }
       });
-    };
-    setTimeout(addSearchIfNeeded, 100);
-
-    const addSortIfNeeded = () => {
-      const headers = document.querySelectorAll('.table-header th');
-      headers.forEach((header, index) => {
-        header.style.cursor = 'pointer';
-        header.addEventListener('click', () => sortTable(index));
-      });
-    };
-
-    const sortTable = (columnIndex) => {
-      const table = document.querySelector('.table');
-      const tbody = table.querySelector('tbody');
-      const rows = Array.from(tbody.querySelectorAll('tr'));
-
-      if (columnIndex === 6) return;
-
-      const isAscending = !table.dataset.sortAsc || table.dataset.sortAsc === 'false';
-
-      rows.sort((a, b) => {
-        const aText = a.children[columnIndex].textContent.trim();
-        const bText = b.children[columnIndex].textContent.trim();
-
-        if (columnIndex === 3 || columnIndex === 4 || columnIndex === 5) {
-          const aNum = parseFloat(aText.replace(/[^0-9.-]+/g, "")) || 0;
-          const bNum = parseFloat(bText.replace(/[^0-9.-]+/g, "")) || 0;
-          return isAscending ? aNum - bNum : bNum - aNum;
-        }
-
-        return isAscending
-          ? aText.localeCompare(bText)
-          : bText.localeCompare(aText);
-      });
-
-      rows.forEach(row => tbody.appendChild(row));
-      table.dataset.sortAsc = isAscending;
-    };
-
-
-    setTimeout(addSortIfNeeded, 100);
+    }
   });
 
-  function exportToCSV() {
-    const rows = document.querySelectorAll('.table-body tr');
-    let csv = 'Container Number,Name,Company,Products,Stock Qty,Inventory Value\n';
+  function clearSearch() {
+    const searchInput = document.querySelector('.search-input');
+    const searchForm = document.getElementById('searchForm');
 
-    rows.forEach(row => {
-      if (row.style.display !== 'none') {
-        const cols = row.querySelectorAll('td');
-        const rowData = [];
-
-        cols.forEach((col, index) => {
-          if (index < 6) { 
-            let text = col.textContent.trim();
-            text = text.replace(/[^\x00-\x7F]/g, '').trim();
-            if (text.includes(',')) text = `"${text}"`;
-            rowData.push(text);
-          }
-        });
-
-        csv += rowData.join(',') + '\n';
-      }
-    });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'containers.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    if (searchInput) {
+      searchInput.value = '';
+      searchForm.submit();
+    }
   }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    setTimeout(() => {
-      const header = document.querySelector('.page-header');
-      if (header && !document.querySelector('.export-btn')) {
-        const exportBtn = document.createElement('button');
-        exportBtn.className = 'export-btn';
-        exportBtn.textContent = 'Export CSV';
-        exportBtn.style.cssText = `
-                position: absolute;
-                right: 0;
-                top: 0;
-                padding: 0.5rem 1rem;
-                background: #3498db;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 0.875rem;
-            `;
-
-        header.style.position = 'relative';
-        header.appendChild(exportBtn);
-
-        exportBtn.addEventListener('click', exportToCSV);
-      }
-    }, 200);
-  });
+  function getColumnIndex(field) {
+    const fieldMap = {
+      'name': 1,
+      'company': 2,
+      'products': 3,
+      'stock': 4,
+      'value': 5
+    };
+    return fieldMap[field] || 1;
+  }
 </script>
 {% endblock %}

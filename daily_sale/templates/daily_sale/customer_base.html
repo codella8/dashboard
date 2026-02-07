@@ -36,52 +36,6 @@
       </button>
 
       <div class="collapse navbar-collapse" id="navbarMain">
-        <ul class="navbar-nav me-auto">
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'accounts:dashboard' %}active{% endif %}"
-              href="{% url 'accounts:dashboard' %}">
-              <i class="bi bi-house me-2"></i>
-              Home 
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'transaction_create' %}active{% endif %}"
-              href="{% url 'daily_sale:transaction_create' %}">
-              <i class="bi bi-plus-circle me-2"></i>
-              New Transaction
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}"
-              href="{% url 'daily_sale:transaction_list' %}">
-              <i class="bi bi-list-check me-2"></i>
-              Transactions
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'daily_summary' %}active{% endif %}"
-              href="{% url 'daily_sale:daily_summary' %}">
-              <i class="bi bi-file-text me-2"></i>
-              Daily Summary
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'outstanding' %}active{% endif %}"
-              href="{% url 'daily_sale:outstanding' %}">
-              <i class="bi bi-exclamation-triangle me-2"></i>
-              Old Transactions
-            </a>
-          </li>
-
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'cleared_transactions' %}active{% endif %}"
-              href="{% url 'daily_sale:cleared_transactions' %}">
-              <i class="bi bi-speedometer2 me-2"></i>
-              Cleared Cashes
-            </a>
-          </li>
-        </ul>
-
         <div class="navbar-right">
           <div class="dropdown user-dropdown">
             <button class="btn btn-user dropdown-toggle" type="button" data-bs-toggle="dropdown">

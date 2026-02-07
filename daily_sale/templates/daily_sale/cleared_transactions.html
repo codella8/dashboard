@@ -2,243 +2,281 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Almuqbil | Cleared Transactions {% endblock %}
+{% block title %}Cleared Customers | Almuqbil Motors{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-2 text-gray-800">
-                <i class="fas fa-check-circle text-success me-2"></i>
-                Cleared Transactions
-            </h1>
-            <p class="text-muted mb-0">
-                <i class="fas fa-chart-line me-1"></i>
-                Comprehensive financial analysis of not paid transactions
-            </p>
-        </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-danger" id="refreshBtn">
-                <i class="fas fa-sync-alt me-1"></i> Refresh
-            </button>
-        </div>
-    </div>
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-success text-uppercase mb-2">Total Cleared Amount</h6>
-                            <h2 class="mb-2">AED {{ cleared_stats.total_amount|floatformat:0|intcomma }}</h2>
-                            <div class="d-flex align-items-center">
-                                <span class="badge bg-success me-2">{{ cleared_stats.total_transactions }}</span>
-                                <small class="text-muted">Transactions</small>
-                            </div>
-                        </div>
-                        <div class="text-success opacity-25">
-                            <i class="fas fa-money-bill-wave fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-primary text-uppercase mb-2">Unpaid</h6>
-                            <h2 class="mb-2">{{ cleared_stats.avg_days_to_settle|floatformat:1 }} days</h2>
-                            <div class="d-flex align-items-center">
-                                <span class="badge bg-primary me-2">{{ cleared_stats.total_customers }}</span>
-                                <small class="text-muted">Customers</small>
-                            </div>
-                        </div>
-                        <div class="text-primary opacity-25">
-                            <i class="fas fa-tachometer-alt fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-info text-uppercase mb-2">Payment Types</h6>
-                            <h2 class="mb-2">{{ cleared_stats.full_payments }}/{{ cleared_stats.partial_payments }}</h2>
-                            <div class="d-flex align-items-center">
-                                <span class="badge bg-info me-2">Full/Partial</span>
-                            </div>
-                        </div>
-                        <div class="text-info opacity-25">
-                            <i class="fas fa-percentage fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-warning text-uppercase mb-2">Average Transaction</h6>
-                            <h2 class="mb-2">AED {{ cleared_stats.avg_amount|floatformat:0|intcomma }}</h2>
-                            <div class="d-flex align-items-center">
-                                <span class="badge bg-warning me-2">Range</span>
-                                <small class="text-muted">{{ cleared_stats.fastest_settle }} - {{
-                                    cleared_stats.slowest_settle }} days</small>
-                            </div>
-                        </div>
-                        <div class="text-warning opacity-25">
-                            <i class="fas fa-chart-bar fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="container-fluid py-4">
+    <!-- Page Header -->
     <div class="card shadow mb-4">
-        <div class="card-header">
-            <h5 class="mb-0">
-                <i class="fas fa-filter me-2"></i>
-                Advanced Filters & Analytics
-            </h5>
+        <div class="card-header bg-success text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Cleared Customers List
+                    </h4>
+                    <p class="mb-0 mt-2">Customers with fully paid accounts</p>
+                </div>
+                <div class="text-end">
+                    <h3 class="mb-0">{{ customers_count }} Customers</h3>
+                    <small>Fully Paid</small>
+                </div>
+            </div>
         </div>
+
+        <!-- Search and Filters -->
         <div class="card-body">
             <form method="get" class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Period</label>
-                    <select class="form-select" name="period">
-                        <option value="today" {% if request.GET.period == 'today' %}selected{% endif %}>Today</option>
-                        <option value="week" {% if request.GET.period == 'week' %}selected{% endif %}>This Week</option>
-                        <option value="month" {% if request.GET.period == 'month' or not request.GET.period %}selected{% endif %}>This Month</option>
-                        <option value="year" {% if request.GET.period == 'year' %}selected{% endif %}>This Year</option>
-                        <option value="all" {% if request.GET.period == 'all' %}selected{% endif %}>All Time</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Sort By</label>
-                    <select class="form-select" name="sort">
-                        <option value="date_desc" {% if request.GET.sort == 'date_desc' %}selected{% endif %}>Newest First
-                        </option>
-                        <option value="date_asc" {% if request.GET.sort == 'date_asc' %}selected{% endif %}>Oldest First
-                        </option>
-                        <option value="amount_desc" {% if request.GET.sort == 'amount_desc' %}selected{% endif %}>Highest
-                            Amount</option>
-                        <option value="amount_asc" {% if request.GET.sort == 'amount_asc' %}selected{% endif %}>Lowest
-                            Amount</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Search</label>
+                <div class="col-md-8">
                     <div class="input-group">
-                        <input type="text" class="form-control" name="search" placeholder="Invoice or Customer..."
-                            value="{{ search_query }}">
-                        <button type="submit" class="btn btn-primary">
+                        <span class="input-group-text">
                             <i class="fas fa-search"></i>
-                        </button>
+                        </span>
+                        <input type="text" name="search" class="form-control"
+                            placeholder="Search customer (name, phone, email)..." value="{{ search_query }}">
                     </div>
+                </div>
+
+                <div class="col-md-2">
+                    <select name="period" class="form-select">
+                        <option value="month" {% if period=='month' %}selected{% endif %}>Last Month</option>
+                        <option value="week" {% if period=='week' %}selected{% endif %}>Last Week</option>
+                        <option value="quarter" {% if period=='quarter' %}selected{% endif %}>Last Quarter</option>
+                        <option value="year" {% if period=='year' %}selected{% endif %}>Last Year</option>
+                        <option value="all" {% if period=='all' %}selected{% endif %}>All Time</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-1"></i> Filter
+                    </button>
                 </div>
             </form>
         </div>
     </div>
-    <div class="card shadow">
-        <div class="card-header">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-list-check me-2"></i>
-                    Cleared Transactions
-                </h5>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-start-success border-start-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1">Total Cleared Amount</h6>
+                            <h4 class="mb-0 text-success">
+                                AED {{ stats.total_amount|floatformat:0|intcomma }}
+                            </h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-money-bill-wave fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="card-body">
+
+        <div class="col-md-4">
+            <div class="card border-start-info border-start-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1">Average per Customer</h6>
+                            <h4 class="mb-0 text-info">
+                                AED {{ stats.avg_amount_per_customer|floatformat:0|intcomma }}
+                            </h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-chart-line fa-2x text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-start-warning border-start-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1">Cleared Transactions</h6>
+                            <h4 class="mb-0 text-warning">
+                                {{ stats.total_transactions }}
+                            </h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-receipt fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customers Table -->
+    <div class="card shadow">
+        <div class="card-header bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-users me-2"></i>
+                    Cleared Customers
+                </h5>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel me-1"></i> Export
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i> Print
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            {% if cleared_customers %}
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
                             <th>#</th>
-                            <th>Invoice No.</th>
-                            <th>Date</th>
                             <th>Customer</th>
-                            <th class="text-end">Amount</th>
-                            <th class="text-end">Paid</th>
-                            <th>Settlement</th>
-                            <th class="text-end">Days</th>
-                            <th>Type</th>
-                            <th>Actions</th>
+                            <th>Contact</th>
+                            <th class="text-end">Cleared Amount</th>
+                            <th>Transactions</th>
+                            <th class="text-center">Last Payment</th>
+                            <th>Status</th>
+                            <th class="text-center">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="transactionsBody">
-                        {% for transaction in cleared_transactions %}
-                        <tr
-                            class="{% if transaction.settlement_type == 'full' %}table-success{% else %}table-info{% endif %}">
+                    <tbody>
+                        {% for customer in cleared_customers %}
+                        <tr>
                             <td>{{ forloop.counter }}</td>
                             <td>
-                                <strong>{{ transaction.invoice_number }}</strong>
-                            </td>
-                            <td>{{ transaction.date|date:"Y-m-d" }}</td>
-                            <td>{{ transaction.customer_name }}</td>
-                            <td class="text-end">
-                                <strong>AED {{ transaction.total_amount|floatformat:2|intcomma }}</strong>
-                            </td>
-                            <td class="text-end text-success">
-                                AED {{ transaction.paid_amount|floatformat:2|intcomma }}
+                                <strong>{{ customer.customer_name }}</strong>
+                                {% if customer.customer_email %}
+                                <br>
+                                <small class="text-muted">{{ customer.customer_email }}</small>
+                                {% endif %}
                             </td>
                             <td>
-                                {% if transaction.settlement_date %}
-                                {{ transaction.settlement_date|date:"Y-m-d" }}
+                                {% if customer.customer_phone %}
+                                <i class="fas fa-phone me-1"></i> {{ customer.customer_phone }}
+                                {% else %}
+                                <span class="text-muted">No phone</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <span class="text-success fw-bold">
+                                    {{ customer.formatted_amount }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">
+                                    {{ customer.total_transactions }} Transaction{{
+                                    customer.total_transactions|pluralize }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {% if customer.last_payment_date %}
+                                {{ customer.last_payment_date|date:"Y-m-d" }}
+                                <br>
+                                <small class="text-muted">{{ customer.clear_days }} days ago</small>
                                 {% else %}
                                 <span class="text-muted">N/A</span>
                                 {% endif %}
                             </td>
-                            <td class="text-end">
-                                {% if transaction.days_to_settle > 0 %}
-                                <span
-                                    class="badge {% if transaction.days_to_settle <= 7 %}bg-success{% elif transaction.days_to_settle <= 30 %}bg-warning{% else %}bg-danger{% endif %}">
-                                    {{ transaction.days_to_settle }} days
+                            <td>
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check-circle me-1"></i> {{ customer.clear_status }}
                                 </span>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
                             </td>
-                            <td>
-                                {% if transaction.settlement_type == 'full' %}
-                                <span class="badge bg-success">Full</span>
-                                {% else %}
-                                <span class="badge bg-info">Partial ({{ transaction.payment_count }})</span>
-                                {% endif %}
-                            </td>
-                            <td>
+                            <td class="text-center">
                                 <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-primary download-receipt-btn"
-                                        data-transaction-id="{{ transaction.id }}">
-                                        <i class="fas fa-receipt"></i>
-                                    </button>
-                                    <button class="btn btn-outline-info view-details-btn"
-                                        data-transaction-id="{{ transaction.id }}">
+                                    <button type="button" class="btn btn-outline-primary"
+                                        onclick="viewCustomerDetails('{{ customer.customer_id }}')"
+                                        title="View Details">
                                         <i class="fas fa-eye"></i>
                                     </button>
-                                    <a href="{% url 'daily_sale:transaction_detail' transaction.id %}"
-                                        class="btn btn-outline-secondary">
-                                        <i class="fas fa-external-link-alt"></i>
+                                    <a href="{% url 'daily_sale:cleared_customer_detail' customer.customer_id %}"
+                                        class="btn btn-outline-info" title="View Transactions">
+                                        <i class="fas fa-receipt"></i>
                                     </a>
+                                    <button type="button" class="btn btn-outline-success"
+                                        onclick="contactCustomer('{{ customer.customer_id }}')"
+                                        title="Contact Customer">
+                                        <i class="fas fa-envelope"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="10" class="text-center py-4">
-                                <div class="text-muted">
-                                    <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
-                                    <h5>No Cleared Transactions Found</h5>
-                                    <p>No fully paid transactions in the selected period.</p>
+
+                        <!-- Customer Details Row (Collapsible) -->
+                        <tr class="customer-details-row" id="details-{{ customer.customer_id }}" style="display: none;">
+                            <td colspan="8" class="bg-light">
+                                <div class="p-3">
+                                    <h6 class="mb-3">
+                                        <i class="fas fa-file-invoice-dollar me-2"></i>
+                                        Cleared Transaction Details
+                                    </h6>
+
+                                    {% if customer.transactions %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered">
+                                            <thead>
+                                                <tr class="table-secondary">
+                                                    <th>Invoice #</th>
+                                                    <th>Date</th>
+                                                    <th>Total Amount</th>
+                                                    <th>Paid</th>
+                                                    <th>Discount</th>
+                                                    <th>Payments</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for transaction in customer.transactions %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ transaction.invoice_number }}</strong>
+                                                    </td>
+                                                    <td>{{ transaction.date|date:"Y-m-d" }}</td>
+                                                    <td class="text-end">
+                                                        AED {{ transaction.total_amount|floatformat:0|intcomma }}
+                                                    </td>
+                                                    <td class="text-end text-success">
+                                                        AED {{ transaction.total_paid|floatformat:0|intcomma }}
+                                                    </td>
+                                                    <td class="text-end text-warning">
+                                                        {% if transaction.discount > 0 %}
+                                                        AED {{ transaction.discount|floatformat:0|intcomma }}
+                                                        {% else %}
+                                                        <span class="text-muted">-</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-info">
+                                                            {{ transaction.payment_count }} Payment{{
+                                                            transaction.payment_count|pluralize }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check-circle me-1"></i> {{
+                                                            transaction.status }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <div class="alert alert-info mb-0">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        No transaction details available.
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -246,340 +284,378 @@
                     </tbody>
                     <tfoot class="table-light">
                         <tr>
-                            <th colspan="4" class="text-end">TOTALS:</th>
-                            <th class="text-end">AED {{ cleared_stats.total_amount|floatformat:2|intcomma }}</th>
-                            <th class="text-end text-success">AED {{ cleared_stats.total_amount|floatformat:2|intcomma }}</th>
-                            <th colspan="2"></th>
-                            <th>
-                                {{ cleared_stats.full_payments }} Full / {{ cleared_stats.partial_payments }} Partial
+                            <th colspan="3" class="text-end">TOTALS:</th>
+                            <th class="text-end text-success">
+                                AED {{ stats.total_amount|floatformat:0|intcomma }}
                             </th>
-                            <th></th>
+                            <th>{{ stats.total_transactions }}</th>
+                            <th colspan="3"></th>
                         </tr>
                     </tfoot>
                 </table>
             </div>
-
-            <!-- Pagination -->
-            {% if page_obj.has_other_pages %}
-            <nav aria-label="Page navigation" class="mt-4">
-                <ul class="pagination justify-content-center">
-                    {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link"
-                            href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode|cut:'page=' }}"
-                            aria-label="Previous">
-                            <span aria-hidden="true">&laquo;</span>
-                        </a>
-                    </li>
-                    {% endif %}
-
-                    {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <li class="page-item"><a
-                            class="page-link" href="?page={{ num }}&{{ request.GET.urlencode|cut:'page=' }}">{{ num }}</a></li>
-                        {% endif %}
-                        {% endfor %}
-
-                        {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link"
-                                href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode|cut:'page=' }}"
-                                aria-label="Next">
-                                <span aria-hidden="true">&raquo;</span>
-                            </a>
-                        </li>
-                        {% endif %}
-                </ul>
-            </nav>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">No Cleared Customers</h4>
+                <p class="text-muted">No customers have fully paid accounts in the selected period.</p>
+                <button type="button" class="btn btn-primary" onclick="window.location.reload()">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh
+                </button>
+            </div>
             {% endif %}
         </div>
-    </div>
 
-    <div class="card shadow mt-4">
-        <div class="card-header">
-            <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Financial Summary</h5>
-        </div>
-        <div class="card-body">
+        {% if cleared_customers %}
+        <div class="card-footer">
             <div class="row">
-               
                 <div class="col-md-6">
-                    <h6>Export Options</h6>
-                    <div class="row">
-                        <div class="col-6 mb-2">
-                            <button class="btn btn-outline-primary w-100" onclick="exportToPDF()">
-                                <i class="fas fa-file-pdf me-2"></i>PDF Report
-                            </button>
-                        </div>
+                    <small class="text-muted">
+                        Showing {{ cleared_customers|length }} customer{{ cleared_customers|length|pluralize }}
+                        from {{ start_date|date:"Y-m-d" }} to {{ end_date|date:"Y-m-d" }}
+                    </small>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="btn-group">
+                        <button type="button"
+                            class="btn btn-outline-secondary btn-sm {% if sort_by == 'date_desc' %}active{% endif %}"
+                            onclick="changeSort('date_desc')">
+                            <i class="fas fa-sort-amount-down me-1"></i> Newest
+                        </button>
+                        <button type="button"
+                            class="btn btn-outline-secondary btn-sm {% if sort_by == 'amount_desc' %}active{% endif %}"
+                            onclick="changeSort('amount_desc')">
+                            <i class="fas fa-sort-numeric-down me-1"></i> Highest Amount
+                        </button>
+                        <button type="button"
+                            class="btn btn-outline-secondary btn-sm {% if sort_by == 'name_asc' %}active{% endif %}"
+                            onclick="changeSort('name_asc')">
+                            <i class="fas fa-sort-alpha-down me-1"></i> Name A-Z
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
-<div id="chart-data" data-transactions='{{ transactions_json|safe }}' style="display: none;">
+
+<!-- Customer Details Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-circle me-2"></i>
+                    Customer Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="customerModalBody">
+                <!-- Content loaded via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contact Modal -->
+<div class="modal fade" id="contactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-envelope me-2"></i>
+                    Contact Customer
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contactModalBody">
+                <!-- Form loaded via AJAX -->
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    let transactionsData = [];
+    // Global variables
+    let currentOpenDetails = null;
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const chartDataElement = document.getElementById('chart-data');
-        if (chartDataElement && chartDataElement.dataset.transactions) {
-            try {
-                transactionsData = JSON.parse(chartDataElement.dataset.transactions);
-            } catch (e) {
-                console.error('Error parsing transaction data:', e);
+    // View customer details
+    function viewCustomerDetails(customerId) {
+        // Toggle details row
+        const detailsRow = document.getElementById(`details-${customerId}`);
+
+        if (currentOpenDetails && currentOpenDetails !== detailsRow) {
+            currentOpenDetails.style.display = 'none';
+        }
+
+        if (detailsRow.style.display === 'none') {
+            detailsRow.style.display = 'table-row';
+            currentOpenDetails = detailsRow;
+        } else {
+            detailsRow.style.display = 'none';
+            currentOpenDetails = null;
+        }
+    }
+
+    // View detailed customer information
+    function viewCustomerInfo(customerId) {
+        fetch(`/api/customers/${customerId}/cleared-details/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const customer = data.customer;
+                    const modalBody = document.getElementById('customerModalBody');
+
+                    modalBody.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Customer Information</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Name:</th>
+                                    <td>${customer.name}</td>
+                                </tr>
+                                <tr>
+                                    <th>Email:</th>
+                                    <td>${customer.email || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <th>Phone:</th>
+                                    <td>${customer.phone || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <th>Address:</th>
+                                    <td>${customer.address || 'N/A'}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Payment Summary</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Total Cleared:</th>
+                                    <td class="text-success">AED ${customer.total_cleared || 0}</td>
+                                </tr>
+                                <tr>
+                                    <th>Transactions:</th>
+                                    <td>${customer.transactions_count || 0}</td>
+                                </tr>
+                                <tr>
+                                    <th>Last Payment:</th>
+                                    <td>${customer.last_payment_date || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <th>First Transaction:</th>
+                                    <td>${customer.first_transaction_date || 'N/A'}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    ${customer.recent_transactions && customer.recent_transactions.length > 0 ? `
+                    <hr>
+                    <h6>Recent Cleared Transactions</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${customer.recent_transactions.map(tx => `
+                                    <tr>
+                                        <td>${tx.invoice_number}</td>
+                                        <td>${tx.date}</td>
+                                        <td>AED ${tx.amount}</td>
+                                        <td><span class="badge bg-success">Paid</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    ` : ''}
+                `;
+
+                    const modal = new bootstrap.Modal(document.getElementById('customerModal'));
+                    modal.show();
+                } else {
+                    alert('Error loading customer details');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading customer details:', error);
+                alert('Error loading customer details');
+            });
+    }
+
+    // Contact customer
+    function contactCustomer(customerId) {
+        fetch(`/api/customers/${customerId}/contact-info/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const customer = data.customer;
+                    const modalBody = document.getElementById('contactModalBody');
+
+                    modalBody.innerHTML = `
+                    <form id="contactForm">
+                        <div class="mb-3">
+                            <label class="form-label">Customer</label>
+                            <input type="text" class="form-control" value="${customer.name}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" value="${customer.email || ''}" 
+                                   ${!customer.email ? 'readonly' : ''} placeholder="No email available">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" value="${customer.phone || ''}" 
+                                   ${!customer.phone ? 'readonly' : ''} placeholder="No phone available">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Message</label>
+                            <textarea class="form-control" rows="4" placeholder="Type your message here..."></textarea>
+                        </div>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Send Message</button>
+                        </div>
+                    </form>
+                `;
+
+                    const modal = new bootstrap.Modal(document.getElementById('contactModal'));
+                    modal.show();
+
+                    // Setup form submission
+                    const form = document.getElementById('contactForm');
+                    form.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        sendCustomerMessage(customerId);
+                    });
+                } else {
+                    alert('Error loading customer contact information');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading contact info:', error);
+                alert('Error loading contact information');
+            });
+    }
+
+    // Send message to customer
+    function sendCustomerMessage(customerId) {
+        const form = document.getElementById('contactForm');
+        const message = form.querySelector('textarea').value;
+
+        fetch(`/api/customers/${customerId}/send-message/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                message: message
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Message sent successfully!');
+                    bootstrap.Modal.getInstance(document.getElementById('contactModal')).hide();
+                } else {
+                    alert('Error sending message: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                alert('Error sending message');
+            });
+    }
+
+    // Export to Excel
+    function exportToExcel() {
+        // Create CSV data
+        let csv = 'Customer Name,Email,Phone,Cleared Amount,Transactions,Last Payment,Status\n';
+
+        document.querySelectorAll('tbody tr:not(.customer-details-row)').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 7) {
+                const customerName = cells[1].querySelector('strong')?.textContent || '';
+                const email = cells[1].querySelector('small')?.textContent || '';
+                const phone = cells[2].textContent.replace('📞', '').trim();
+                const amount = cells[3].textContent.replace('AED', '').trim();
+                const transactions = cells[4].textContent;
+                const lastPayment = cells[5].textContent;
+                const status = cells[6].textContent;
+
+                csv += `"${customerName}","${email}","${phone}","${amount}","${transactions}","${lastPayment}","${status}"\n`;
+            }
+        });
+
+        // Add totals
+        const totalRow = document.querySelector('tfoot tr');
+        if (totalRow) {
+            const totalCells = totalRow.querySelectorAll('th');
+            csv += `\nTOTALS,,,${totalCells[3]?.textContent.replace('AED', '').trim()},${totalCells[4]?.textContent},,\n`;
+        }
+
+        // Download CSV
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cleared_customers_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        alert('Export completed! File downloaded as CSV.');
+    }
+
+    // Change sort order
+    function changeSort(sortBy) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('sort', sortBy);
+        window.location.href = url.toString();
+    }
+
+    // Utility function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
+    }
 
-        initializeCharts();
-        document.querySelectorAll('.download-receipt-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const transactionId = this.dataset.transactionId;
-                downloadReceipt(transactionId);
-            });
-        });
-
-        document.querySelectorAll('.view-details-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const transactionId = this.dataset.transactionId;
-                viewTransactionDetails(transactionId);
-            });
-        });
-
-        // Auto-refresh
-        let refreshInterval = setInterval(refreshData, 120000);
-        let autoRefreshEnabled = true;
-
-        // Manual refresh button
-        document.getElementById('refreshBtn').addEventListener('click', function () {
-            window.location.reload();
-        });
-            
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function (e) {
+        // Ctrl + E to export
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+            e.preventDefault();
+            exportToExcel();
+        }
+        // Esc to close details
+        if (e.key === 'Escape' && currentOpenDetails) {
+            currentOpenDetails.style.display = 'none';
+            currentOpenDetails = null;
+        }
     });
-
-    function refreshData() {
-        if (!autoRefreshEnabled) return;
-
-        const refreshBtn = document.getElementById('refreshBtn');
-        if (refreshBtn) {
-            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Refreshing...';
-            refreshBtn.disabled = true;
-
-            showNotification('Updating cleared transactions data...', 'info');
-
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        }
-    }
-    function viewTransactionDetails(transactionId) {
-        const transaction = transactionsData.find(t => t.id == transactionId);
-        if (transaction) {
-            const detailsContent = document.getElementById('detailsContent');
-            detailsContent.innerHTML = `
-        <div class="row">
-          <div class="col-md-6">
-            <h6>Transaction Information</h6>
-            <table class="table table-sm">
-              <tr>
-                <th>Invoice Number:</th>
-                <td>${transaction.invoice_number}</td>
-              </tr>
-              <tr>
-                <th>Transaction Date:</th>
-                <td>${transaction.date}</td>
-              </tr>
-              <tr>
-                <th>Customer:</th>
-                <td>${transaction.customer_name}</td>
-              </tr>
-              <tr>
-                <th>Total Amount:</th>
-                <td class="text-success">AED ${transaction.total_amount.toFixed(2)}</td>
-              </tr>
-            </table>
-          </div>
-          <div class="col-md-6">
-            <h6>Settlement Details</h6>
-            <table class="table table-sm">
-              <tr>
-                <th>Settlement Type:</th>
-                <td>
-                  <span class="badge ${transaction.settlement_type === 'full' ? 'bg-success' : 'bg-info'}">
-                    ${transaction.settlement_type === 'full' ? 'Full Payment' : 'Partial Payments'}
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <th>Number of Payments:</th>
-                <td>${transaction.payment_count || 1}</td>
-              </tr>
-              <tr>
-                <th>Days to Settle:</th>
-                <td>
-                  <span class="badge ${transaction.days_to_settle <= 7 ? 'bg-success' : transaction.days_to_settle <= 30 ? 'bg-warning' : 'bg-danger'}">
-                    ${transaction.days_to_settle} days
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <th>Settlement Date:</th>
-                <td>${transaction.settlement_date || 'N/A'}</td>
-              </tr>
-            </table>
-          </div>
-        </div>
-        <div class="mt-3">
-          <h6>Payment History</h6>
-          <p class="text-muted">Payment history would be displayed here in real implementation.</p>
-        </div>
-      `;
-            new bootstrap.Modal(document.getElementById('detailsModal')).show();
-        } else {
-            showNotification('Transaction details not found', 'danger');
-        }
-    }
-    function exportToPDF() {
-        const url = new URL(window.location.href);
-        url.searchParams.set('export', 'pdf');
-        window.open(url.toString(), '_blank');
-    }
-
-    function viewAnalytics() {
-        window.open("{% url 'daily_sale:cleared_transactions' %}?analytics=true", '_blank');
-    }
-
-    function initializeCharts() {
-        if (transactionsData.length === 0) return;
-
-        const settlementCtx = document.getElementById('settlementChart');
-        if (settlementCtx) {
-            let fullPaymentCount = 0;
-            let partialPaymentCount = 0;
-
-            transactionsData.forEach(transaction => {
-                if (transaction.settlement_type === 'full') {
-                    fullPaymentCount++;
-                } else {
-                    partialPaymentCount++;
-                }
-            });
-
-            new Chart(settlementCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Full Payment', 'Partial Payments'],
-                    datasets: [{
-                        data: [fullPaymentCount, partialPaymentCount],
-                        backgroundColor: ['#1cc88a', '#f6c23e'],
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    const total = fullPaymentCount + partialPaymentCount;
-                                    const percentage = Math.round((context.parsed / total) * 100);
-                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
-                                }
-                            }
-                        }
-                    },
-                    cutout: '70%'
-                }
-            });
-        }
-
-        const trendCtx = document.getElementById('trendChart');
-        if (trendCtx) {
-            const monthlyData = {};
-
-            transactionsData.forEach(transaction => {
-                const date = new Date(transaction.date);
-                const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
-                if (!monthlyData[monthKey]) {
-                    monthlyData[monthKey] = 0;
-                }
-                monthlyData[monthKey] += transaction.total_amount;
-            });
-
-            const months = Object.keys(monthlyData);
-            const amounts = Object.values(monthlyData);
-
-            new Chart(trendCtx, {
-                type: 'line',
-                data: {
-                    labels: months,
-                    datasets: [{
-                        label: 'Cleared Amount',
-                        data: amounts,
-                        borderColor: '#4e73df',
-                        backgroundColor: 'rgba(78, 115, 223, 0.05)',
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#4e73df',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    return `AED ${context.parsed.y.toLocaleString('en-US', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    })}`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                display: false
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function (value) {
-                                    return 'AED ' + value.toLocaleString('en-US', {
-                                        minimumFractionDigits: 0,
-                                        maximumFractionDigits: 0
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    }
-        setTimeout(() => {
-            toastElement.remove();
-        }, 3000);
-
 </script>
 {% endblock %}

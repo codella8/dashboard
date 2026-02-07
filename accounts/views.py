@@ -81,8 +81,8 @@ def signup_user(request):
     return render(request, 'signup.html', {'form': form})
 
 def product(request, pk):
-    product = get_object_or_404(Product, id=pk) 
-    return render(request, 'product.html', { 
+    product = get_object_or_404(Product, id=pk)
+    return render(request, 'product.html', {
         'product': product,
     })
 
@@ -113,7 +113,7 @@ def dashboard(request):
     apps = [
         {
             'name': 'Daily Sales', 
-            'url': 'daily_sale:transaction_list',
+            'url': 'daily_sale:transaction_list/',
             'icon': 'fas fa-shopping-cart', 
             'description': 'Daily transactions and sales management'
         },
@@ -125,7 +125,7 @@ def dashboard(request):
         },
         {
             'name': 'Expenses', 
-            'url': 'expenses:report/', 
+            'url': 'expenses:expenses_dashboard/', 
             'icon': 'fas fa-money-bill-wave', 
             'description': 'Expense tracking and management'
         },

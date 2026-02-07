@@ -1,0 +1,399 @@
+<!-- templates/employee/employee_detail.html -->
+{% extends 'employee/employee_base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Employee Details - {{ employee_info.full_name }}{% endblock %}
+
+{% block content %}
+<div class="employees-detail-container">
+    <!-- هدر ناوبری -->
+    <div class="detail-header">
+        <a href="{% url 'employee:employee_list' %}" class="back-btn">
+            <i class="fas fa-arrow-left"></i>
+            Back to Employees
+        </a>
+        <div class="header-actions">
+            <a href="{% url 'admin:employee_employee_change' employee.id %}" class="btn-edit">
+                <i class="fas fa-edit"></i>
+                Edit Employee
+            </a>
+        </div>
+    </div>
+    <div class="profile-header">
+        <div class="profile-avatar">
+            <div class="avatar-large">
+                {{ employee_info.avatar_initials }}
+            </div>
+        </div>
+        <div class="profile-info">
+            <h1>{{ employee_info.full_name }}</h1>
+            <div class="profile-meta">
+                <span class="position">
+                    <i class="fas fa-briefcase"></i>
+                    {{ employee_info.position }}
+                </span>
+                <span class="employment-type">
+                    <i class="fas fa-user-tie"></i>
+                    {{ employee_info.employment_type }}
+                </span>
+                <span class="employee-id">
+                    <i class="fas fa-id-card"></i>
+                    ID: {{ employee.id|slice:":8" }}
+                </span>
+                <span class="email">
+                    <i class="fas fa-envelope"></i>
+                    {{ employee_info.email }}
+                </span>
+            </div>
+            <div class="profile-status">
+                <span
+                    class="status-badge {% if employee_info.status == 'Active' %}status-active{% else %}status-inactive{% endif %}">
+                    <i class="fas fa-circle"></i>
+                    {{ employee_info.status }}
+                </span>
+                {% if employee_info.is_current %}
+                <span class="status-badge status-active">
+                    <i class="fas fa-check-circle"></i>
+                    Currently Employed
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="profile-stats">
+            <div class="stat-item">
+                <div class="stat-label">Years of Service</div>
+                <div class="stat-value">
+                    {% if employee_info.years_of_service %}
+                    {{ employee_info.years_of_service }} years
+                    {% if employee_info.months_of_service %}
+                    {{ employee_info.months_of_service }} months
+                    {% endif %}
+                    {% else %}
+                    Not specified
+                    {% endif %}
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Hire Date</div>
+                <div class="stat-value">
+                    {% if employee_info.hire_date %}
+                    {{ employee_info.hire_date|date:"F d, Y" }}
+                    {% else %}
+                    Not specified
+                    {% endif %}
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Termination Date</div>
+                <div class="stat-value">
+                    {% if employee_info.termination_date %}
+                    {{ employee_info.termination_date|date:"F d, Y" }}
+                    {% else %}
+                    Currently Active
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="section">
+        <div class="section-header">
+            <h2>
+                <i class="fas fa-bolt"></i>
+                Financial Summary
+            </h2>
+            <span class="payment-status {{ payment_status.class }}">
+                <i class="fas fa-{{ payment_status.icon }}"></i>
+                {{ payment_status.label }}
+            </span>
+        </div>
+
+        <div class="quick-summary-grid">
+            <div class="quick-summary-item">
+                <div class="quick-summary-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="quick-summary-label">Monthly Salary</div>
+                <div class="quick-summary-value">AED{{ employee.salary_due|floatformat:0|intcomma }}</div>
+            </div>
+            <div class="quick-summary-item">
+                <div class="quick-summary-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="quick-summary-label">Total Paid</div>
+                <div class="quick-summary-value">AED{{ financials.total_paid|floatformat:0|intcomma }}</div>
+            </div>
+            <div class="quick-summary-item">
+                <div class="quick-summary-icon">
+                    <i class="fas fa-receipt"></i>
+                </div>
+                <div class="quick-summary-label">Total Expenses</div>
+                <div class="quick-summary-value">AED{{ financials.total_expenses|floatformat:0|intcomma }}</div>
+            </div>
+            <div class="quick-summary-item">
+                <div class="quick-summary-icon">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <div class="quick-summary-label">Remaining Balance</div>
+                <div class="quick-summary-value">
+                    AED{{ financials.remaining_balance|floatformat:0|intcomma }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- مرور مالی کامل -->
+    <div class="section financial-overview">
+        <div class="section-header">
+            <h2>
+                <i class="fas fa-chart-pie"></i>
+                Complete Financial Overview
+            </h2>
+        </div>
+
+        <div class="financial-grid">
+            <!-- جزئیات حقوق -->
+            <div class="financial-card">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
+                    <h3>Salary Details</h3>
+                </div>
+                <div class="card-body">
+                    <div class="financial-item">
+                        <span class="label">Monthly Salary</span>
+                        <span class="value">AED{{ employee.salary_due|floatformat:0|intcomma }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="label">Employee Debt</span>
+                        <span class="value">AED{{ employee.debt_to_company|floatformat:0|intcomma }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="label">Total Expense</span>
+                        <span
+                            class="value">AED{{financials.total_expenses|add:employee.debt_to_company|floatformat:0|intcomma}}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="label">Net Payable</span>
+                        <span class="value">AED{{ financials.net_salary|floatformat:0|intcomma }}</span>
+                    </div>
+                    <div class="financial-item highlight">
+                        <span class="label">Balance</span>
+                        <span class="value">AED{{ financials.remaining_balance|floatformat:0|intcomma }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="financial-card">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <i class="fas fa-list"></i>
+                    </div>
+                    <h3>Expense Summary</h3>
+                </div>
+                <div class="card-body">
+                    <div class="financial-item">
+                        <span class="label">Total Expenses</span>
+                        <span class="value">{{ expense_stats.total_expenses }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="label">Total Amount</span>
+                        <span class="value">AED{{ expense_stats.total_amount|floatformat:0|intcomma }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="label">Average Expense</span>
+                        <span class="value">AED{{ expense_stats.avg_expense|floatformat:0|intcomma }}</span>
+                    </div>
+                    <div class="financial-item">
+                        <span class="label">Categories</span>
+                        <span class="value">{{ expense_stats.by_category|length }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- تاریخچه هزینه‌ها -->
+    <div class="section expense-history">
+        <div class="section-header">
+            <h2>
+                <i class="fas fa-receipt"></i>
+                Recent Expense History
+            </h2>
+            <div class="section-stats">
+                <span class="stat">
+                    <i class="fas fa-list"></i>
+                    {{ expense_stats.total_expenses }} expenses
+                </span>
+                <span class="stat">
+                    <i class="fas fa-money-bill-wave"></i>
+                    AED{{ expense_stats.total_amount|floatformat:0|intcomma }} total
+                </span>
+            </div>
+        </div>
+
+        {% if expenses %}
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Expense & Type</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Note</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for expense in expenses|slice:":10" %}
+                    <tr>
+                        <td>{{ expense.date|date:"Y-m-d" }}</td>
+                        <td>{{ expense.expense }}</td>
+                        <td>
+                            <span class="category-badge">
+                                {{ expense.get_category_display }}
+                            </span>
+                        </td>
+                        <td class="amount">AED{{ expense.price|floatformat:0|intcomma }}</td>
+                        <td class="notes">{{ expense.note|truncatechars:30|default:"—" }}</td>
+
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if expenses.count > 10 %}
+        <div class="view-all">
+            <a href="#" class="btn-secondary" id="viewAllExpenses">
+                <i class="fas fa-eye"></i>
+                View All {{ expenses.count }} Expenses
+            </a>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-receipt"></i>
+            <h3>No Expenses Recorded</h3>
+            <p>No expenses have been recorded for this employee yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- یادداشت‌ها -->
+    {% if employee_info.notes %}
+    <div class="section notes-section">
+        <div class="section-header">
+            <h2>
+                <i class="fas fa-sticky-note"></i>
+                Notes & Comments
+            </h2>
+        </div>
+
+        <div class="notes-content">
+            {{ employee_info.notes|linebreaks }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- اقدامات سریع -->
+    <div class="section quick-actions">
+        <div class="section-header">
+            <h2>
+                <i class="fas fa-bolt"></i>
+                Quick Actions
+            </h2>
+        </div>
+
+        <div class="action-list">
+            <a href="{% url 'admin:employee_employee_change' employee.id %}" class="action-item">
+                <div class="action-icon">
+                    <i class="fas fa-user-edit"></i>
+                </div>
+                <div class="action-content">
+                    <h4>Edit Profile</h4>
+                    <p>Update employee information</p>
+                </div>
+            </a>
+            <a href="{% url 'admin:employee_employee_delete' employee.id %}" class="action-item"
+                onclick="return confirm('Are you sure you want to delete this employee?');"
+                style="border-color: var(--danger-color);">
+                <div class="action-icon" style="background: rgba(239, 71, 111, 0.1);">
+                    <i class="fas fa-trash-alt" style="color: var(--danger-color);"></i>
+                </div>
+                <div class="action-content">
+                    <h4>Delete Employee</h4>
+                    <p>Permanently remove this employee</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // نمایش تمام هزینه‌ها
+        const viewAllExpenses = document.getElementById('viewAllExpenses');
+        if (viewAllExpenses) {
+            viewAllExpenses.addEventListener('click', function (e) {
+                e.preventDefault();
+                const expenseRows = document.querySelectorAll('.expense-history tbody tr');
+                expenseRows.forEach(row => {
+                    row.style.display = 'table-row';
+                });
+                this.style.display = 'none';
+            });
+        }
+
+        // قالب‌بندی ارز
+        function formatCurrency(amount) {
+            return 'AED' + parseFloat(amount).toLocaleString('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+        }
+
+        // قالب‌بندی تمام مقادیر ارزی
+        document.querySelectorAll('.amount, .value, .stat-value').forEach(el => {
+            const text = el.textContent.trim();
+            if (text.startsWith('AED')) {
+                const amount = parseFloat(text.replace('AED', '').replace(/,/g, ''));
+                if (!isNaN(amount)) {
+                    el.textContent = formatCurrency(amount);
+                }
+            }
+        });
+
+        // لودینگ دکمه‌ها
+        const actionButtons = document.querySelectorAll('.btn-primary, .btn-secondary, .action-item');
+        actionButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                if (!this.classList.contains('disabled')) {
+                    const originalHTML = this.innerHTML;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                    this.classList.add('disabled');
+
+                    setTimeout(() => {
+                        this.innerHTML = originalHTML;
+                        this.classList.remove('disabled');
+                    }, 2000);
+                }
+            });
+        });
+
+        // ایجاد نمودار دسته‌بندی هزینه‌ها
+        const categoryProgressBars = document.querySelectorAll('.category-progress .progress-fill');
+        categoryProgressBars.forEach(bar => {
+            const width = bar.style.width;
+            bar.style.width = '0%';
+            setTimeout(() => {
+                bar.style.width = width;
+            }, 500);
+        });           
+    });
+</script>
+{% endblock %}

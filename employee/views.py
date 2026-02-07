@@ -1,25 +1,22 @@
 # employees/views.py
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, permission_required
-from django.db.models import Q, Sum, Count, Avg, Max
+from django.db.models import Q, Sum, Count, Avg, Max, F, Min
+from django.db.models.functions import TruncMonth
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.contrib import messages
 from reportlab.pdfgen import canvas
 from django.utils import timezone
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from .models import Employee, SalaryPayment, EmployeeExpense
 from accounts.models import UserProfile
 from .forms import EmployeeForm,  SalaryPaymentForm
 from .report import calculate_employee_financials
 from django.http import HttpResponse
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm, inch
 from io import BytesIO
+import math
 
 @login_required
 @permission_required('employees.view_employee', raise_exception=True)
@@ -27,11 +24,16 @@ def employee_list(request):
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', 'all')
     employment_type = request.GET.get('type', 'all')
-    sort_by = request.GET.get('sort', '-hire_date')
+    sort_by = request.GET.get('sort', '-created_at')
     page_number = request.GET.get('page', 1)
+
     employees = Employee.objects.filter(is_active=True).select_related(
-        'employee__user', 
-    ).order_by('-created_at') 
+        'employee__user'
+    ).prefetch_related(
+        'salary_payments',
+        'expenses'
+    )
+    
     if search_query:
         employees = employees.filter(
             Q(employee__user__first_name__icontains=search_query) |
@@ -40,123 +42,158 @@ def employee_list(request):
             Q(position__icontains=search_query) |
             Q(employee__user__username__icontains=search_query)
         )
+    
     if employment_type and employment_type != 'all':
         employees = employees.filter(employment_type=employment_type)
+    
     if status_filter and status_filter != 'all':
-        employees_with_financials = []
-        for emp in employees:
-            financials = calculate_employee_financials(emp)
-            emp.financials = financials
-            employees_with_financials.append(emp)
         if status_filter == 'paid':
-            employees = [e for e in employees_with_financials if e.financials.get('is_fully_paid', False)]
+            employees = employees.filter(
+                Q(total_paid__gte=F('salary_due')) |
+                Q(total_paid__gte=F('salary_due') - F('debt_to_company'))
+            )
         elif status_filter == 'partial':
-            employees = [e for e in employees_with_financials 
-                if not e.financials.get('is_fully_paid', False) 
-                and e.financials.get('total_paid', 0) > 0]
+            employees = employees.filter(
+                Q(total_paid__gt=0) &
+                Q(total_paid__lt=F('salary_due') - F('debt_to_company'))
+            )
         elif status_filter == 'unpaid':
-            employees = [e for e in employees_with_financials 
-                if e.financials.get('total_paid', 0) == 0]
+            employees = employees.filter(total_paid=0)
+    
+    # مرتب‌سازی
     if sort_by == 'name':
-        employees = sorted(employees, key=lambda x: x.employee.user.get_full_name() if x.employee and x.employee.user else '')
+        employees = employees.order_by('employee__user__last_name', 'employee__user__first_name')
     elif sort_by == '-name':
-        employees = sorted(employees, key=lambda x: x.employee.user.get_full_name() if x.employee and x.employee.user else '', reverse=True)
+        employees = employees.order_by('-employee__user__last_name', '-employee__user__first_name')
     elif sort_by == 'salary':
-        employees = sorted(employees, key=lambda x: x.salary_due)
+        employees = employees.order_by('salary_due')
     elif sort_by == '-salary':
-        employees = sorted(employees, key=lambda x: x.salary_due, reverse=True)
+        employees = employees.order_by('-salary_due')
     elif sort_by == 'hire_date':
-        employees = sorted(employees, key=lambda x: x.hire_date or datetime.max.date())
+        employees = employees.order_by('hire_date')
     elif sort_by == '-hire_date':
         employees = employees.order_by('-hire_date')
-    else:
+    else:  # پیش‌فرض
         employees = employees.order_by('-created_at')
-    paginator = Paginator(employees, 25) 
+    
+    # Pagination
+    paginator = Paginator(employees, 25)
     page_obj = paginator.get_page(page_number)
+    
+    # آماده‌سازی داده‌های کارمندان
     employees_data = []
     for emp in page_obj:
-        financials = calculate_employee_financials(emp)
-        if financials.get('is_fully_paid', False):
+        # محاسبات مالی
+        total_paid = emp.total_paid
+        total_expenses = emp.total_expenses
+        remaining_balance = emp.remaining_salary
+        
+        # وضعیت پرداخت
+        if remaining_balance <= 0:
             payment_status = {
                 'label': 'Paid',
                 'color': 'success',
                 'icon': 'check-circle',
-                'badge': 'badge bg-success'
+                'badge_class': 'status-paid'
             }
-        elif financials.get('total_paid', 0) > 0:
+            payment_progress = 100
+        elif total_paid > 0:
             payment_status = {
                 'label': 'Partial',
                 'color': 'warning',
                 'icon': 'exclamation-circle',
-                'badge': 'badge bg-warning'
+                'badge_class': 'status-partial'
             }
+            if emp.salary_due > 0:
+                payment_progress = (total_paid / emp.salary_due * 100)
+            else:
+                payment_progress = 0
         else:
             payment_status = {
                 'label': 'Unpaid',
                 'color': 'danger',
                 'icon': 'times-circle',
-                'badge': 'badge bg-danger'
+                'badge_class': 'status-unpaid'
             }
-        payment_progress = financials.get('payment_percentage', 0)
+            payment_progress = 0
+        
+        # سال‌های خدمت
         years_of_service = None
         if emp.hire_date:
-            delta = timezone.now().date() - emp.hire_date
-            years_of_service = delta.days / 365.25
+            today = date.today()
+            if emp.termination_date:
+                end_date = emp.termination_date
+            else:
+                end_date = today
+            
+            total_days = (end_date - emp.hire_date).days
+            years_of_service = math.floor(total_days / 365.25)
         
         employees_data.append({
             'employee': emp,
-            'financials': financials,
+            'financials': {
+                'total_paid': total_paid,
+                'total_expenses': total_expenses,
+                'remaining_balance': remaining_balance,
+                'debt_to_company': emp.debt_to_company,
+                'salary_due': emp.salary_due,
+                'payment_percentage': payment_progress,
+                'is_fully_paid': remaining_balance <= 0,
+            },
             'payment_status': payment_status,
-            'payment_progress': payment_progress,
+            'payment_progress': round(payment_progress, 1),
             'years_of_service': years_of_service,
-            'has_advances': financials.get('total_advances', 0) > 0,
-            'has_expenses': financials.get('total_expenses', 0) > 0,
         })
+    
+    # آمار کلی
+    active_employees = Employee.objects.filter(is_active=True)
+    total_salary = active_employees.aggregate(
+        total=Sum('salary_due')
+    )['total'] or Decimal('0')
+    
+    total_paid = SalaryPayment.objects.filter(
+        is_paid=True,
+        employee__is_active=True
+    ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0')
+    
+    total_expenses = EmployeeExpense.objects.filter(
+        employee__is_active=True
+    ).aggregate(total=Sum('price'))['total'] or Decimal('0')
+    
+    total_debt = active_employees.aggregate(
+        total=Sum('debt_to_company')
+    )['total'] or Decimal('0')
+    
     total_stats = {
-        'active_employees': Employee.objects.filter(is_active=True).count(),
-        'total_salary': Employee.objects.filter(is_active=True).aggregate(
-            total=Sum('salary_due')
-        )['total'] or Decimal('0'),
-        'total_paid': SalaryPayment.objects.filter(
-            is_paid=True,
-            employee__is_active=True
-        ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0'),
-        'avg_salary': Employee.objects.filter(is_active=True).aggregate(
+        'active_employees': active_employees.count(),
+        'total_salary': total_salary,
+        'total_paid': total_paid,
+        'total_expenses': total_expenses,
+        'total_debt': total_debt,
+        'total_remaining': total_salary - total_paid - total_expenses - total_debt,
+        'avg_salary': active_employees.aggregate(
             avg=Avg('salary_due')
         )['avg'] or Decimal('0'),
     }
-    monthly_stats = []
-    for i in range(5, -1, -1):
-        month_date = timezone.now().date() - timedelta(days=30*i)
-        month_start = month_date.replace(day=1)
-        if i == 0:
-            month_end = timezone.now().date()
+    payment_status_stats = {
+        'paid': 0,
+        'partial': 0,
+        'unpaid': 0,
+    }
+    
+    for emp in active_employees:
+        if emp.remaining_salary <= 0:
+            payment_status_stats['paid'] += 1
+        elif emp.total_paid > 0:
+            payment_status_stats['partial'] += 1
         else:
-            next_month = month_start.replace(day=28) + timedelta(days=4)
-            month_end = next_month - timedelta(days=next_month.day)
-        
-        month_payments = SalaryPayment.objects.filter(
-            date__range=[month_start, month_end],
-            is_paid=True
-        ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0')
-        
-        month_employees = Employee.objects.filter(
-            hire_date__lte=month_end,
-            is_active=True
-        ).count()
-        
-        monthly_stats.append({
-            'month': month_start.strftime('%b %Y'),
-            'total_payments': month_payments,
-            'active_employees': month_employees,
-            'month_start': month_start,
-        })
+            payment_status_stats['unpaid'] += 1
     
     context = {
         'employees_data': employees_data,
         'page_obj': page_obj,
         'total_stats': total_stats,
-        'monthly_stats': monthly_stats,
+        'payment_status_stats': payment_status_stats,
         'filters': {
             'search': search_query,
             'status': status_filter,
@@ -183,7 +220,6 @@ def employee_list(request):
             ('all', 'All Types'),
             ('full_time', 'Full Time'),
             ('part_time', 'Part Time'),
-            ('contract', 'Contract'),
             ('freelance', 'Freelance'),
         ],
     }
@@ -231,48 +267,50 @@ def employee_quick_view(request, employee_id):
         ],
         'status': 'paid' if financials.get('is_fully_paid', False) else 'partial' if financials.get('total_paid', 0) > 0 else 'unpaid',
     }
-    
     return JsonResponse(data)
 
 @login_required
-def employee_bulk_actions(request):
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        employee_ids = request.POST.getlist('employee_ids')
-        if not employee_ids:
-            messages.warning(request, 'No employees selected.')
-            return redirect('employee:employee_list')       
-        employees = Employee.objects.filter(id__in=employee_ids)
-        if action == 'export_selected':
-            messages.success(request, f'{employees.count()} employees exported successfully.')
-        elif action == 'send_payment_reminders':
-            messages.success(request, f'Payment reminders sent to {employees.count()} employees.')
-        
-        return redirect('employee:employee_list')
-    
-    return redirect('employee:employee_list')
-
-@login_required
 @permission_required('employees.view_employee', raise_exception=True)
-def employee_detail(request, employee_id):
+def employee_detail(request, pk):
     employee = get_object_or_404(
         Employee.objects.select_related(
-            'employee__user', 
+            'employee__user'
         ).prefetch_related(
             'salary_payments',
             'expenses'
         ),
-        id=employee_id,
-        is_active=True
+        id=pk
     )
-    financials = calculate_employee_financials(employee)
+    
+    # محاسبات مالی دقیق
+    total_paid = employee.total_paid
+    total_expenses = employee.total_expenses
+    remaining_balance = employee.remaining_salary
+    
+    # اطلاعات کامل مالی
+    financials = {
+        'total_paid': total_paid,
+        'total_expenses': total_expenses,
+        'debt_to_company': employee.debt_to_company,
+        'salary_due': employee.salary_due,
+        'remaining_balance': remaining_balance,
+        'payment_percentage': (total_paid / employee.salary_due * 100) if employee.salary_due > 0 else 0,
+        'is_fully_paid': remaining_balance <= 0,
+        'net_salary': employee.salary_due - total_expenses - employee.debt_to_company,
+    }
+    
+    # آمار پرداخت‌ها
     salary_payments = employee.salary_payments.all().order_by('-date')
-    expenses = employee.expenses.all().order_by('-date')
+    recent_payments = salary_payments[:10]
+    
     payment_stats = {
         'total_payments': salary_payments.count(),
         'paid_count': salary_payments.filter(is_paid=True).count(),
         'pending_count': salary_payments.filter(is_paid=False).count(),
         'total_paid_amount': salary_payments.filter(is_paid=True).aggregate(
+            total=Sum('salary_amount')
+        )['total'] or Decimal('0'),
+        'total_pending_amount': salary_payments.filter(is_paid=False).aggregate(
             total=Sum('salary_amount')
         )['total'] or Decimal('0'),
         'avg_payment_amount': salary_payments.filter(is_paid=True).aggregate(
@@ -281,59 +319,103 @@ def employee_detail(request, employee_id):
         'largest_payment': salary_payments.filter(is_paid=True).aggregate(
             max=Max('salary_amount')
         )['max'] or Decimal('0'),
+        'smallest_payment': salary_payments.filter(is_paid=True).aggregate(
+            min=Min('salary_amount')
+        )['min'] or Decimal('0'),
         'last_payment_date': salary_payments.filter(is_paid=True).order_by('-date').first(),
+        'first_payment_date': salary_payments.filter(is_paid=True).order_by('date').first(),
+        'payment_method_distribution': salary_payments.values('payment_method').annotate(
+            count=Count('id'),
+            total=Sum('salary_amount')
+        ).order_by('-total'),
     }
+    
+    # آمار هزینه‌ها
+    expenses = employee.expenses.all().order_by('-date')
+    recent_expenses = expenses[:10]
+    
     expense_stats = {
         'total_expenses': expenses.count(),
         'total_amount': expenses.aggregate(total=Sum('price'))['total'] or Decimal('0'),
         'avg_expense': expenses.aggregate(avg=Avg('price'))['avg'] or Decimal('0'),
+        'largest_expense': expenses.aggregate(max=Max('price'))['max'] or Decimal('0'),
+        'smallest_expense': expenses.aggregate(min=Min('price'))['min'] or Decimal('0'),
         'by_category': expenses.values('category').annotate(
             total=Sum('price'),
             count=Count('id')
         ).order_by('-total'),
+        'monthly_expenses': expenses.annotate(
+            month=TruncMonth('date')
+        ).values('month').annotate(
+            total=Sum('price'),
+            count=Count('id')
+        ).order_by('-month')[:6],
     }
+    
+    user = employee.employee.user if employee.employee and employee.employee.user else None
+    
     years_of_service = None
     months_of_service = None
+    total_days_of_service = None
+    
     if employee.hire_date:
-        today = timezone.now().date()
-        delta = today - employee.hire_date
-        years_of_service = delta.days // 365
-        months_of_service = (delta.days % 365) // 30
-    if financials.get('is_fully_paid', False):
+        today = date.today()
+        start_date = employee.hire_date
+        end_date = employee.termination_date if employee.termination_date else today
+        
+        total_days = (end_date - start_date).days
+        total_days_of_service = total_days
+        
+        # محاسبه دقیق سال و ماه
+        years_of_service = total_days // 365
+        remaining_days = total_days % 365
+        months_of_service = remaining_days // 30
+    
+    # وضعیت پرداخت
+    if remaining_balance <= 0:
         payment_status = {
             'label': 'Paid in Full',
             'color': 'success',
             'icon': 'check-circle',
-            'description': 'All payments completed'
+            'class': 'status-paid',
+            'description': 'All salary and expenses are paid'
         }
-    elif financials.get('total_paid', 0) > 0:
+    elif total_paid > 0:
         payment_status = {
             'label': 'Partial Payment',
             'color': 'warning',
             'icon': 'exclamation-circle',
-            'description': f"{financials.get('payment_percentage', 0):.1f}% paid"
+            'class': 'status-partial',
+            'description': f'{financials["payment_percentage"]:.1f}% of salary paid'
         }
     else:
         payment_status = {
-            'label': 'No Payments',
+            'label': 'Unpaid',
             'color': 'danger',
             'icon': 'times-circle',
-            'description': 'No payments received yet'
+            'class': 'status-unpaid',
+            'description': 'No payments made yet'
         }
     
-    six_months_ago = timezone.now().date() - timedelta(days=180)
-    recent_payments = salary_payments.filter(
-        date__gte=six_months_ago
-    ).order_by('-date')[:10]
-    recent_expenses = expenses.filter(
-        date__gte=six_months_ago
-    ).order_by('-date')[:10]
+    # سلامت مالی
+    if remaining_balance <= 0:
+        financial_health = 'excellent'
+    elif remaining_balance <= employee.salary_due * Decimal('0.3'):
+        financial_health = 'good'
+    elif remaining_balance <= employee.salary_due * Decimal('0.6'):
+        financial_health = 'fair'
+    else:
+        financial_health = 'poor'
+    
+    financials['financial_health'] = financial_health
+    
     payment_trend_data = []
     for i in range(11, -1, -1):
-        month_date = timezone.now().date() - timedelta(days=30*i)
+        month_date = date.today().replace(day=1) - timedelta(days=30*i)
         month_start = month_date.replace(day=1)
+        
         if i == 0:
-            month_end = timezone.now().date()
+            month_end = date.today()
         else:
             next_month = month_start.replace(day=28) + timedelta(days=4)
             month_end = next_month - timedelta(days=next_month.day)
@@ -343,28 +425,83 @@ def employee_detail(request, employee_id):
             is_paid=True
         ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0')
         
+        month_expenses = expenses.filter(
+            date__range=[month_start, month_end]
+        ).aggregate(total=Sum('price'))['total'] or Decimal('0')
+        
         payment_trend_data.append({
             'month': month_start.strftime('%b'),
-            'year': month_start.strftime('%Y'),
-            'full_month': month_start.strftime('%b %Y'),
-            'amount': month_payments,
+            'year': month_start.year,
+            'full_month': month_start.strftime('%B %Y'),
+            'payments_amount': month_payments,
+            'expenses_amount': month_expenses,
             'payment_count': salary_payments.filter(
                 date__range=[month_start, month_end],
                 is_paid=True
-            ).count()
+            ).count(),
+            'expense_count': expenses.filter(
+                date__range=[month_start, month_end]
+            ).count(),
+            'month_start': month_start,
         })
+    
+    current_year = date.today().year
+    yearly_stats = []
+    
+    for year in range(current_year - 2, current_year + 1):
+        year_payments = salary_payments.filter(
+            date__year=year,
+            is_paid=True
+        ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0')
+        
+        year_expenses = expenses.filter(
+            date__year=year
+        ).aggregate(total=Sum('price'))['total'] or Decimal('0')
+        
+        yearly_stats.append({
+            'year': year,
+            'total_payments': year_payments,
+            'total_expenses': year_expenses,
+            'net_amount': year_payments - year_expenses,
+            'payment_count': salary_payments.filter(date__year=year, is_paid=True).count(),
+            'expense_count': expenses.filter(date__year=year).count(),
+        })
+    
+    quick_summary = {
+        'total_earned': total_paid,
+        'total_deducted': total_expenses + employee.debt_to_company,
+        'net_earned': total_paid - total_expenses - employee.debt_to_company,
+        'current_month_payments': salary_payments.filter(
+            date__month=date.today().month,
+            date__year=date.today().year,
+            is_paid=True
+        ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0'),
+        'current_month_expenses': expenses.filter(
+            date__month=date.today().month,
+            date__year=date.today().year
+        ).aggregate(total=Sum('price'))['total'] or Decimal('0'),
+        'pending_payments_count': salary_payments.filter(is_paid=False).count(),
+    }
+    
     employee_info = {
-        'full_name': employee.employee.user.get_full_name() if employee.employee and employee.employee.user else 'Unknown',
-        'email': employee.employee.user.email if employee.employee and employee.employee.user else '',
+        'full_name': user.get_full_name() if user else 'Unknown Employee',
+        'first_name': user.first_name if user else '',
+        'last_name': user.last_name if user else '',
+        'email': user.email if user else '',
+        'username': user.username if user else '',
         'position': employee.position or 'Not specified',
         'employment_type': employee.get_employment_type_display(),
         'hire_date': employee.hire_date,
+        'termination_date': employee.termination_date,
         'years_of_service': years_of_service,
         'months_of_service': months_of_service,
+        'days_of_service': total_days_of_service,
         'status': 'Active' if employee.is_active else 'Inactive',
         'salary_due': employee.salary_due,
         'debt_to_company': employee.debt_to_company,
         'notes': employee.note,
+        'avatar_initials': (user.first_name[0] + user.last_name[0]).upper() if user and user.first_name and user.last_name else '?',
+        'is_current': not employee.termination_date or employee.termination_date >= date.today(),
     }
     
     context = {
@@ -372,93 +509,55 @@ def employee_detail(request, employee_id):
         'employee_info': employee_info,
         'financials': financials,
         'payment_status': payment_status,
-        'salary_payments': salary_payments[:20],  
-        'expenses': expenses[:20],  
+        'salary_payments': salary_payments[:50],  # محدود کردن برای نمایش
+        'expenses': expenses[:50],  # محدود کردن برای نمایش
         'payment_stats': payment_stats,
         'expense_stats': expense_stats,
         'recent_payments': recent_payments,
         'recent_expenses': recent_expenses,
         'payment_trend_data': payment_trend_data,
-        'years_of_service': years_of_service,
-        'today': timezone.now().date(),
+        'yearly_stats': yearly_stats,
+        'quick_summary': quick_summary,
+        'today': date.today(),
+        'current_year': current_year,
     }
     
-    return render(request, 'employees/employee_detail.html', context)
+    return render(request, 'employee/employee_detail.html', context)
 
-
-def calculate_employee_financials(employee):
-    try:
-        total_paid = employee.salary_payments.filter(
-            is_paid=True
-        ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0')
-        total_expenses = employee.expenses.aggregate(
-            total=Sum('price')
-        )['total'] or Decimal('0')
-        debt_to_company = employee.debt_to_company or Decimal('0')
-        net_salary = employee.salary_due - total_paid - total_expenses - debt_to_company
-        payment_percentage = (total_paid / employee.salary_due * 100) if employee.salary_due > 0 else 0
-        avg_monthly = employee.salary_payments.filter(
-            is_paid=True
-        ).aggregate(avg=Avg('salary_amount'))['avg'] or Decimal('0')
-        last_payment = employee.salary_payments.filter(
-            is_paid=True
-        ).order_by('-date').first()
-        recent_payments = employee.salary_payments.filter(
-            is_paid=True,
-            date__gte=timezone.now().date() - timedelta(days=90)
-        ).order_by('date')
+def calculate_advanced_financials(employee):
+    today = date.today()
+    
+    current_year_payments = employee.salary_payments.filter(
+        date__year=today.year,
+        is_paid=True
+    ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0')
+    
+    current_year_expenses = employee.expenses.filter(
+        date__year=today.year
+    ).aggregate(total=Sum('price'))['total'] or Decimal('0')
+    
+    # میانگین ماهانه
+    months_active = 12
+    if employee.hire_date:
+        hire_year = employee.hire_date.year
+        hire_month = employee.hire_date.month
         
-        payment_trend = 'stable'
-        if recent_payments.count() >= 2:
-            payments = list(recent_payments)
-            if payments[-1].salary_amount > payments[0].salary_amount:
-                payment_trend = 'up'
-            elif payments[-1].salary_amount < payments[0].salary_amount:
-                payment_trend = 'down'
-        financial_health = 'good'
-        if payment_percentage >= 90:
-            financial_health = 'excellent'
-        elif payment_percentage >= 70:
-            financial_health = 'good'
-        elif payment_percentage >= 50:
-            financial_health = 'fair'
-        else:
-            financial_health = 'poor'
-        
-        return {
-            'total_paid': total_paid,
-            'total_expenses': total_expenses,
-            'debt_to_company': debt_to_company,
-            'net_salary': max(net_salary, Decimal('0')),
-            'payment_percentage': round(payment_percentage, 1),
-            'avg_monthly': avg_monthly,
-            'last_payment': last_payment,
-            'payment_trend': payment_trend,
-            'financial_health': financial_health,
-            'remaining_balance': max(net_salary, Decimal('0')),
-            'is_fully_paid': net_salary <= 0,
-            'days_since_last_payment': (
-                (timezone.now().date() - last_payment.date).days 
-                if last_payment else None
-            )
-        }
-        
-    except Exception as e:
-        return {
-            'total_paid': Decimal('0'),
-            'total_expenses': Decimal('0'),
-            'debt_to_company': Decimal('0'),
-            'net_salary': employee.salary_due,
-            'payment_percentage': 0,
-            'avg_monthly': Decimal('0'),
-            'last_payment': None,
-            'payment_trend': 'stable',
-            'financial_health': 'unknown',
-            'remaining_balance': employee.salary_due,
-            'is_fully_paid': False,
-            'days_since_last_payment': None
-        }
-
+        if hire_year == today.year:
+            months_active = today.month - hire_month + 1
+        elif hire_year < today.year:
+            months_active = 12
+    
+    avg_monthly_payment = current_year_payments / months_active if months_active > 0 else Decimal('0')
+    avg_monthly_expense = current_year_expenses / months_active if months_active > 0 else Decimal('0')
+    
+    return {
+        'current_year_payments': current_year_payments,
+        'current_year_expenses': current_year_expenses,
+        'avg_monthly_payment': avg_monthly_payment,
+        'avg_monthly_expense': avg_monthly_expense,
+        'months_active_this_year': months_active,
+    }
+    
 @login_required
 @permission_required('employees.add_salarypayment', raise_exception=True)
 def process_salary_payment(request):
@@ -678,111 +777,4 @@ def download_payment_pdf(request, payment_id):
     except Exception as e:
         messages.error(request, f'Error generating PDF: {str(e)}')
         return redirect('employee:payment_invoice', payment_id=payment_id)
-    
-@login_required
-@permission_required('employees.add_salarypayment', raise_exception=True)
-def process_salary_payment(request):
-    today = timezone.now().date()
-    search_query = request.GET.get('search', '').strip()
-    selected_employee_id = request.GET.get('employee', '')
-    form = SalaryPaymentForm()
-    selected_employee = None
-    remaining_balance = Decimal('0')
-    if selected_employee_id:
-        try:
-            selected_employee = Employee.objects.get(id=selected_employee_id, is_active=True)
-            total_paid = selected_employee.salary_payments.filter(
-                is_paid=True
-            ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0')
-            
-            total_advances = selected_employee.expenses.aggregate(
-                total=Sum('price')
-            )['total'] or Decimal('0')
-            
-            remaining_balance = selected_employee.salary_due - total_paid - total_advances
-            form = SalaryPaymentForm(initial={
-                'employee': selected_employee,
-                'date': today,
-                'salary_amount': max(remaining_balance, Decimal('0')),
-                'is_paid': True,
-            })
-            
-        except Employee.DoesNotExist:
-            messages.error(request, 'Selected employee not found')
-    if request.method == 'POST':
-        form = SalaryPaymentForm(request.POST)
-        if form.is_valid():
-            payment = form.save(commit=False)
-            payment.is_paid = True
-            total_paid = payment.employee.salary_payments.filter(
-                is_paid=True
-            ).aggregate(total=Sum('salary_amount'))['total'] or Decimal('0')
-            
-            total_advances = payment.employee.expenses.aggregate(
-                total=Sum('price')
-            )['total'] or Decimal('0')
-            
-            max_payable = payment.employee.salary_due - total_paid - total_advances
-            
-            if payment.salary_amount > max_payable:
-                messages.error(request, 
-                    f'Amount exceeds maximum payable amount (${max_payable})')
-            else:
-                payment.save()
-                return redirect('employee:payment_invoice', payment_id=payment.id)
-        else:
-            messages.error(request, 'Please check the form for errors')
-def payroll_report(request):
-    month = int(request.GET.get('month', timezone.now().month))
-    year = int(request.GET.get('year', timezone.now().year))
-    report_start = datetime(year, month, 1).date()
-    next_month = datetime(year + (month // 12), ((month % 12) + 1), 1).date()
-    report_end = next_month - timedelta(days=1)
-    salary_payments = SalaryPayment.objects.filter(date__gte=report_start, date__lte=report_end).select_related('employee', 'employee__employee', 'employee__employee__user').order_by('employee__employee__user__last_name')
-    summary = salary_payments.aggregate(total_paid=Sum('salary_amount', filter=Q(is_paid=True)), total_pending=Sum('salary_amount', filter=Q(is_paid=False)), total_count=Count('id'), paid_count=Count('id', filter=Q(is_paid=True)), avg_amount=Avg('salary_amount'))
-    employee_totals = {}
-    for payment in salary_payments:
-        eid = payment.employee.id
-        if eid not in employee_totals:
-            employee_totals[eid] = {'employee': payment.employee, 'total_paid': Decimal('0'), 'total_pending': Decimal('0'), 'payments': []}
-        if payment.is_paid:
-            employee_totals[eid]['total_paid'] += payment.salary_amount
-        else:
-            employee_totals[eid]['total_pending'] += payment.salary_amount
-        employee_totals[eid]['payments'].append(payment)
-    
-    department_totals = {}
-    for emp_data in employee_totals.values():
-        dept_name = emp_data['employee'].department.name if emp_data['employee'].department else 'No Department'
-        if dept_name not in department_totals:
-            department_totals[dept_name] = {'total_paid': Decimal('0'), 'total_pending': Decimal('0'), 'employee_count': 0}
-        department_totals[dept_name]['total_paid'] += emp_data['total_paid']
-        department_totals[dept_name]['total_pending'] += emp_data['total_pending']
-        department_totals[dept_name]['employee_count'] += 1
-
-    return render(request, 'employee/payroll_report.html', {
-        'salary_payments': salary_payments,
-        'summary': summary,
-        'employee_totals': employee_totals,
-        'department_totals': department_totals,
-        'report_start': report_start,
-        'report_end': report_end,
-        'selected_month': month,
-        'selected_year': year,
-        'months': range(1, 13),
-        'years': range(timezone.now().year - 2, timezone.now().year + 1)
-    })
-    
-def salary_payment(request):
-    if request.method == "POST":
-        form = SalaryPaymentForm(request.form)
-        if form.is_valid():
-            user = form.save()
-            messages.success(request, ("payment form created successfully."))
-            return redirect('employee:employee_detail')
-        else:
-            messages.error(request, ("Please correct the form errors"))
-            
-    else:
-        form = SalaryPaymentForm()
-    return render(request, 'employee:salary_payment', {'form': form})
+ 

@@ -16,80 +16,7 @@ from decimal import Decimal
 from accounts.models import UserProfile
 from collections import defaultdict
 
-
-def container_financial_report(request, container_id):
-    container = get_object_or_404(Container, id=container_id)
-    transactions = container.transactions.all()
-
-    total_income = transactions.filter(
-        sale_status__in=["sold_to_company", "sold_to_customer"]
-    ).aggregate(total_income=Sum('total_price'))["total_income"] or 0
-
-    total_sold_qty = transactions.aggregate(
-        total_sold=Sum('quantity')
-    )["total_sold"] or 0
-
-    return render(request, 'container/container_financial_report.html', {
-        'container': container,
-        'total_income': total_income,
-        'total_sold_qty': total_sold_qty,
-        'transactions': transactions
-    })
-@login_required
-def saraf_transactions_report(request, saraf_id):
-    saraf = get_object_or_404(Saraf, id=saraf_id)
-
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-    
-    transactions = saraf.transactions.select_related('container').all()
-    
-    if start_date:
-        transactions = transactions.filter(transaction_time__gte=parse_date(start_date))
-    if end_date:
-        transactions = transactions.filter(transaction_time__lte=parse_date(end_date))
-
-    total_received = transactions.aggregate(total=Sum('received_from_saraf'))['total'] or 0
-    total_paid = transactions.aggregate(total=Sum('paid_by_company'))['total'] or 0
-    total_debit = transactions.aggregate(total=Sum('debit_company'))['total'] or 0
-    
-    context = {
-        'saraf': saraf,
-        'transactions': transactions.order_by('-transaction_time'),
-        'total_received': total_received,
-        'total_paid': total_paid,
-        'total_debit': total_debit,
-        'net_balance': total_received + total_debit - total_paid,
-    }
-    
-    return render(request, 'container/saraf_transactions_report.html', context)
-
-def total_container_transactions_report(request):
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-
-    transactions = ContainerTransaction.objects.all()
-
-    if start_date:
-        transactions = transactions.filter(created_at__gte=parse_date(start_date))
-    if end_date:
-        transactions = transactions.filter(created_at__lte=parse_date(end_date))
-
-    report = transactions.values(
-        'sale_status',
-        'transport_status',
-        'payment_status'
-    ).annotate(
-        total_amount=Sum('total_price')
-    )
-
-    return render(request, 'container/total_container_transactions_report.html', {
-        'report': report
-    })
-
-
 class CompanyAccessMixin:
-    """Limit queries by user's company if available on profile"""
     def get_company(self):
         user = getattr(self.request, "user", None)
         if not user or not user.is_authenticated:
@@ -98,75 +25,6 @@ class CompanyAccessMixin:
         if not profile:
             return None
         return profile.company
-
-class SarafListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
-    model = Saraf
-    template_name = "container/saraf_list.html"
-    context_object_name = "sarafs"
-    paginate_by = 25
-
-    def get_queryset(self):
-
-        company = self.get_company()
-        qs = Saraf.objects.filter(
-            user__role='saraf',
-            is_active=True,
-            user__is_active=True
-        ).select_related(
-            "user", 
-            "user__user"  
-        )
-        
-        if company:
-            qs = qs.filter(user__company=company)
-        return qs.annotate(
-            total_received=Coalesce(
-                Sum("transactions__received_from_saraf"), 
-                Decimal('0'),
-                output_field=DecimalField(max_digits=28, decimal_places=0)
-            ),
-            total_paid=Coalesce(
-                Sum("transactions__paid_by_company"), 
-                Decimal('0'),
-                output_field=DecimalField(max_digits=28, decimal_places=0)
-            ),
-        ).annotate(
-            balance=F("total_received") - F("total_paid")
-        ).order_by("-created_at")
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        sarafs = context['sarafs']
-        all_sarafs = self.get_queryset()
-        
-        total_received_sum = all_sarafs.aggregate(
-            total=Coalesce(Sum('total_received'), Decimal('0'))
-        )['total']
-        
-        total_paid_sum = all_sarafs.aggregate(
-            total=Coalesce(Sum('total_paid'), Decimal('0'))
-        )['total']
-        
-        net_balance_sum = all_sarafs.aggregate(
-            total=Coalesce(Sum('balance'), Decimal('0'))
-        )['total']
-        creditors_count = all_sarafs.filter(balance__gt=0).count()
-        debtors_count = all_sarafs.filter(balance__lt=0).count()
-        balanced_count = all_sarafs.filter(balance=0).count()
-        
-        context.update({
-            'total_received_sum': total_received_sum,
-            'total_paid_sum': total_paid_sum,
-            'net_balance_sum': net_balance_sum,
-            'creditors_count': creditors_count,
-            'debtors_count': debtors_count,
-            'balanced_count': balanced_count,
-            'total_count': all_sarafs.count(),
-            'page_title': 'Sarafs Management',
-            'page_subtitle': 'Financial accounts overview',
-        })
-        
-        return context
 
 class SarafListView(LoginRequiredMixin, CompanyAccessMixin, ListView):
     model = Saraf
@@ -358,7 +216,6 @@ class SarafDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
                 transaction_time__date__range=[start_date, end_date]
             )
         financial_summary = self.get_transaction_summary(saraf)
-        currency_breakdown = self.get_currency_breakdown(saraf)
         monthly_summary = self.get_monthly_summary(saraf)
         container_summary = self.get_container_summary(saraf)
         recent_activity = self.get_recent_activity(saraf, 30)
@@ -388,7 +245,6 @@ class SarafDetailView(LoginRequiredMixin, CompanyAccessMixin, DetailView):
             'transactions': transactions.order_by('-transaction_time')[:100],
             'total_transactions_count': transactions.count(),
             'financial_summary': financial_summary,
-            'currency_breakdown': currency_breakdown,
             'monthly_summary': monthly_summary,
             'container_summary': container_summary[:10],
             'recent_activity': recent_activity[:20],

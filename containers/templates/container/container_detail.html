@@ -42,17 +42,7 @@
                             </ul>
                         </div>
                     </div>
-                    <div class="col-lg-4 mb-4">
-                        <div class="action-buttons">
-                            <a class="btn btn-sm btn-outline-secondary"
-                                href="{% url 'containers:container_financial_report' container_id=container.id %}">
-                                Financial Report
-                            </a>
-                            <a href="{% url 'containers:total_container_transactions_report' %}">
-                                {{ container.container_number|default:container.id }}
-                            </a>
-                        </div>
-                    </div>
+                    
                 </div>
             </div>
 

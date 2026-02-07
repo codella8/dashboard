@@ -1,373 +1,319 @@
+
 {% extends 'employee/employee_base.html' %}
 {% load static %}
 {% load humanize %}
 
-{% block title %}Employee Directory{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/employee_list.minimal.css' %}">
-{% endblock %}
+{% block title %}Employee Management System{% endblock %}
 
 {% block content %}
-<div class="employee-list-container">
-    <!-- Header -->
+<div class="employee-dashboard">
+    <!-- هدر صفحه -->
     <div class="page-header">
         <div class="header-content">
             <h1>
-                <i class="fas fa-users"></i>
-                Employee Directory
+                <i class="fas fa-user-tie"></i>
+                Employee Management Dashboard
             </h1>
-            <p class="subtitle">Manage and monitor all active employees</p>
+            <p class="subtitle">Comprehensive overview of all employees, payments, and expenses</p>
         </div>
     </div>
 
-    <!-- Quick Stats -->
-    <div class="quick-stats">
+    <!-- کارت‌های آماری -->
+    <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-icon">
-                <i class="fas fa-user-tie"></i>
+                <i class="fas fa-users"></i>
             </div>
             <div class="stat-content">
                 <div class="stat-value">{{ total_stats.active_employees|intcomma }}</div>
                 <div class="stat-label">Active Employees</div>
             </div>
         </div>
-        
-        <div class="stat-card">
+
+        <div class="stat-card paid">
             <div class="stat-icon">
                 <i class="fas fa-money-bill-wave"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">${{ total_stats.total_salary|floatformat:0|intcomma }}</div>
-                <div class="stat-label">Monthly Budget</div>
-            </div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-icon">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-value">${{ total_stats.total_paid|floatformat:0|intcomma }}</div>
+                <div class="stat-value">AED{{ total_stats.total_paid|floatformat:0|intcomma }}</div>
                 <div class="stat-label">Total Paid</div>
             </div>
         </div>
-        
-        <div class="stat-card">
+
+        <div class="stat-card unpaid">
             <div class="stat-icon">
-                <i class="fas fa-chart-line"></i>
+                <i class="fas fa-clock"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">${{ total_stats.avg_salary|floatformat:0|intcomma }}</div>
-                <div class="stat-label">Average Salary</div>
+                <div class="stat-value">AED{{ total_stats.total_remaining|floatformat:0|intcomma }}</div>
+                <div class="stat-label">Pending Balance</div>
+            </div>
+        </div>
+
+        <div class="stat-card expenses">
+            <div class="stat-icon">
+                <i class="fas fa-receipt"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">AED{{ total_stats.total_expenses|floatformat:0|intcomma }}</div>
+                <div class="stat-label">Total Expenses</div>
             </div>
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- فیلترها -->
     <div class="filter-section">
-        <form method="get" class="filter-form">
+        <form method="get" class="filter-form" id="filterForm">
             <div class="filter-grid">
                 <div class="filter-group">
                     <div class="search-box">
                         <i class="fas fa-search"></i>
-                        <input type="text" 
-                               name="search" 
-                               placeholder="Search employees..."
-                               value="{{ filters.search }}">
-                        {% if filters.search %}
-                        <button type="button" class="clear-search" onclick="clearSearch()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                        {% endif %}
+                        <input type="text" name="search" placeholder="Search employees..." value="{{ filters.search }}"
+                            autocomplete="off" id="searchInput">
                     </div>
                 </div>
-                
-                <div class="filter-group">
-                    <select name="department" class="form-select" onchange="this.form.submit()">
-                        <option value="">All Departments</option>
-                        {% for dept in departments %}
-                        <option value="{{ dept.id }}" {% if filters.department == dept.id|stringformat:"s" %}selected{% endif %}>
-                            {{ dept.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="filter-group">
-                    <select name="status" class="form-select" onchange="this.form.submit()">
-                        <option value="all">All Status</option>
-                        <option value="paid" {% if filters.status == 'paid' %}selected{% endif %}>Paid</option>
-                        <option value="partial" {% if filters.status == 'partial' %}selected{% endif %}>Partial</option>
-                        <option value="unpaid" {% if filters.status == 'unpaid' %}selected{% endif %}>Unpaid</option>
-                    </select>
-                </div>
-                
-                <div class="filter-group">
-                    <select name="type" class="form-select" onchange="this.form.submit()">
-                        <option value="all">All Types</option>
-                        <option value="full_time" {% if filters.type == 'full_time' %}selected{% endif %}>Full Time</option>
-                        <option value="part_time" {% if filters.type == 'part_time' %}selected{% endif %}>Part Time</option>
-                        <option value="contract" {% if filters.type == 'contract' %}selected{% endif %}>Contract</option>
-                        <option value="freelance" {% if filters.type == 'freelance' %}selected{% endif %}>Freelance</option>
-                    </select>
-                </div>
-                
-                <div class="filter-group">
-                    <select name="sort" class="form-select" onchange="this.form.submit()">
-                        <option value="-created_at">Newest First</option>
-                        <option value="created_at" {% if filters.sort == 'created_at' %}selected{% endif %}>Oldest First</option>
-                        <option value="salary" {% if filters.sort == 'salary' %}selected{% endif %}>Salary Low-High</option>
-                        <option value="-salary" {% if filters.sort == '-salary' %}selected{% endif %}>Salary High-Low</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="filter-actions">
-                <button type="submit" class="btn-primary">
-                    <i class="fas fa-filter"></i>
-                    Apply Filters
-                </button>
-                <a href="{% url 'employee:employee_list' %}" class="btn-secondary">
-                    <i class="fas fa-redo"></i>
-                    Reset
-                </a>
             </div>
         </form>
     </div>
 
-    <!-- Department Distribution -->
-    {% if department_distribution %}
-    <div class="department-section">
-        <h3>Department Overview</h3>
-        <div class="department-grid">
-            {% for dept in department_distribution %}
-            <div class="department-card">
-                <div class="dept-header">
-                    <div class="dept-name">{{ dept.name }}</div>
-                    <div class="dept-count">{{ dept.employee_count }} employees</div>
-                </div>
-                <div class="dept-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill"></div>
-                    </div>
-                </div>
-                <div class="dept-footer">
-                    <span class="dept-salary">${{ dept.total_salary|floatformat:0|intcomma }}</span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Employees Table -->
-    <div class="table-section">
+    <!-- جدول کارمندان -->
+    <div class="table-container">
         <div class="table-header">
-            <h3>All Employees</h3>
+            <h3>
+                <i class="fas fa-list"></i>
+                Employee List
+            </h3>
             <div class="table-info">
                 Showing {{ page_obj.start_index }} - {{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+                employees
             </div>
         </div>
-        
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Employee</th>
-                        <th>Department</th>
-                        <th>Position</th>
-                        <th>Salary</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in employees_data %}
-                    <tr>
-                        <td>
-                            <div class="employee-cell">
-                                <div class="employee-avatar">
-                                    {% if item.employee.employee and item.employee.employee.user %}
-                                        {{ item.employee.employee.user.first_name|first|upper }}{{ item.employee.employee.user.last_name|first|upper }}
-                                    {% else %}
-                                        ?
-                                    {% endif %}
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 250px;">Employee</th>
+                    <th>Position</th>
+                    <th>Salary</th>
+                    <th>Recieved employee</th>
+                    <th>Payment Status</th>
+                    <th>Service</th>
+                    <th style="width: 120px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in employees_data %}
+                <tr>
+                    <td>
+                        <div class="employee-cell">
+                            <div class="employee-avatar">
+                                {% with user=item.employee.employee.user %}
+                                {% if user.first_name and user.last_name %}
+                                {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                                {% elif user.first_name %}
+                                {{ user.first_name|first|upper }}
+                                {% else %}
+                                {{ user.email|first|upper }}
+                                {% endif %}
+                                {% endwith %}
+                            </div>
+                            <div class="employee-info">
+                                <div class="employee-name">
+                                    {% with user=item.employee.employee.user %}
+                                    {{ user.get_full_name|default:user.email }}
+                                    {% endwith %}
                                 </div>
-                                <div class="employee-info">
-                                    <div class="employee-name">
-                                        {% if item.employee.employee and item.employee.employee.user %}
-                                            {{ item.employee.employee.user.get_full_name }}
-                                        {% else %}
-                                            Unknown Employee
-                                        {% endif %}
-                                    </div>
-                                    <div class="employee-email">
-                                        {% if item.employee.employee and item.employee.employee.user %}
-                                            {{ item.employee.employee.user.email }}
-                                        {% endif %}
-                                    </div>
+                                <div class="employee-email">
+                                    {% with user=item.employee.employee.user %}
+                                    {{ user.email }}
+                                    {% endwith %}
                                 </div>
                             </div>
-                        </td>
-                        <td>
-                            {% if item.employee.department %}
-                            <span class="dept-badge">
-                                {{ item.employee.department.name }}
-                            </span>
-                            {% else %}
-                            <span class="text-muted">—</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="position-cell">
+                            <div class="position-title">{{ item.employee.position|default:"—" }}</div>
+                            <div class="employment-type-badge">
+                                {{ item.employee.get_employment_type_display }}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="salary-details">
+                            <div>
+                                <div class="salary-label">Monthly Salary</div>
+                                <div class="salary-amount">AED{{ item.employee.salary_due|floatformat:0|intcomma }}</div>
+                            </div>
+                            {% if item.financials.total_expenses > 0 %}
+                            <div>
+                                <div class="salary-label">Expenses</div>
+                                <div class="expense-amount">AED{{ item.financials.total_expenses|floatformat:0|intcomma }}
+                                </div>
+                            </div>
                             {% endif %}
-                        </td>
-                        <td>
-                            <div class="position-cell">
-                                <div class="position-title">{{ item.employee.position|default:"—" }}</div>
-                                {% if item.employee.employment_type %}
-                                <div class="employment-type">
-                                    {{ item.employee.get_employment_type_display }}
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="salary-details">
+                            <div>
+                                <div class="salary-label">Recieved employee</div>
+                                <div class="salary-amount">AED{{ total_stats.total_paid|floatformat:0|intcomma }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <span class="status-badge {{ item.payment_status.badge_class }}">
+                                <i class="fas fa-{{ item.payment_status.icon }}"></i>
+                                {{ item.payment_status.label }}
+                            </span>
+
+                            {% if item.payment_progress > 0 %}
+                            <div class="progress-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill {{ item.payment_status.badge_class }}"></div>
                                 </div>
-                                {% endif %}
-                        </td>
-                        <td>
-                            <div class="salary-cell">
-                                <div class="salary-amount">${{ item.employee.salary_due|floatformat:0|intcomma }}</div>
-                                {% if item.payment_progress > 0 %}
-                                <div class="salary-progress">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill"></div>
-                                    </div>
-                                    <div class="progress-text">{{ item.payment_progress|floatformat:1 }}% paid</div>
-                                </div>
-                                {% endif %}
+                                <div class="progress-text">{{ item.payment_progress|floatformat:1 }}% paid</div>
                             </div>
-                        </td>
-                        <td>
-                            <div class="status-cell">
-                                <span class="status-badge status-{{ item.payment_status.label|lower }}">
-                                    <i class="fas fa-{{ item.payment_status.icon }}"></i>
-                                    {{ item.payment_status.label }}
-                                </span>
-                                {% if item.financials.remaining_balance > 0 %}
-                                <div class="balance-due">
-                                    ${{ item.financials.remaining_balance|floatformat:0|intcomma }} due
-                                </div>
-                                {% endif %}
+                            {% endif %}
+
+                            {% if item.financials.remaining_balance > 0 %}
+                            <div style="font-size: 12px; color: var(--danger-color); font-weight: 500;">
+                                AED{{ item.financials.remaining_balance|floatformat:0|intcomma }} due
                             </div>
-                        </td>
-                        <td>
-                            <div class="action-buttons">
-                                <a href="{% url 'employee:employee_detail' item.employee.id %}" class="btn-action" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <a href="{% url 'admin:employees_employee_change' item.employee.id %}" class="btn-action" title="Edit">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <a href="{% url 'employee:process_salary_payment' %}?employee={{ item.employee.id }}" class="btn-action" title="Process Payment">
-                                    <i class="fas fa-money-bill-wave"></i>
-                                </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="service-details">
+                            {% if item.employee.hire_date %}
+                            <div>
+                                <div class="salary-label">Hire Date</div>
+                                <div class="hire-date">{{ item.employee.hire_date|date:"M d, Y" }}</div>
                             </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            <div class="empty-content">
-                                <i class="fas fa-user-slash"></i>
-                                <h4>No employees found</h4>
-                                <p>
-                                    {% if filters.search or filters.department or filters.status != 'all' %}
-                                    Try adjusting your filters
-                                    {% else %}
-                                    No employees have been added yet
-                                    {% endif %}
-                                </p>
+                            {% if item.years_of_service %}
+                            <div>
+                                <div class="salary-label">Service</div>
+                                <div class="service-years">{{ item.years_of_service }} years</div>
                             </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Pagination -->
-        {% if page_obj.paginator.num_pages > 1 %}
-        <div class="pagination">
-            <nav>
-                <ul class="pagination-list">
-                    {% if page_obj.has_previous %}
-                    <li>
-                        <a href="?page=1{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
-                            <i class="fas fa-angle-double-left"></i>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="?page={{ page_obj.previous_page_number }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
-                            <i class="fas fa-angle-left"></i>
-                        </a>
-                    </li>
-                    {% endif %}
-                    
-                    {% for num in page_obj.paginator.page_range %}
-                        {% if page_obj.number == num %}
-                        <li>
-                            <span class="pagination-link active">{{ num }}</span>
-                        </li>
-                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <li>
-                            <a href="?page={{ num }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
-                                {{ num }}
+                            {% endif %}
+                            {% else %}
+                            <span style="color: #6c757d; font-style: italic;">Not specified</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="{% url 'employee:employee_detail' item.employee.id %}" class="btn-action"
+                                title="View Details">
+                                <i class="fas fa-eye"></i>
                             </a>
-                        </li>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% if page_obj.has_next %}
-                    <li>
-                        <a href="?page={{ page_obj.next_page_number }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
-                            <i class="fas fa-angle-right"></i>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="?page={{ page_obj.paginator.num_pages }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="pagination-link">
-                            <i class="fas fa-angle-double-right"></i>
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-            <div class="pagination-info">
-                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-            </div>
-        </div>
-        {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6">
+                        <div class="empty-state">
+                            <i class="fas fa-user-slash"></i>
+                            <h4>No employees found</h4>
+                            <p>
+                                {% if filters.search or filters.status != 'all' or filters.type != 'all' %}
+                                Try adjusting your filters or
+                                <a href="{% url 'employee:employee_list' %}">clear all filters</a>
+                                {% else %}
+                                No employees have been added yet.
+                                <a href="{% url 'admin:employee_employee_add' %}">Add your first employee</a>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+
+    <!-- Pagination -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </div>
+
+        <nav class="pagination-nav">
+            {% if page_obj.has_previous %}
+            <a href="?page=1{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                class="pagination-btn" title="First Page">
+                <i class="fas fa-angle-double-left"></i>
+            </a>
+            <a href="?page={{ page_obj.previous_page_number }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                class="pagination-btn" title="Previous Page">
+                <i class="fas fa-angle-left"></i>
+            </a>
+            {% else %}
+            <span class="pagination-btn disabled">
+                <i class="fas fa-angle-double-left"></i>
+            </span>
+            <span class="pagination-btn disabled">
+                <i class="fas fa-angle-left"></i>
+            </span>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <span class="pagination-btn active">{{ num }}</span>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+                href="?page={{ num }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                class="pagination-btn">{{ num }}</a>
+                {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                    class="pagination-btn" title="Next Page">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% for key,value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                    class="pagination-btn" title="Last Page">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+                {% else %}
+                <span class="pagination-btn disabled">
+                    <i class="fas fa-angle-right"></i>
+                </span>
+                <span class="pagination-btn disabled">
+                    <i class="fas fa-angle-double-right"></i>
+                </span>
+                {% endif %}
+        </nav>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Minimal JavaScript
-function clearSearch() {
-    const searchInput = document.querySelector('input[name="search"]');
-    if (searchInput) {
-        searchInput.value = '';
-        searchInput.closest('form').submit();
-    }
-}
-
-// Simple form validation
-document.addEventListener('DOMContentLoaded', function() {
-    // Add loading state to form submit
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        form.addEventListener('submit', function() {
-            const submitBtn = this.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-                submitBtn.disabled = true;
-            }
-        });
+    document.addEventListener('DOMContentLoaded', function () {
+        // تنظیم عرض نوارهای پیشرفت
+        if (totalEmployees > 0) {
+            document.getElementById('paidProgress').style.width = ((paidCount / totalEmployees) * 100) + '%';
+            document.getElementById('partialProgress').style.width = ((partialCount / totalEmployees) * 100) + '%';
+            document.getElementById('unpaidProgress').style.width = ((unpaidCount / totalEmployees) * 100) + '%';
+        }
+        // جستجوی خودکار با تاخیر
+        let searchTimeout;
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', function () {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    document.getElementById('filterForm').submit();
+                }, 500);
+            });
+        }
     });
-});
 </script>
 {% endblock %}

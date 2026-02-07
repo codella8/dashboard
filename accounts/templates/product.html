@@ -1,49 +1,141 @@
 {% extends "accounts_base.html" %}
 {% load static %}
-{% load i18n %}
-{% load humanize %}
 
-{% block title %}{{ product.name }} | Almuqbil{% endblock %}
-{% block content1 %}
+{% block title %}{{ product.name }} | Almuqbil Motors{% endblock %}
 
-<section class="product-detail mt-5">
+{% block content %}
+
+<div class="product-details-container">
     <div class="container">
-        <div class="product-main">
-            <div class="product-gallery">
-                <div class="main-image-container">
-                    <img src="{{ product.picture.url }}" alt="{{ product.name }}" class="main-image img-fluid">
-                </div>
-                {% if product.picture2 or product.picture3 %}
-                <div class="thumbnail-gallery">
-                    <div class="thumbnail-container">
-                        <img src="{{ product.picture.url }}" alt="{{ product.name }}" class="thumbnail active">
-                        {% if product.picture2 %}
-                        <img src="{{ product.picture2.url }}" alt="{{ product.name }}" class="thumbnail">
-                        {% endif %}
-                        {% if product.picture3 %}
-                        <img src="{{ product.picture3.url }}" alt="{{ product.name }}" class="thumbnail">
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
 
-            <div class="product-info">
-                <div class="product-header">
-                    <h1 class="product-title">{{ product.name }}</h1>
-                    <div class="product-meta">
-                        <span class="product-category badge bg-primary">{{ product.category }}</span>
-                        <span class="product-code">{% trans 'کد محصول :' %} {{ product.id }}</span>
+        <!-- Header with Back Button -->
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <a href="{% url 'accounts:home' %}" class="product-back-btn">
+                <i class="fas fa-arrow-left"></i>
+                <span>Back to Products</span>
+            </a>
+        </div>
+
+        <!-- Product Details -->
+        <div class="row g-5">
+            <!-- Product Images -->
+            <div class="col-lg-6">
+                <div class="product-gallery-card">
+                    {% if product.picture %}
+                    <img src="{{ product.picture.url }}" alt="{{ product.name }}" class="product-main-image">
+                    {% else %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="product-info-card">
+
+                    <!-- Product Title and Badges -->
+                    <h1 class="product-titles">{{ product.name }}</h1>
+
+                    <div class="product-badges">
+                        <span class="product-badge badge-premium">
+                            <i class="fas fa-crown"></i>
+                            Premium Product
+                        </span>
+                        <span class="product-badge badge-id">
+                            <i class="fas fa-hashtag"></i>
+                            ID: {{ product.id }}
+                        </span>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="description-section">
+                        <h3 class="description-title">Product Description</h3>
+                        <div class="description-content">
+                            {% if product.description %}
+                            {{ product.description }}
+                            {% else %}
+                            <p class="text-muted">No detailed description available for this product.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+
+                    <!-- Action Buttons -->
+                    <div class="action-buttons">
+                        <a href="mailto:sales@almuqbil-motors.com?subject=Inquiry about {{ product.name }} (ID: {{ product.id }})"
+                            class="inquire-btn">
+                            <i class="fas fa-envelope"></i>
+                            <span>Email</span>
+                        </a>
+
+                        <a href="https://wa.me/?text=Hi,%20I'm%20interested%20in%20{{ product.name }}%20(ID:%20{{ product.id }})%20from%20Almuqbil%20Motors"
+                            target="_blank" class="whatsapp-btn">
+                            <i class="fab fa-whatsapp"></i>
+                            <span>WhatsApp</span>
+                        </a>
                     </div>
                 </div>
-                <div class="short-description">
-                    <h3>{% trans 'توضیحات کامل محصول' %}</h3>
-                    <ul class="features-list">
-                        <p>{{ product.description }}</p>
-                    </ul>
+            </div>
+        </div>
+
+        <!-- Additional Information -->
+        <div class="additional-info mt-5">
+            <h3 class="info-title">Product Specifications</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-icon">
+                        <i class="fas fa-cog"></i>
+                    </div>
+                    <div class="info-content">
+                        <h6>Category</h6>
+                        <p>Premium Vehicle</p>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-icon">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <div class="info-content">
+                        <h6>Condition</h6>
+                        <p>Brand New</p>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="info-content">
+                        <h6>Availability</h6>
+                        <p>In Stock</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</section>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Add animation to feature cards on hover
+        const featureCards = document.querySelectorAll('.feature-card');
+
+        featureCards.forEach(card => {
+            card.addEventListener('mouseenter', function () {
+                this.style.transform = 'translateY(-5px)';
+            });
+
+            card.addEventListener('mouseleave', function () {
+                this.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Smooth scroll for page load
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
+</script>
 {% endblock %}

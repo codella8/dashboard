@@ -1,13 +1,12 @@
 {% extends "daily_sale/daily_sale_base.html" %}
-{% load static %}
-
+{% load static %} 
 {% block title %}Almuqbil | transaction_create{% endblock %}
 
 {% block content %}
 <div class="transaction-wrapper">
     <div class="page-header">
         <h1 class="page-title">
-            <i class="bi bi-plus-circle"></i>Create New Transaction
+            <i class="bi bi-check"></i>Create New Transaction
         </h1>
         <a href="{% url 'daily_sale:transaction_list' %}" class="back-btn">
             <i class="bi bi-arrow-left"></i> Back
@@ -25,7 +24,7 @@
 
     <div class="two-column-layout">
         <div class="main-panel">
-            <div class="main-card fade-in-up">
+            <div class="main-cards fade-in-up">
                 <div class="form-section">
                     <div class="section-header">
                         <div class="section-icon">
@@ -43,24 +42,32 @@
                         <input type="hidden" name="items_data" id="id_items_data">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label class="form-label">Invoice Number</label>
+                                <div class="form-label">Invoice Number</div>
                                 <input type="text" class="form-control" id="id_invoice_number" name="invoice_number"
                                     placeholder="Auto-generated">
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label">Date</label>
+                                <div class="form-label">Date</div>
                                 <input type="date" class="form-control" id="id_date" name="date"
                                     value="{{ form.date.value|default:'' }}">
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label">Due Date</label>
+                                <div class="form-label">Due Date</div>
                                 <input type="date" class="form-control" id="id_due_date" name="due_date"
                                     value="{{ form.due_date.value|default:'' }}">
                             </div>
+
                             <div class="form-group">
-                                <label class="form-label">Transaction Type</label>
+                                <div class="form-label">Customer</div>
+                                <select class="form-select" id="id_customer" name="customer" required>
+                                    <option value="">Select Customer</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="form-label">Transaction Type</div>
                                 <select class="form-select" id="id_transaction_type" name="transaction_type" required>
                                     <option value="">Select Type</option>
                                     {% for value, label in form.transaction_type.field.choices %}
@@ -72,24 +79,17 @@
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label">Customer</label>
-                                <select class="form-select" id="id_customer" name="customer" required>
-                                    <option value="">Select Customer</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Tax</label>
+                                <div class="form-label">Tax</div>
                                 <div class="input-group">
                                     <input type="number" class="form-control" id="id_tax" name="tax" value="5.00"
                                         step="0.01" min="0" max="100">
                                     <span class="input-group-text">%</span>
                                 </div>
-                                <small class="text-muted mt-2 d-block">Applied after discount</small>
+                                
                             </div>
-                            <div class="advance-section">
-                                <div class="advance-title">
-                                    <i class="bi bi-wallet2"></i> Advance (paid)
+                            <div class="form-group">
+                                <div class="form-label">
+                                     Advance (paid)
                                 </div>
                                 <div class="advance-input">
                                     <div class="input-group">
@@ -243,7 +243,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     $(document).ready(function () {
         // AJAX URLs
@@ -549,7 +548,7 @@
 
             $('#items-list tr').each(function () {
                 const sel = $(this).find('.item-select');
-                const itemId = sel.val(); // این UUID است
+                const itemId = sel.val(); 
                 const qty = $(this).find('.qty').val();
                 const price = $(this).find('.unit-price').val();
                 const discount = $(this).find('.discount').val();
@@ -572,7 +571,7 @@
                 }
 
                 items.push({
-                    item_id: itemId, 
+                    item_id: itemId,
                     quantity: parseFloat(qty),
                     unit_price: parseFloat(price),
                     discount: parseFloat(discount) || 0

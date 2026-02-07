@@ -2,396 +2,388 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Almuqbil | Daily Summary{% endblock %}
+{% block title %}daily_summary | Almuqbil{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h1 class="h3 mb-0 text-gray-800">
-        <i class="fas fa-chart-line me-2"></i>Daily Summary | Almuqbil
-      </h1>
-      <p class="text-muted mb-0">Real-time sales analytics and financial overview</p>
+<div class="financial-report-container">
+  <!-- Report Header -->
+  <div class="report-header">
+    <div class="report-header-pattern"></div>
+    <div class="report-title-section">
+      <h1 class="report-title">daily_summary</h1>
+      <p class="report-subtitle">Almuqbil Motors - Professional Financial Analysis</p>
+      <div class="report-period">
+        <i class="fas fa-calendar-alt me-2"></i>
+        {{ report_title }}
+      </div>
     </div>
-    <div>
-      <span class="text-muted me-3">
-        <i class="fas fa-clock"></i> Last updated: {% now "H:i:s" %}
-      </span>
-      <a href="{% url 'daily_sale:daily_summary' %}" class="btn btn-primary">
-        <i class="fas fa-sync-alt me-1"></i> Refresh
+  </div>
+
+  <!-- Report Controls -->
+  <div class="report-controls">
+    <div class="report-type-selector">
+      <a href="?type=daily&date={{ target_date|date:'Y-m-d' }}"
+        class="report-type-btn {% if report_type == 'daily' %}active{% endif %}">
+        <i class="fas fa-calendar-day me-2"></i>Daily Report
       </a>
+      <a href="?type=weekly&date={{ target_date|date:'Y-m-d' }}"
+        class="report-type-btn {% if report_type == 'weekly' %}active{% endif %}">
+        <i class="fas fa-calendar-week me-2"></i>Weekly Report
+      </a>
+      <a href="?type=monthly&date={{ target_date|date:'Y-m-d' }}"
+        class="report-type-btn {% if report_type == 'monthly' %}active{% endif %}">
+        <i class="fas fa-calendar-alt me-2"></i>Monthly Report
+      </a>
+      <a href="?type=yearly&date={{ target_date|date:'Y-m-d' }}"
+        class="report-type-btn {% if report_type == 'yearly' %}active{% endif %}">
+        <i class="fas fa-calendar-year me-2"></i>Yearly Report
+      </a>
+    </div>
+
+    <div class="date-navigation">
+      <button class="date-btn" onclick="navigateDate('prev')">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+
+      <div class="current-date">
+        {% if report_type == 'daily' %}
+        {{ target_date|date:"F d, Y" }}
+        {% elif report_type == 'weekly' %}
+        Week of {{ week_start|date:"M d" }} - {{ week_end|date:"M d, Y" }}
+        {% elif report_type == 'monthly' %}
+        {{ target_date|date:"F Y" }}
+        {% else %}
+        {{ target_date.year }}
+        {% endif %}
+      </div>
+
+      <button class="date-btn" onclick="navigateDate('next')">
+        <i class="fas fa-chevron-right"></i>
+      </button>
     </div>
   </div>
 
   {% if error %}
-  <div class="alert alert-danger" role="alert">
+  <div class="alert alert-danger mx-4 mt-4" role="alert">
     <i class="fas fa-exclamation-triangle me-2"></i>
-    {{ error_message }}
+    <strong>Error!</strong> {{ error_message }}
   </div>
   {% endif %}
 
-  <div class="card border-0 shadow mb-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-    <div class="card-body">
-      <div class="row align-items-center">
-        <div class="col-md-8">
-          <h5 class="card-title text-white mb-3">
-            <i class="fas fa-calendar-range me-2"></i>Select Date Range
-          </h5>
-          <form method="get" class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label text-white">Start Date</label>
-              <input type="date" class="form-control" name="start_date" 
-                     value="{{ start_date|date:'Y-m-d' }}" required>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label text-white">End Date</label>
-              <input type="date" class="form-control" name="end_date" 
-                     value="{{ end_date|date:'Y-m-d' }}" required>
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
-              <button type="submit" class="btn btn-light w-100">
-                <i class="fas fa-filter me-1"></i> Apply Range
-              </button>
-            </div>
-          </form>
-        </div>
-        <div class="col-md-4">
-          <div class="text-center">
-            <h2 class="text-white mb-1">{{ daily_series|length }}</h2>
-            <p class="text-white-50 mb-0">Days Analyzed</p>
+  <!-- Summary Cards -->
+  <div class="summary-cards">
+    <div class="summary-grid">
+      <!-- Total Sales -->
+      <div class="summary-card sales-card">
+        <div class="summary-card-header">
+          <div class="summary-title">Total Sales</div>
+          <div class="summary-icon">
+            <i class="fas fa-cash-register"></i>
           </div>
+        </div>
+        <div class="summary-value">
+          {{ period_stats.total_sales|default:0|floatformat:0|intcomma }}
+          <span class="summary-currency">AED</span>
+        </div>
+        <div class="summary-details">
+          <i class="fas fa-shopping-cart"></i>
+          {{ period_stats.total_transactions|default:0 }} transactions
+          {% if previous_period_stats.total_sales %}
+          <span
+            class="summary-change {% if period_stats.total_sales > previous_period_stats.total_sales %}change-positive{% else %}change-negative{% endif %}">
+            {% with change=period_stats.total_sales|default:0 %}
+            {% if change > 0 %}+{% endif %}{{ change|floatformat:0|intcomma }} AED
+            {% endwith %}
+          </span>
+          {% endif %}
         </div>
       </div>
 
-      <div class="row mt-4">
-        <div class="col-12">
-          <div class="d-flex flex-wrap gap-2">
-            <a href="?start_date={% now 'Y-m-d' %}&end_date={% now 'Y-m-d' %}"
-               class="btn btn-sm btn-outline-light">Today</a>
-            <a href="?start_date={{ yesterday|date:'Y-m-d' }}&end_date={{ yesterday|date:'Y-m-d' }}"
-               class="btn btn-sm btn-outline-light">Yesterday</a>
-            <a href="?start_date={{ week_start|date:'Y-m-d' }}&end_date={% now 'Y-m-d' %}"
-               class="btn btn-sm btn-outline-light">This Week</a>
-            <a href="?start_date={{ month_start|date:'Y-m-d' }}&end_date={% now 'Y-m-d' %}"
-               class="btn btn-sm btn-outline-light">This Month</a>
-            <a href="?start_date={{ last_month_start|date:'Y-m-d' }}&end_date={{ last_month_end|date:'Y-m-d' }}"
-               class="btn btn-sm btn-outline-light">Last Month</a>
-            <a href="?start_date={{ year_start|date:'Y-m-d' }}&end_date={% now 'Y-m-d' %}"
-               class="btn btn-sm btn-outline-light">This Year</a>
+      <!-- Net Profit -->
+      <div class="summary-card profit-card">
+        <div class="summary-card-header">
+          <div class="summary-title">Net Profit</div>
+          <div class="summary-icon">
+            <i class="fas fa-chart-line"></i>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row mb-4">
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-primary h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-primary text-uppercase mb-1">Total Sales</h6>
-              <h2 class="mb-0">AED {{ period_stats.total_sales|default:0|floatformat:0|intcomma }}</h2>
-              <div class="mt-2">
-                <span class="text-muted small">
-                  <i class="fas fa-shopping-cart me-1"></i>
-                  {{ period_stats.total_transactions|default:0 }} transactions
-                </span>
-              </div>
-            </div>
-            <div class="icon text-primary">
-              <i class="fas fa-cash-register fa-2x"></i>
-            </div>
-          </div>
+        <div
+          class="summary-value {% if period_stats.total_profit|default:0 >= 0 %}text-success{% else %}text-danger{% endif %}">
+          {{ period_stats.total_profit|default:0|floatformat:0|intcomma }}
+          <span class="summary-currency">AED</span>
+        </div>
+        <div class="summary-details">
+          <i class="fas fa-percent"></i>
+          {% if period_stats.total_sales and period_stats.total_sales > 0 %}
+          {{ period_stats.total_profit|default:0|floatformat:1 }}% margin
+          {% else %}
+          0% margin
+          {% endif %}
         </div>
       </div>
-    </div>
 
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-success h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-success text-uppercase mb-1">Cash In</h6>
-              <h2 class="mb-0">AED {{ cash_in_total|default:0|floatformat:0|intcomma }}</h2>
-              <div class="mt-2">
-                <span class="text-muted small">
-                  <i class="fas fa-arrow-down me-1"></i>
-                  {{ cash_in_count|default:0 }} payments
-                </span>
-              </div>
-            </div>
-            <div class="icon text-success">
-              <i class="fas fa-money-bill-wave fa-2x"></i>
-            </div>
+      <!-- Cash In -->
+      <div class="summary-card cash-in-card">
+        <div class="summary-card-header">
+          <div class="summary-title">Cash In</div>
+          <div class="summary-icon">
+            <i class="fas fa-money-bill-wave"></i>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-danger h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-danger text-uppercase mb-1">Cash Out</h6>
-              <h2 class="mb-0">AED {{ cash_out_total|default:0|floatformat:0|intcomma }}</h2>
-              <div class="mt-2">
-                <span class="text-muted small">
-                  <i class="fas fa-arrow-up me-1"></i>
-                  {{ cash_out_count|default:0 }} expenses
-                </span>
-              </div>
-            </div>
-            <div class="icon text-danger">
-              <i class="fas fa-file-invoice-dollar fa-2x"></i>
-            </div>
-          </div>
+        <div class="summary-value">
+          {{ cash_flow.cash_in|default:0|floatformat:0|intcomma }}
+          <span class="summary-currency">AED</span>
+        </div>
+        <div class="summary-details">
+          <i class="fas fa-arrow-down"></i>
+          Collected payments
+          <span class="summary-change change-positive">
+            {{ collection_rate|default:0|floatformat:1 }}% collection rate
+          </span>
         </div>
       </div>
-    </div>
 
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-info h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-info text-uppercase mb-1">Net Profit</h6>
-              <h2 class="mb-0 {% if net_profit|default:0 >= 0 %}text-success{% else %}text-danger{% endif %}">
-                AED {{ net_profit|default:0|floatformat:0|intcomma }}
-              </h2>
-              <div class="mt-2">
-                <span class="text-muted small">
-                  <i class="fas fa-chart-line me-1"></i>
-                  Cash In - Cash Out
-                </span>
-              </div>
-            </div>
-            <div class="icon text-info">
-              <i class="fas fa-chart-bar fa-2x"></i>
-            </div>
+      <!-- Cash Out -->
+      <div class="summary-card cash-out-card">
+        <div class="summary-card-header">
+          <div class="summary-title">Cash Out</div>
+          <div class="summary-icon">
+            <i class="fas fa-file-invoice-dollar"></i>
           </div>
+        </div>
+        <div class="summary-value">
+          {{ cash_flow.cash_out|default:0|floatformat:0|intcomma }}
+          <span class="summary-currency">AED</span>
+        </div>
+        <div class="summary-details">
+          <i class="fas fa-arrow-up"></i>
+          Purchase expenses
+        </div>
+      </div>
+
+      <!-- Transactions -->
+      <div class="summary-card transactions-card">
+        <div class="summary-card-header">
+          <div class="summary-title">Transactions</div>
+          <div class="summary-icon">
+            <i class="fas fa-exchange-alt"></i>
+          </div>
+        </div>
+        <div class="summary-value">
+          {{ period_stats.total_transactions|default:0|intcomma }}
+        </div>
+        <div class="summary-details">
+          <i class="fas fa-box"></i>
+          {{ period_stats.total_items_sold|default:0|intcomma }} items sold
         </div>
       </div>
     </div>
   </div>
 
-  <div class="row mb-4">
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-success h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-success text-uppercase mb-1">Fully Paid</h6>
-              <h2 class="mb-0">{{ payment_stats.fully_paid|default:0 }}</h2>
-              <div class="mt-2">
-                <span class="text-muted small">
-                  <i class="fas fa-check-circle me-1"></i>
-                  {{ payment_stats.fully_paid_percentage|default:0|floatformat:0 }}% of total
-                </span>
-              </div>
-            </div>
-            <div class="icon text-success">
-              <i class="fas fa-check fa-2x"></i>
-            </div>
-          </div>
-        </div>
-      </div>
+  <!-- Daily Breakdown -->
+  <div class="daily-breakdown">
+    <div class="section-title">
+      <i class="fas fa-calendar-alt"></i>Daily Financial Breakdown
     </div>
 
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-warning h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-warning text-uppercase mb-1">Partial Paid</h6>
-              <h2 class="mb-0">{{ payment_stats.partially_paid|default:0 }}</h2>
-              <div class="mt-2">
-                <span class="text-muted small">
-                  <i class="fas fa-clock me-1"></i>
-                  {{ payment_stats.partially_paid_percentage|default:0|floatformat:0 }}% of total
-                </span>
-              </div>
-            </div>
-            <div class="icon text-warning">
-              <i class="fas fa-clock fa-2x"></i>
-            </div>
-          </div>
+    <div class="financial-table">
+      <div class="table-header">
+        <div>Date</div>
+        <div class="text-right">Sales</div>
+        <div class="text-right">Profit</div>
+        <div class="text-right">Cash In</div>
+        <div class="text-right">Cash Out</div>
+        <div class="text-right">Transactions</div>
+        <div class="text-right">Items</div>
+      </div>
+
+      {% if daily_series %}
+      {% for day in daily_series %}
+      <div class="table-row">
+        <div class="date-cell">
+          <div class="day-name">{{ day.date|date:"D" }}</div>
+          <div class="day-date">{{ day.date|date:"M d, Y" }}</div>
+        </div>
+        <div class="amount-cell sales-cell">
+          {{ day.total_sales|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="amount-cell profit-cell">
+          {{ day.net_profit|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="amount-cell cash-in-cell">
+          {{ day.cash_in|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="amount-cell cash-out-cell">
+          {{ day.cash_out|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="text-right">
+          {{ day.transactions_count|default:0 }}
+        </div>
+        <div class="text-right">
+          {{ day.items_sold|default:0 }}
         </div>
       </div>
-    </div>
+      {% endfor %}
 
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-danger h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-danger text-uppercase mb-1">Unpaid</h6>
-              <h2 class="mb-0">{{ payment_stats.unpaid|default:0 }}</h2>
-              <div class="mt-2">
-                <span class="text-muted small">
-                  <i class="fas fa-exclamation-triangle me-1"></i>
-                  {{ payment_stats.unpaid_percentage|default:0|floatformat:0 }}% of total
-                </span>
-              </div>
-            </div>
-            <div class="icon text-danger">
-              <i class="fas fa-exclamation-triangle fa-2x"></i>
-            </div>
-          </div>
+      <!-- Total Row -->
+      <div class="table-footer">
+        <div>TOTAL</div>
+        <div class="amount-cell sales-cell">
+          {{ period_stats.total_sales|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="amount-cell profit-cell">
+          {{ period_stats.total_profit|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="amount-cell cash-in-cell">
+          {{ cash_flow.cash_in|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="amount-cell cash-out-cell">
+          {{ cash_flow.cash_out|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="text-right">
+          {{ period_stats.total_transactions|default:0 }}
+        </div>
+        <div class="text-right">
+          {{ period_stats.total_items_sold|default:0 }}
         </div>
       </div>
+      {% else %}
+      <div class="text-center py-5">
+        <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+        <h4 class="text-muted">No financial data available</h4>
+        <p class="text-muted">Select a different date range</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Financial Analysis -->
+  <div class="financial-analysis">
+    <div class="section-title">
+      <i class="fas fa-chart-pie"></i>Financial Analysis
     </div>
 
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card border-left-info h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6 class="text-info text-uppercase mb-1">Collection Rate</h6>
-              <h2 class="mb-0">{{ collection_rate|default:0|floatformat:1 }}%</h2>
-              <div class="mt-2">
-                <span class="text-muted small">
-                  <i class="fas fa-percent me-1"></i>
-                  Collected vs Sales
-                </span>
-              </div>
-            </div>
-            <div class="icon text-info">
-              <i class="fas fa-percent fa-2x"></i>
-            </div>
-          </div>
+    <div class="analysis-grid">
+      <!-- Gross Profit -->
+      <div class="analysis-card">
+        <div class="analysis-title">
+          <i class="fas fa-chart-line text-success"></i>Gross Profit
+        </div>
+        <div class="analysis-value text-success">
+          {{ total_summary.total_gross_profit|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="analysis-details">
+          Total gross profit before expenses<br>
+          Average daily: {{ total_summary.avg_daily_gross_profit|default:0|floatformat:0|intcomma }} AED
+        </div>
+      </div>
+
+      <!-- Collection Rate -->
+      <div class="analysis-card">
+        <div class="analysis-title">
+          <i class="fas fa-percent text-info"></i>Collection Rate
+        </div>
+        <div class="analysis-value text-info">
+          {{ collection_rate|default:0|floatformat:1 }}%
+        </div>
+        <div class="analysis-details">
+          Amount collected vs total sales<br>
+          Outstanding: {{ payment_stats.total_outstanding|default:0|floatformat:0|intcomma }} AED
+        </div>
+      </div>
+
+      <!-- Average Transaction -->
+      <div class="analysis-card">
+        <div class="analysis-title">
+          <i class="fas fa-calculator text-primary"></i>Avg Transaction
+        </div>
+        <div class="analysis-value text-primary">
+          {{ total_summary.avg_transaction_value|default:0|floatformat:0|intcomma }} AED
+        </div>
+        <div class="analysis-details">
+          Average value per transaction<br>
+          Total items: {{ total_summary.total_items_sold|default:0|intcomma }}
+        </div>
+      </div>
+
+      <!-- Customer Statistics -->
+      <div class="analysis-card">
+        <div class="analysis-title">
+          <i class="fas fa-users text-warning"></i>Customers
+        </div>
+        <div class="analysis-value text-warning">
+          {{ total_summary.total_customers|default:0|intcomma }}
+        </div>
+        <div class="analysis-details">
+          Unique customers in period<br>
+          {% if total_summary.days_count > 0 %}
+          {{ total_summary.total_customers|default:0|floatformat:1 }} per day
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
 
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="card shadow">
-        <div class="card-header">
-          <h5 class="mb-0">
-            <i class="fas fa-calendar-alt me-2"></i>Daily Breakdown
-          </h5>
-        </div>
-        <div class="card-body">
-          <div class="table-responsive">
-            <table class="table table-hover">
-              <thead class="table-light">
-                <tr>
-                  <th>Date</th>
-                  <th class="text-end">Total Sales</th>
-                  <th class="text-end">Cash In</th>
-                  <th class="text-end">Cash Out</th>
-                  <th class="text-end">Profit</th>
-                  <th class="text-end">Transactions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for day in daily_series %}
-                <tr>
-                  <td>
-                    <strong>{{ day.date|date:"D" }}</strong><br>
-                    <small class="text-muted">{{ day.date|date:"M d, Y" }}</small>
-                  </td>
-                  <td class="text-end">
-                    <strong>AED {{ day.total_sales|default:0|floatformat:0|intcomma }}</strong>
-                  </td>
-                  <td class="text-end text-success">
-                    AED {{ day.cash_in|default:0|floatformat:0|intcomma }}
-                  </td>
-                  <td class="text-end text-danger">
-                    AED {{ day.cash_out|default:0|floatformat:0|intcomma }}
-                  </td>
-                  <td class="text-end {% if day.profit|default:0 >= 0 %}text-success{% else %}text-danger{% endif %}">
-                    <strong>AED {{ day.profit|default:0|floatformat:0|intcomma }}</strong>
-                  </td>
-                  <td class="text-end">
-                    <span class="badge bg-info">{{ day.transactions_count|default:0 }}</span>
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="6" class="text-center py-4">
-                    <div class="text-muted">
-                      <i class="fas fa-calendar-times fa-3x mb-3"></i>
-                      <h5>No data available</h5>
-                      <p>Select a different date range</p>
-                    </div>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-              <tfoot class="table-light">
-                <tr>
-                  <th>TOTAL</th>
-                  <th class="text-end">AED {{ period_stats.total_sales|default:0|floatformat:0|intcomma }}</th>
-                  <th class="text-end text-success">AED {{ cash_in_total|default:0|floatformat:0|intcomma }}</th>
-                  <th class="text-end text-danger">AED {{ cash_out_total|default:0|floatformat:0|intcomma }}</th>
-                  <th class="text-end {% if net_profit|default:0 >= 0 %}text-success{% else %}text-danger{% endif %}">
-                    AED {{ net_profit|default:0|floatformat:0|intcomma }}
-                  </th>
-                  <th class="text-end">{{ period_stats.total_transactions|default:0 }}</th>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="card shadow">
-        <div class="card-header">
-          <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Old Summary</h5>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-4 mb-3">
-              <div class="card border-left-danger">
-                <div class="card-body">
-                  <h6 class="text-danger">Total Outstanding</h6>
-                  <h3>AED {{ payment_stats.total_outstanding|default:0|floatformat:0|intcomma }}</h3>
-                  <small class="text-muted">Across {{ payment_stats.unpaid|default:0 }} transactions</small>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4 mb-3">
-              <div class="card border-left-warning">
-                <div class="card-body">
-                  <h6 class="text-warning">Collection Rate</h6>
-                  <h3>{{ collection_rate|default:0|floatformat:0 }}%</h3>
-                  <small class="text-muted">Collected vs Total Sales</small>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4 mb-3">
-              <div class="card border-left-info">
-                <div class="card-body">
-                  <h6 class="text-info">Avg Transaction</h6>
-                  <h3>AED {{ period_stats.avg_transaction|default:0|floatformat:0|intcomma }}</h3>
-                  <small class="text-muted">Average per transaction</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="text-center mt-3">
-            <a href="{% url 'daily_sale:old_transactions' %}" class="btn btn-outline-danger">
-              <i class="fas fa-eye me-1"></i> View Outstanding Customers
-            </a>
-            <a href="{% url 'daily_sale:cleared_transactions' %}" class="btn btn-outline-success ms-2">
-              <i class="fas fa-check-circle me-1"></i> View Cleared Transactions
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
+  <!-- Action Buttons -->
+  <div class="action-buttons">
+    <a href="{% url 'daily_sale:daily_summary' %}?type={{ report_type }}&date={{ target_date|date:'Y-m-d' }}"
+      class="btn btn-success">
+      <i class="fas fa-file-excel me-1"></i>Export to Excel
+    </a>
+    <button onclick="window.print()" class="btn btn-outline">
+      <i class="fas fa-print me-1"></i>Print Report
+    </button>
+    <a href="{% url 'daily_sale:daily_summary' %}" class="btn btn-outline">
+      <i class="fas fa-chart-bar me-1"></i>View Dashboard
+    </a>
+    <a href="{% url 'daily_sale:transaction_list' %}" class="btn btn-primary">
+      <i class="fas fa-list me-1"></i>View All Transactions
+    </a>
   </div>
 </div>
-{% endblock %}
-{% block extra_js %}
-<!-- بدون جاوااسکریپت -->
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Auto-refresh every 10 minutes
+    setInterval(function () {
+      window.location.reload();
+    }, 600000); // 10 minutes
+  });
+
+  function navigateDate(direction) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentDate = new Date('{{ target_date|date:"Y-m-d" }}');
+    const reportType = '{{ report_type }}';
+
+    if (reportType === 'daily') {
+      if (direction === 'prev') {
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    } else if (reportType === 'weekly') {
+      if (direction === 'prev') {
+        currentDate.setDate(currentDate.getDate() - 7);
+      } else {
+        currentDate.setDate(currentDate.getDate() + 7);
+      }
+    } else if (reportType === 'monthly') {
+      if (direction === 'prev') {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+      } else {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+    } else if (reportType === 'yearly') {
+      if (direction === 'prev') {
+        currentDate.setFullYear(currentDate.getFullYear() - 1);
+      } else {
+        currentDate.setFullYear(currentDate.getFullYear() + 1);
+      }
+    }
+
+    const newDate = currentDate.toISOString().split('T')[0];
+    urlParams.set('date', newDate);
+    window.location.search = urlParams.toString();
+  }
+</script>
 {% endblock %}

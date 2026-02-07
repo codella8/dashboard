@@ -207,6 +207,8 @@ class Payment(models.Model):
 class DailySummary(models.Model):
     id = models.BigAutoField(primary_key=True)
     date = models.DateField(unique=True, db_index=True)
+    
+    # آمار اصلی
     total_sales = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     total_purchases = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     total_profit = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
@@ -214,14 +216,50 @@ class DailySummary(models.Model):
     transactions_count = models.PositiveIntegerField(default=0)
     items_sold = models.PositiveIntegerField(default=0)
     customers_count = models.PositiveIntegerField(default=0)
+    
+    # آمار اضافی برای گزارش‌گیری بهتر
+    gross_profit = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    total_returns = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    total_tax = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    total_discount = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    total_paid = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    avg_transaction_value = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    
+    # آمار وضعیت پرداخت
+    paid_transactions = models.PositiveIntegerField(default=0)
+    partial_transactions = models.PositiveIntegerField(default=0)
+    unpaid_transactions = models.PositiveIntegerField(default=0)
+    total_outstanding = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    
+    # آمار روش پرداخت
+    payment_method_cash = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    payment_method_card = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    payment_method_bank = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
+    
     updated_at = models.DateTimeField(auto_now=True)
     is_final = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-date"]
+        verbose_name = "خلاصه روزانه"
+        verbose_name_plural = "خلاصه‌های روزانه"
 
     def __str__(self):
         return f"Daily Summary {self.date}"
+
+    @property
+    def collection_rate(self):
+        """نرخ وصول"""
+        if self.total_sales > 0:
+            return (self.total_paid / self.total_sales) * 100
+        return 0
+
+    @property
+    def avg_items_per_transaction(self):
+        """میانگین اقلام در هر تراکنش"""
+        if self.transactions_count > 0:
+            return self.items_sold / self.transactions_count
+        return 0
 
 
 class OutstandingCustomer(models.Model):

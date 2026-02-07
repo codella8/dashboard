@@ -52,13 +52,6 @@
                                 Admin Dashboard
                             </a>
                         </li>
-
-                        <li>
-                            <a class="dropdown-item luxury-dropdown-item" href="{% url 'accounts:home' %}">
-                                <i class="bi bi-speedometer2 me-2"></i>
-                                Customer page
-                            </a>
-                        </li>
                         {% endif %}
                         <li>
                             <a class="dropdown-item luxury-dropdown-item" href="{% url 'accounts:update_user' %}">
@@ -77,9 +70,9 @@
                             </a>
                         </li>
                         <li>
-                            <a class="dropdown-item luxury-dropdown-item" href="{% url 'accounts:home' %}">
-                                <i class="bi bi-speedometer2 me-2"></i>
-                                Deals
+                            <a class="dropdown-item luxury-dropdown-item" href="{% url 'daily_sale:customer_detail' %}">
+                                <i class="bi bi-cart me-2"></i>
+                                Cart
                             </a>
                         </li>
                     </ul>

@@ -1,163 +1,201 @@
-{% load static humanize %}
-{% block title %}Almuqbil | customer_detail{% endblock %}
+<!doctype html>
+{% load humanize %}
+{% load i18n %}
+{% load static %}
+<html lang="en">
 
-{% block content %}
-<div class="customer-detail-container">
-    <div class="container">
-        <div class="glass-card fade-in">
-            <div class="customer-header">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        {% if is_self_view %}
-                        <h1 class="display-5 fw-bold mb-3">Hello, {{ customer.full_name }}</h1>
-                        <p class="lead mb-0">
-                            <i class="fas fa-envelope me-2"></i>{{ customer.email }} |
-                            <i class="fas fa-phone ms-3 me-2"></i>{{ customer.phone|default:"Not provided" }}
-                        </p>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Daily Sale Dashboard{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.2.0/dist/select2-bootstrap-5-theme.min.css"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/customer.css' %}">
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+
+    <nav class="navbar navbar-expand-lg navbar-dark modern-nav">
+        <div class="container-fluid">
+            <div class="brand-container">
+                <span class="brand-text">ALmuqbil</span>
+            </div>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarMain">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{% url 'accounts:home' %}">
+                            <i class="bi bi-house me-2"></i>Home
+                        </a>
+                    </li>
+                    {% if request.user.is_staff %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'admin:index' %}">
+                            <i class="bi bi-shield-lock me-2"></i>Admin
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <div class="navbar-right">
+                <div class="dropdown user-dropdown">
+                    <button class="btn btn-user dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle me-2"></i>
+                        {% if user.get_full_name %}
+                        {{ user.get_full_name }}
                         {% else %}
-                        <h1 class="display-5 fw-bold mb-3">
-                            <i class="fas fa-user-tie me-3"></i>{{ customer.full_name }}
-                        </h1>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p class="mb-2"><i class="fas fa-envelope me-2"></i>{{ customer.email }}</p>
-                                <p class="mb-0"><i class="fas fa-phone me-2"></i>{{ customer.phone|default:"Not
-                                    provided" }}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p class="mb-2"><i class="fas fa-map-marker-alt me-2"></i>{{
-                                    customer.address|default:"Address not provided"|truncatechars:50 }}</p>
-                                <p class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Member since {{
-                                    customer.created_at|date:"M d, Y" }}</p>
-                            </div>
-                        </div>
+                        {{ user.username }}
                         {% endif %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{% url 'accounts:update_user' %}">
+                                <i class="bi bi-person me-2"></i>Profile
+                            </a></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}">
+                                <i class="bi bi-box-arrow-right me-2"></i>Logout
+                            </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid modern-main">
+        {% if messages %}
+        <div class="message-container">
+            {% for m in messages %}
+            <div class="alert alert-{{ m.tags }} alert-dismissible fade show message-alert" role="alert">
+                <i
+                    class="bi bi-{% if m.tags == 'success' %}check-circle{% elif m.tags == 'error' %}x-circle{% elif m.tags == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+                {{ m }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="page-header fade-in">
+            <div class="page-header-content">
+                <h1 class="page-title">
+                    <i class="bi bi-person-circle me-3"></i>
+                    {% if is_self_view %}
+                    My Account
+                    {% else %}
+                    Customer Details
+                    {% endif %}
+                </h1>
+            </div>
+            <div class="page-header-actions">
+                <div class="date-display">
+                    <i class="bi bi-calendar3 me-2"></i>
+                    <span id="currentDateTime">
+                        {% now "F d, Y - h:i A" %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-wrapper fade-in">
+            {% block content %}
+            
+
+            <!-- Stats Cards -->
+            <div class="row g-4 mb-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card stat-card paid h-100">
+                        <div class="card-body">
+                            <div class="stat-icon paid">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                            <h6 class="text-uppercase text-muted mb-2">Total Paid</h6>
+                            <h2 class="mb-1 amount-positive">${{ total_paid|floatformat:2|intcomma }}</h2>
+                            <small class="text-muted">
+                                {% if total_sales > 0 %}
+                                {% widthratio total_paid total_sales 100 %}% paid
+                                {% else %}
+                                0% paid
+                                {% endif %}
+                            </small>
+                            {% if total_sales > 0 %}
+                            <div class="progress mt-3">
+                                <div class="progress-bar bg-success">
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="col-md-4 text-end">
-                        <div class="d-flex justify-content-end gap-3">
-                            {% if not is_self_view %}
-                            <a href="#" class="btn export-btn no-print">
-                                <i class="fas fa-file-export me-2"></i>Export
-                            </a>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card stat-card debt h-100">
+                        <div class="card-body">
+                            <div class="stat-icon debt">
+                                <i class="bi bi-exclamation-circle"></i>
+                            </div>
+                            <h6 class="text-uppercase text-muted mb-2">Remaining Balance</h6>
+                            <h2 class="mb-1 amount-negative">${{ total_remaining|floatformat:2|intcomma }}</h2>
+                            <small class="text-muted">Outstanding amount</small>
+                            {% if total_remaining > 0 %}
+                            <div class="mt-3 pt-3 border-top">
+                                <button class="btn btn-sm btn-outline-danger w-100" onclick="sendPaymentReminder()">
+                                    <i class="bi bi-bell me-1"></i>Send Reminder
+                                </button>
+                            </div>
+                            {% else %}
+                            <div class="mt-3 pt-3 border-top">
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle me-1"></i>All Paid
+                                </span>
+                            </div>
                             {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="p-4">
-                <div class="row g-4">
-                    <div class="col-md-3">
-                        <div class="card stat-card sales h-100">
-                            <div class="card-body">
-                                <div class="stat-icon sales">
-                                    <i class="fas fa-shopping-cart fa-2x"></i>
-                                </div>
-                                <h6 class="text-uppercase text-muted mb-2">Total Sales</h6>
-                                <h2 class="mb-1">${{ total_sales|intcomma }}</h2>
-                                <small class="text-muted">{{ transactions_count }} transactions</small>
-                                {% if last_transaction %}
-                                <div class="mt-3">
-                                    <small><i class="fas fa-history me-1"></i>Last: {{ last_transaction|date:"M d, Y"
-                                        }}</small>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="col-md-3">
-                        <div class="card stat-card tax h-100">
-                            <div class="card-body">
-                                <div class="stat-icon tax">
-                                    <i class="fas fa-receipt fa-2x"></i>
-                                </div>
-                                <h6 class="text-uppercase text-muted mb-2">Total Tax</h6>
-                                <h2 class="mb-1">${{ total_tax|intcomma }}</h2>
-                                <small class="text-muted">{{ tax_rate }}% tax rate</small>
-                                <div class="mt-3">
-                                    <small><i class="fas fa-percentage me-1"></i>Included in totals</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-3">
-                        <div class="card stat-card paid h-100">
-                            <div class="card-body">
-                                <div class="stat-icon paid">
-                                    <i class="fas fa-check-circle fa-2x"></i>
-                                </div>
-                                <h6 class="text-uppercase text-muted mb-2">Total Paid</h6>
-                                <h2 class="mb-1 amount-positive">${{ total_paid|intcomma }}</h2>
-                                <small class="text-muted">{{ total_paid|floatformat:0|intcomma }} paid</small>
-                                <div class="progress mt-3" style="height: 6px;">
-                                    {% if total_sales > 0 %}
-                                    <div class="progress-bar bg-success"></div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
- 
-                    <div class="col-md-3">
-                        <div class="card stat-card debt h-100">
-                            <div class="card-body">
-                                <div class="stat-icon debt">
-                                    <i class="fas fa-exclamation-circle fa-2x"></i>
-                                </div>
-                                <h6 class="text-uppercase text-muted mb-2">Remaining Balance</h6>
-                                <h2 class="mb-1 amount-negative">${{ total_remaining|intcomma }}</h2>
-                                <small class="text-muted">Old amount</small>
-                                {% if total_remaining > 0 %}
-                                <div class="mt-3">
-                                    <button class="btn btn-sm btn-outline-danger">
-                                        <i class="fas fa-credit-card me-1"></i>Request Payment
-                                    </button>
-                                </div>
-                                {% endif %}
-                            </div>
+            <!-- Filter Section -->
+            <div class="search-filter mb-4">
+                <div class="row align-items-center">
+                    <div class="col-lg-4 col-md-6 mb-3 mb-md-0">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white">
+                                <i class="bi bi-search text-muted"></i>
+                            </span>
+                            <input type="text" id="searchInput" class="form-control"
+                                placeholder="Search transactions...">
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="search-filter glass-card no-print">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0">
-                            <i class="fas fa-search text-muted"></i>
-                        </span>
-                        <input type="text" id="searchInput" class="form-control border-start-0"
-                            placeholder="Search transactions by item, type, or note...">
+            <!-- Transaction History -->
+            <div class="mb-5">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>
+                        Transaction History
+                        <span class="badge bg-primary ms-2" id="recordCount">{{ transactions|length }} records</span>
+                    </h3>
+                    <div class="d-flex gap-2">
+                        {% if is_admin and total_remaining > 0 %}
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                            <i class="bi bi-credit-card me-2"></i>Record Payment
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="d-flex gap-3 justify-content-end">
-                        <select id="typeFilter" class="form-select" style="width: auto;">
-                            <option value="">All Types</option>
-                            <option value="sale">Sale</option>
-                            <option value="return">Return</option>
-                        </select>
-                        <select id="dateFilter" class="form-select" style="width: auto;">
-                            <option value="">All Time</option>
-                            <option value="30">Last 30 Days</option>
-                            <option value="90">Last 90 Days</option>
-                            <option value="365">Last Year</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="glass-card fade-in">
-            <div class="p-4">
-                <h3 class="mb-4">
-                    <i class="fas fa-history me-2"></i>
-                    Transaction History
-                    <span class="badge bg-primary ms-2">{{ transactions|length }} records</span>
-                </h3>
 
                 {% if transactions %}
                 <div class="table-container">
@@ -175,49 +213,68 @@
                                     <th class="text-end">Total</th>
                                     <th class="text-end">Paid</th>
                                     <th class="text-end">Balance</th>
+                                    <th>Status</th>
                                     <th>Note</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for tx in transactions %}
-                                <tr class="transaction-row" data-type="{{ tx.type|lower }}"
-                                    data-date="{{ tx.date|date:'Y-m-d' }}">
+                                <tr class="transaction-row hover-lift" data-type="{{ tx.type|lower }}"
+                                    data-date="{{ tx.date|date:'Y-m-d' }}"
+                                    data-status="{% if tx.remaining_amount == 0 %}paid{% elif tx.paid_amount > 0 %}partial{% else %}unpaid{% endif %}">
                                     <td>
                                         <div class="fw-semibold">{{ tx.date|date:"M d, Y" }}</div>
                                         <small class="text-muted">{{ tx.date|date:"h:i A" }}</small>
                                     </td>
                                     <td>
                                         <span
-                                            class="badge {% if tx.type == 'sale' or tx.type == 'SALE' %}sale{% else %}return{% endif %}">
+                                            class="badge {% if tx.type|lower == 'sale' %}sale{% else %}return{% endif %}">
                                             {{ tx.type|title }}
                                         </span>
                                     </td>
                                     <td>
                                         <div class="fw-medium">{{ tx.item }}</div>
-                                        <small class="text-muted">ID: {{ tx.id }}</small>
+                                        <small class="text-muted">ID: {{ tx.id|slice:":8" }}</small>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-light text-dark">{{ tx.quantity }}</span>
                                     </td>
-                                    <td class="text-end">${{ tx.unit_price|intcomma }}</td>
-                                    <td class="text-end fw-semibold">${{ tx.total_amount|intcomma }}</td>
+                                    <td class="text-end">${{ tx.unit_price|floatformat:2|intcomma }}</td>
+                                    <td class="text-end fw-semibold">${{ tx.total_amount|floatformat:2|intcomma }}</td>
                                     <td class="text-end">
-                                        <span class="text-muted">${{ tx.tax_amount|intcomma }}</span>
+                                        <span class="text-muted">${{ tx.tax_amount|floatformat:2|intcomma }}</span>
                                     </td>
-                                    <td class="text-end fw-bold text-primary">${{ tx.total_with_tax|intcomma }}</td>
+                                    <td class="text-end fw-bold text-primary">${{
+                                        tx.total_with_tax|floatformat:2|intcomma }}</td>
                                     <td class="text-end">
-                                        <span class="amount-positive">${{ tx.paid_amount|intcomma }}</span>
+                                        <span class="amount-positive">${{ tx.paid_amount|floatformat:2|intcomma
+                                            }}</span>
                                     </td>
                                     <td class="text-end">
                                         <span
                                             class="{% if tx.remaining_amount > 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                                            ${{ tx.remaining_amount|intcomma }}
+                                            ${{ tx.remaining_amount|floatformat:2|intcomma }}
                                         </span>
+                                    </td>
+                                    <td>
+                                        {% if tx.remaining_amount == 0 %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>Paid
+                                        </span>
+                                        {% elif tx.paid_amount > 0 %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>Partial
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-x-circle me-1"></i>Unpaid
+                                        </span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if tx.note %}
                                         <span class="d-inline-block text-truncate" style="max-width: 150px;"
-                                            title="{{ tx.note }}">
+                                            data-bs-toggle="tooltip" title="{{ tx.note }}">
                                             {{ tx.note }}
                                         </span>
                                         {% else %}
@@ -229,249 +286,501 @@
                             </tbody>
                             <tfoot class="table-dark">
                                 <tr>
-                                    <th colspan="5" class="text-start">TOTALS</th>
-                                    <th class="text-end">${{ total_sales|intcomma }}</th>
-                                    <th class="text-end">${{ total_tax|intcomma }}</th>
-                                    <th class="text-end">${{ total_sales|add:total_tax|intcomma }}</th>
-                                    <th class="text-end amount-positive">${{ total_paid|intcomma }}</th>
-                                    <th class="text-end amount-negative">${{ total_remaining|intcomma }}</th>
-                                    <th></th>
+                                    <th colspan="5" class="text-start">GRAND TOTALS</th>
+                                    <th class="text-end">${{ total_sales|floatformat:2|intcomma }}</th>
+                                    <th class="text-end">${{ total_tax|floatformat:2|intcomma }}</th>
+                                    <th class="text-end">${{ total_sales|add:total_tax|floatformat:2|intcomma }}</th>
+                                    <th class="text-end amount-positive">${{ total_paid|floatformat:2|intcomma }}</th>
+                                    <th class="text-end amount-negative">${{ total_remaining|floatformat:2|intcomma }}
+                                    </th>
+                                    <th colspan="2"></th>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
                 </div>
-                <div class="row mt-4">
-                    <div class="col-md-4">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6 class="card-title text-muted">Payment Status</h6>
-                                {% if total_remaining == 0 %}
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-check-circle fa-2x text-success me-3"></i>
-                                    <div>
-                                        <h4 class="mb-0">Fully Paid</h4>
-                                        <small class="text-muted">All payments completed</small>
-                                    </div>
-                                </div>
-                                {% elif total_remaining > 0 and total_remaining < total_sales %} <div
-                                    class="d-flex align-items-center">
-                                    <i class="fas fa-exclamation-triangle fa-2x text-warning me-3"></i>
-                                    <div>
-                                        <h4 class="mb-0">Partially Paid</h4>
-                                        <small class="text-muted">
-                                            {{ total_paid|floatformat:0|intcomma }}/{{
-                                            total_sales|floatformat:0|intcomma }} paid
-                                        </small>
-                                    </div>
-                            </div>
-                            {% else %}
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-times-circle fa-2x text-danger me-3"></i>
-                                <div>
-                                    <h4 class="mb-0">Not Paid</h4>
-                                    <small class="text-muted">No payments received</small>
-                                </div>
-                            </div>
-                            {% endif %}
-                        </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="bi bi-cart-x"></i>
                     </div>
+                    <h3 class="mb-3">No Transactions Found</h3>
+                    <p class="text-muted mb-4">
+                        {% if is_self_view %}
+                        You haven't made any purchases yet.
+                        {% else %}
+                        This customer hasn't made any purchases yet.
+                        {% endif %}
+                    </p>
                 </div>
-
-                <div class="col-md-4">
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted">Average Transaction</h6>
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-chart-bar fa-2x text-primary me-3"></i>
-                                <div>
-                                    {% if transactions_count > 0 %}
-                                    <h4 class="mb-0">${{
-                                        total_sales|floatformat:0|divisibleby:transactions_count|intcomma }}</h4>
-                                    <small class="text-muted">Per transaction</small>
-                                    {% else %}
-                                    <h4 class="mb-0">$0</h4>
-                                    <small class="text-muted">No transactions</small>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-4">
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted">Tax Liability</h6>
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-balance-scale fa-2x text-warning me-3"></i>
-                                <div>
-                                    <h4 class="mb-0">{{ tax_rate }}%</h4>
-                                    <small class="text-muted">${{ total_tax|intcomma }} total tax</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {% endif %}
             </div>
 
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-state-icon">
-                    <i class="fas fa-shopping-cart fa-3x text-muted"></i>
+            <!-- Payment Form (Admin Only) -->
+            {% if is_admin and total_remaining > 0 %}
+            <div class="card border-primary mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-credit-card me-2"></i>
+                        Record Payment
+                    </h4>
                 </div>
-                <h3 class="mb-3">No Transactions Found</h3>
-                <p class="text-muted mb-4">
-                    {% if is_self_view %}
-                    This customer hasn't made any purchases yet. Their transaction history will appear here once they
-                    start shopping.
-                    {% endif %}
-                </p>
+                <div class="card-body">
+                    <form method="post" class="row g-3">
+                        {% csrf_token %}
+                        <div class="col-md-4">
+                            <label class="form-label">Amount *</label>
+                            <input type="number" name="amount" class="form-control" placeholder="0.00" step="0.01"
+                                min="0.01" max="{{ total_remaining|floatformat:2 }}"
+                                value="{{ total_remaining|floatformat:2 }}" required>
+                            <small class="text-muted">Max: ${{ total_remaining|floatformat:2 }}</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Payment Method</label>
+                            <select name="payment_method" class="form-select">
+                                <option value="cash">Cash</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="check">Check</option>
+                                <option value="card">Card</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Reference Number</label>
+                            <input type="text" name="reference" class="form-control" placeholder="Optional">
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Apply to Transaction</label>
+                            <select name="transaction_id" class="form-select">
+                                <option value="">Select transaction (optional)</option>
+                                {% for tx in transactions %}
+                                {% if tx.remaining_amount > 0 %}
+                                <option value="{{ tx.id }}">
+                                    {{ tx.date|date:"m/d/Y" }} - {{ tx.item }} - ${{ tx.remaining_amount|floatformat:2
+                                    }}
+                                </option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Payment Date</label>
+                            <input type="date" name="payment_date" class="form-control" value="{% now 'Y-m-d' %}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea name="note" class="form-control" rows="3"
+                                placeholder="Payment details..."></textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex gap-3">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-check-circle me-2"></i>Record Payment
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="clearForm()">
+                                    <i class="bi bi-x-circle me-2"></i>Clear
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
             {% endif %}
+
+            <!-- Summary Stats -->
+            {% if transactions %}
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-muted mb-3">
+                                <i class="bi bi-pie-chart me-2"></i>Payment Overview
+                            </h6>
+                            <div id="paymentChart"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-muted mb-3">
+                                <i class="bi bi-bar-chart me-2"></i>Transaction Statistics
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="text-center">
+                                        <h3 class="mb-1 text-primary">{{ transactions_count }}</h3>
+                                        <small class="text-muted">Total Transactions</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="text-center">
+                                        <h3 class="mb-1 text-success">
+                                            {% if transactions_count > 0 %}
+                                            ${{ total_sales|divisibleby:transactions_count|floatformat:2|intcomma }}
+                                            {% else %}
+                                            $0
+                                            {% endif %}
+                                        </h3>
+                                        <small class="text-muted">Average per Transaction</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="text-center">
+                                        <h3 class="mb-1 text-info">{{ tax_rate|floatformat:1 }}%</h3>
+                                        <small class="text-muted">Tax Rate</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endblock %}
+        </div>
+    </main>
+
+    <!-- Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-credit-card me-2"></i>
+                        Quick Payment
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="quickPaymentForm">
+                        <div class="mb-3">
+                            <label class="form-label">Amount</label>
+                            <input type="number" class="form-control" id="quickAmount"
+                                value="{{ total_remaining|floatformat:2 }}" max="{{ total_remaining|floatformat:2 }}"
+                                step="0.01" required>
+                            <div class="form-text">
+                                Outstanding balance: ${{ total_remaining|floatformat:2 }}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Payment Method</label>
+                            <select class="form-select" id="quickMethod">
+                                <option value="cash">Cash</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="check">Check</option>
+                                <option value="card">Card</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Reference</label>
+                            <input type="text" class="form-control" id="quickReference" placeholder="Optional">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitQuickPayment()">
+                        <i class="bi bi-check-circle me-2"></i>Submit Payment
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
-</div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-    document.getElementById('searchInput').addEventListener('keyup', function () {
-        const searchTerm = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#transactionsTable tbody tr');
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(searchTerm) ? '' : 'none';
+    <script>
+        // Initialize when page loads
+        $(document).ready(function () {
+            // Update current date/time
+            function updateDateTime() {
+                const now = new Date();
+                const options = {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                };
+                $('#currentDateTime').text(now.toLocaleDateString('en-US', options));
+            }
+            updateDateTime();
+            setInterval(updateDateTime, 60000);
+
+            // Initialize Select2
+            $('.form-select').select2({
+                theme: 'bootstrap-5',
+                width: '100%'
+            });
+
+            // Initialize tooltips
+            $('[data-bs-toggle="tooltip"]').tooltip();
+
+            // Animate alerts
+            $('.alert').addClass('animate__animated animate__fadeIn');
+
+            // Create payment chart
+            createPaymentChart();
         });
-    });
 
-    document.getElementById('typeFilter').addEventListener('change', function () {
-        const type = this.value;
-        const rows = document.querySelectorAll('#transactionsTable tbody tr');
-        rows.forEach(row => {
-            if (!type) {
-                row.style.display = '';
+        // Table filtering functions
+        $('#searchInput').on('input', function () {
+            const searchTerm = $(this).val().toLowerCase();
+            $('#transactionsTable tbody tr').each(function () {
+                const text = $(this).text().toLowerCase();
+                if (text.includes(searchTerm)) {
+                    $(this).show();
+                    $(this).addClass('highlight');
+                    setTimeout(() => $(this).removeClass('highlight'), 1000);
+                } else {
+                    $(this).hide();
+                }
+            });
+            updateRecordCount();
+        });
+
+        $('#typeFilter, #dateFilter, #statusFilter').on('change', filterTable);
+
+        function filterTable() {
+            const typeFilter = $('#typeFilter').val();
+            const dateFilter = $('#dateFilter').val();
+            const statusFilter = $('#statusFilter').val();
+            const cutoffDate = new Date();
+
+            if (dateFilter) {
+                cutoffDate.setDate(cutoffDate.getDate() - parseInt(dateFilter));
+            }
+
+            $('#transactionsTable tbody tr').each(function () {
+                const rowType = $(this).data('type');
+                const rowDate = new Date($(this).data('date'));
+                const rowStatus = $(this).data('status');
+
+                let show = true;
+
+                if (typeFilter && !rowType.includes(typeFilter)) {
+                    show = false;
+                }
+
+                if (dateFilter && rowDate < cutoffDate) {
+                    show = false;
+                }
+
+                if (statusFilter && rowStatus !== statusFilter) {
+                    show = false;
+                }
+
+                if (show) {
+                    $(this).show();
+                    $(this).addClass('filtered-in');
+                } else {
+                    $(this).hide();
+                    $(this).removeClass('filtered-in');
+                }
+            });
+
+            updateRecordCount();
+        }
+
+        function resetFilters() {
+            $('#searchInput').val('');
+            $('#typeFilter').val('').trigger('change');
+            $('#dateFilter').val('').trigger('change');
+            $('#statusFilter').val('').trigger('change');
+
+            $('#transactionsTable tbody tr').each(function () {
+                $(this).show();
+                $(this).removeClass('filtered-in');
+            });
+
+            updateRecordCount();
+        }
+
+        function updateRecordCount() {
+            const visibleCount = $('#transactionsTable tbody tr:visible').length;
+            $('#recordCount').text(visibleCount + ' records');
+        }
+
+        // Payment reminder
+        function sendPaymentReminder() {
+            if (confirm('Send payment reminder to {{ customer.full_name }}?')) {
+                const btn = event.target;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Sending...';
+                btn.disabled = true;
+
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Sent!';
+                    btn.classList.remove('btn-outline-danger');
+                    btn.classList.add('btn-success');
+
+                    showNotification('Payment reminder sent successfully!', 'success');
+
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-outline-danger');
+                    }, 3000);
+                }, 1500);
+            }
+        }
+
+        // Quick payment
+        function submitQuickPayment() {
+            const amount = $('#quickAmount').val();
+            const method = $('#quickMethod').val();
+            const reference = $('#quickReference').val();
+
+            if (!amount || parseFloat(amount) <= 0) {
+                showNotification('Please enter a valid amount', 'danger');
                 return;
             }
-            const rowType = row.getAttribute('data-type');
-            row.style.display = rowType.includes(type) ? '' : 'none';
-        });
-    });
 
-    document.getElementById('dateFilter').addEventListener('change', function () {
-        const days = parseInt(this.value);
-        if (!days) {
-            document.querySelectorAll('#transactionsTable tbody tr').forEach(row => {
-                row.style.display = '';
-            });
-            return;
-        }
-
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutdownDate.getDate() - days);
-
-        document.querySelectorAll('#transactionsTable tbody tr').forEach(row => {
-            const rowDate = new Date(row.getAttribute('data-date'));
-            row.style.display = rowDate >= cutoffDate ? '' : 'none';
-        });
-    });
-
-    function exportToCSV() {
-        const rows = document.querySelectorAll('#transactionsTable tr');
-        let csv = [];
-        const headers = [];
-        document.querySelectorAll('#transactionsTable thead th').forEach(th => {
-            headers.push(th.textContent.trim());
-        });
-        csv.push(headers.join(','));
-        rows.forEach(row => {
-            if (row.querySelector('thead') || row.style.display === 'none') return;
-            const rowData = [];
-            row.querySelectorAll('td').forEach(td => {
-                let text = td.textContent.trim();
-                text = text.replace(/\$|,/g, '');
-                rowData.push(`"${text}"`);
-            });
-            csv.push(rowData.join(','));
-        });
-
-        const csvContent = csv.join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `customer-{{ customer.id }}-transactions-${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    }
-    function sendPaymentReminder() {
-        if (confirm('Send payment reminder to {{ customer.full_name }}?')) {
-            const btn = event.target;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending...';
-            btn.disabled = true;
-            setTimeout(() => {
-                btn.innerHTML = '<i class="fas fa-check me-2"></i>Sent!';
-                btn.classList.remove('btn-outline-warning');
-                btn.classList.add('btn-success');
-                showNotification('Payment reminder sent successfully!', 'success');
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-outline-warning');
-                }, 3000);
-            }, 1500);
-        }
-    }
-    function showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-        notification.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.remove();
-        }, 5000);
-    }
-    document.querySelectorAll('#transactionsTable tbody tr').forEach(row => {
-        row.addEventListener('mouseenter', function () {
-            this.style.backgroundColor = '#f8fafc';
-        });
-
-        row.addEventListener('mouseleave', function () {
-            this.style.backgroundColor = '';
-        });
-    });
-    document.addEventListener('DOMContentLoaded', function () {
-        const tooltips = document.querySelectorAll('[title]');
-        tooltips.forEach(el => {
-            new bootstrap.Tooltip(el);
-        });
-    });
-
-    // Animate stats cards on scroll
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
-
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('animate__animated', 'animate__fadeInUp');
+            const totalRemaining = parseFloat('{{ total_remaining|floatformat:2 }}');
+            if (parseFloat(amount) > totalRemaining) {
+                showNotification('Amount cannot exceed outstanding balance', 'danger');
+                return;
             }
-        });
-    }, observerOptions);
 
-    document.querySelectorAll('.stat-card').forEach(card => {
-        observer.observe(card);
-    });
-</script>
-{% endblock %}
+            // Submit the quick payment form
+            $('#quickPaymentForm').submit();
+        }
+
+        // Export CSV
+        function exportToCSV() {
+            const rows = [];
+            const headers = [];
+
+            // Get headers
+            $('#transactionsTable thead th').each(function () {
+                headers.push('"' + $(this).text().trim() + '"');
+            });
+            rows.push(headers.join(','));
+
+            // Get data
+            $('#transactionsTable tbody tr:visible').each(function () {
+                const rowData = [];
+                $(this).find('td').each(function () {
+                    let text = $(this).text().trim();
+                    text = text.replace(/\$/g, '').replace(/,/g, '');
+                    rowData.push('"' + text + '"');
+                });
+                rows.push(rowData.join(','));
+            });
+
+            // Create CSV content
+            const csvContent = rows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'customer-transactions-{{ customer.full_name|slugify }}-' + new Date().toISOString().split('T')[0] + '.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showNotification('CSV exported successfully!', 'success');
+        }
+
+        // Print page
+        function printPage() {
+            window.print();
+        }
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notification = $('<div>', {
+                class: 'alert alert-' + type + ' alert-dismissible fade show position-fixed',
+                css: {
+                    top: '20px',
+                    right: '20px',
+                    zIndex: '9999',
+                    minWidth: '300px'
+                },
+                html: `
+                    <i class="bi bi-${type === 'success' ? 'check' : type === 'danger' ? 'exclamation' : 'info'}-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `
+            });
+
+            $('body').append(notification);
+
+            // Remove after 5 seconds
+            setTimeout(() => {
+                notification.alert('close');
+            }, 5000);
+        }
+
+        // Clear form
+        function clearForm() {
+            $('form[method="post"]')[0].reset();
+            $('input[name="amount"]').val('{{ total_remaining|floatformat:2 }}');
+        }
+
+        // Create payment chart
+        function createPaymentChart() {
+            const ctx = document.getElementById('paymentChart');
+            if (!ctx) return;
+
+            const paidAmount = parseFloat('{{ total_paid|default:"0" }}');
+            const remainingAmount = parseFloat('{{ total_remaining|default:"0" }}');
+
+            // Create canvas if not exists
+            if (!$(ctx).find('canvas').length) {
+                $(ctx).html('<canvas></canvas>');
+            }
+
+            const canvas = $(ctx).find('canvas')[0];
+            const chart = new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Paid', 'Remaining'],
+                    datasets: [{
+                        data: [paidAmount, remainingAmount],
+                        backgroundColor: ['#06d6a0', '#ef476f'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': $';
+                                    }
+                                    label += context.raw.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    });
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>
