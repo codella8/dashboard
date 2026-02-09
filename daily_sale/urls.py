@@ -21,6 +21,7 @@ urlpatterns = [
     path('transactions/<uuid:pk>/', views.invoice_view, name='invoice'),
     path('transactions/<uuid:pk>/', views.detail_view, name='detail'),
     path('transaction/<int:pk>/invoice/download/', views.download_invoice_pdf, name='download_invoice_pdf'),
+    path('transaction/<uuid:pk>/delete/', views.transaction_delete, name='transaction_delete'),
     
 
 ]

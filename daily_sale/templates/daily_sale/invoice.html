@@ -122,10 +122,6 @@
                 <span class="info-label">Tax Rate:</span>
                 <span class="info-value">{{ transaction.tax }}%</span>
             </div>
-            <div class="info-row">
-                <span class="info-label">Created By:</span>
-                <span class="info-value">{{ transaction.created_by.get_full_name|default:transaction.created_by.username }}</span>
-            </div>
         </div>
     </div>
 
@@ -145,10 +141,10 @@
                         <th style="width: 50px;">#</th>
                         <th>PRODUCT DETAILS</th>
                         <th class="text-center" style="width: 100px;">QTY</th>
-                        <th class="text-right" style="width: 120px;">UNIT PRICE</th>
-                        <th class="text-right" style="width: 120px;">DISCOUNT</th>
-                        <th class="text-right" style="width: 120px;">TAX</th>
-                        <th class="text-right" style="width: 140px;">TOTAL</th>
+                        <th class="text-right" style="width: 130px;">UNIT PRICE</th>
+                        <th class="text-right" style="width: 130px;">DISCOUNT</th>
+                        <th class="text-left" style="width: 140px;">TAX</th>
+                        <th class="text-right" style="width: 10px;">TOTAL</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -329,55 +325,6 @@
                     <span class="amount-label">BALANCE DUE:</span>
                     <span class="amount-value">{{ balance|floatformat:0|intcomma }} AED</span>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="invoice-footer">
-        <div class="footer-grid">
-            <div class="footer-column">
-                <h4><i class="fas fa-map-marker-alt"></i> Contact Information</h4>
-                <p>
-                    Almuqbil Motors LLC<br>
-                    Dubai, United Arab Emirates<br>
-                    <i class="fas fa-phone"></i> Phone: +971 4 XXX XXXX<br>
-                    <i class="fas fa-envelope"></i> Email: info@almuqbil-motors.com<br>
-                    <i class="fas fa-globe"></i> Website: www.almuqbil-motors.com
-                </p>
-            </div>
-
-            <div class="footer-column">
-                <h4><i class="fas fa-university"></i> Bank Details</h4>
-                <p>
-                    Bank: Emirates NBD<br>
-                    Account: Almuqbil Motors LLC<br>
-                    Account No: XXXX-XXXX-XXXX<br>
-                    IBAN: AE00 1234 5678 9012 3456 789<br>
-                    SWIFT: EBILAEAD
-                </p>
-            </div>
-
-            <div class="footer-column">
-                <h4><i class="fas fa-file-contract"></i> Terms & Conditions</h4>
-                <p>
-                    Payment due within {{ transaction.get_payment_terms_display|default:"30 days" }}<br>
-                    Late fee: 2% per month<br>
-                    All amounts in UAE Dirhams (AED)<br>
-                    Subject to UAE VAT regulations
-                </p>
-            </div>
-        </div>
-
-        <div class="invoice-meta">
-            <div>
-                <i class="far fa-file-alt"></i> Invoice #{{ transaction.invoice_number }}
-                | {{ transaction.date|date:"Y-m-d" }}
-            </div>
-            <div>
-                <i class="far fa-user"></i> 
-                {{ transaction.created_by.get_full_name|default:transaction.created_by.username }}
-                | Computer Generated Invoice
             </div>
         </div>
     </div>

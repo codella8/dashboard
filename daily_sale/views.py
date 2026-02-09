@@ -125,7 +125,7 @@ def customer_detail(request, customer_id=None):
     return render(request, 'daily_sale/customer_detail.html', context)
 
 @login_required
-@db_transaction.atomic
+@db_transaction.atomic 
 def transaction_create(request):
     """ایجاد تراکنش جدید (نسخه اصلی با لاگ‌گیری بهتر)"""
     if request.method == "POST":
@@ -424,6 +424,7 @@ def transaction_edit(request, pk):
 @login_required
 def transaction_list(request):
     try:
+        # پارامترهای فیلتر
         start_date = parse_date_param(request.GET.get("start_date"))
         end_date = parse_date_param(request.GET.get("end_date"))
         transaction_type = request.GET.get("type", "")
@@ -434,15 +435,21 @@ def transaction_list(request):
         items_per_page = int(request.GET.get("per_page", 25))
         export_csv = request.GET.get("export") == "csv"
         
+        # کوئری اصلی با لود همه روابط لازم
         qs = DailySaleTransaction.objects.select_related(
             "item", 
             "customer__user", 
             "company", 
             "container"
+        ).prefetch_related(
+            "items",  # آیتم‌های تراکنش از DailySaleTransactionItem
+            "items__item",  # آیتم اصلی از Inventory_List
+            "payments"  # پرداخت‌ها
         ).order_by("-date", "-created_at")
         
         filter_applied = False
         
+        # اعمال فیلترها
         if start_date:
             qs = qs.filter(date__gte=start_date)
             filter_applied = True
@@ -467,77 +474,69 @@ def transaction_list(request):
             qs = qs.filter(invoice_number__icontains=invoice_number)
             filter_applied = True
 
+        # فیلتر وضعیت پرداخت
         if status_filter:
             if status_filter == 'paid':
-                qs = qs.filter(
-                    id__in=DailySaleTransaction.objects.annotate(
-                        paid_amount=Coalesce(Sum('payments__amount'), Decimal('0'), output_field=DecimalField())
-                    ).filter(total_amount__lte=F('paid_amount')).values('id')
-                )
+                qs = qs.filter(payment_status='paid')
             elif status_filter == 'partial':
-                qs = qs.filter(
-                    id__in=DailySaleTransaction.objects.annotate(
-                        paid_amount=Coalesce(Sum('payments__amount'), Decimal('0'), output_field=DecimalField())
-                    ).filter(
-                        Q(paid_amount__gt=Decimal('0')) & 
-                        Q(paid_amount__lt=F('total_amount'))
-                    ).values('id')
-                )
+                qs = qs.filter(payment_status='partial')
             elif status_filter == 'unpaid':
-                qs = qs.filter(
-                    id__in=DailySaleTransaction.objects.annotate(
-                        paid_amount=Coalesce(Sum('payments__amount'), Decimal('0'), output_field=DecimalField())
-                    ).filter(paid_amount=Decimal('0')).values('id')
-                )
+                qs = qs.filter(payment_status='unpaid')
             filter_applied = True
         
         total_count = qs.count()
 
+        # محاسبه آمار
         stats = {}
-
+        
+        # مجموع فروش
         sales_total = qs.filter(transaction_type='sale').aggregate(
             total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
         )['total']
         stats['total_sales'] = sales_total
         
+        # مجموع خرید
         purchases_total = qs.filter(transaction_type='purchase').aggregate(
             total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
         )['total']
         stats['total_purchases'] = purchases_total
         
+        # مجموع برگشت
         returns_total = qs.filter(transaction_type='return').aggregate(
             total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
         )['total']
         stats['total_returns'] = returns_total
-        outstanding_total = Decimal('0')
-        outstanding_count = 0
-
-        for transaction in qs:
-            paid_amount = Payment.objects.filter(transaction=transaction).aggregate(
-                total=Coalesce(Sum('amount'), Decimal('0'), output_field=DecimalField())
-            )['total'] or Decimal('0')
-            
-            remaining = transaction.total_amount - paid_amount
-            if remaining > Decimal('0'):
-                outstanding_total += remaining
-                outstanding_count += 1
+        
+        # مانده معوقات
+        outstanding_qs = qs.filter(Q(payment_status='unpaid') | Q(payment_status='partial'))
+        outstanding_total = outstanding_qs.aggregate(
+            total=Coalesce(Sum('balance'), Decimal('0'), output_field=DecimalField())
+        )['total']
+        outstanding_count = outstanding_qs.count()
         
         stats['total_outstanding'] = outstanding_total
         stats['outstanding_count'] = outstanding_count
-        items_sold = qs.filter(transaction_type='sale').aggregate(
-            total=Coalesce(Sum('quantity'), 0)
-        )['total']
+        
+        # تعداد کالاهای فروخته شده
+        items_sold = 0
+        for transaction in qs.filter(transaction_type='sale'):
+            # اگر آیتم‌هایی در DailySaleTransactionItem وجود دارند
+            if transaction.items.exists():
+                items_sold += sum(item.quantity for item in transaction.items.all())
+            else:
+                # اگر از فیلد مستقیم quantity استفاده شده
+                items_sold += transaction.quantity
+        
         stats['items_sold'] = items_sold
 
+        # میانگین تراکنش
         if total_count > 0:
             avg_transaction = (sales_total + purchases_total + returns_total) / total_count
         else:
             avg_transaction = Decimal('0')
         stats['avg_transaction'] = avg_transaction
 
-        if export_csv:
-            return export_transactions_to_csv(qs)
-        
+        # صفحه‌بندی
         paginator = Paginator(qs, items_per_page)
         page_number = request.GET.get("page", 1)
         
@@ -548,30 +547,85 @@ def transaction_list(request):
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
 
-        transactions_with_payments = []
+        # پردازش تراکنش‌ها برای نمایش
+        transactions_with_details = []
         for transaction in page_obj:
-            paid_amount = Payment.objects.filter(transaction=transaction).aggregate(
-                total=Coalesce(Sum('amount'), Decimal('0'), output_field=DecimalField())
-            )['total'] or Decimal('0')
+            # محاسبه مبلغ پرداخت شده از جدول Payment
+            paid_amount = sum(payment.amount for payment in transaction.payments.all())
             
+            # مانده بدهی
             remaining = transaction.total_amount - paid_amount
-            if paid_amount == Decimal('0'):
-                payment_status = 'unpaid'
-                status_class = 'danger'
-            elif remaining == Decimal('0'):
-                payment_status = 'paid'
-                status_class = 'success'
-            else:
-                payment_status = 'partial'
-                status_class = 'warning'
-                 
+            
+            # وضعیت پرداخت
             transaction.paid_amount = paid_amount
             transaction.remaining_balance = remaining
-            transaction.payment_status = payment_status
-            transaction.status_class = status_class
-            transaction.payment_percentage = int((paid_amount / transaction.total_amount * 100)) if transaction.total_amount > 0 else 0
-            transactions_with_payments.append(transaction)
+        
+            # **محاسبه اطلاعات نمایشی از آیتم‌ها**
+            # ابتدا بررسی کن آیا آیتم‌هایی از طریق DailySaleTransactionItem وجود دارند
+            transaction_items = transaction.items.all()
+            
+            if transaction_items.exists():
+                # اگر آیتم‌ها از طریق DailySaleTransactionItem هستند
+                first_item = transaction_items.first()
+                
+                # جمع quantity همه آیتم‌ها
+                total_quantity = sum(item.quantity for item in transaction_items)
+                
+                # محاسبه میانگین unit_price (وزنی)
+                total_value = sum(item.quantity * item.unit_price for item in transaction_items)
+                avg_unit_price = total_value / total_quantity if total_quantity > 0 else Decimal('0')
+                
+                # نام آیتم (از اولین آیتم)
+                item_name = ""
+                if first_item.item:
+                    # همه احتمالات برای نام آیتم
+                    if hasattr(first_item.item, 'name') and first_item.item.name:
+                        item_name = first_item.item.name
+                    elif hasattr(first_item.item, 'product_name') and first_item.item.product_name:
+                        item_name = first_item.item.product_name
+                    elif hasattr(first_item.item, 'title') and first_item.item.title:
+                        item_name = first_item.item.title
+                    else:
+                        item_name = str(first_item.item)
+                
+                # کانتینر (از اولین آیتم)
+                container = first_item.container
+                items_count = transaction_items.count()
+                
+            else:
+                # اگر از فیلدهای مستقیم مدل استفاده شده
+                total_quantity = transaction.quantity
+                avg_unit_price = transaction.unit_price
+                
+                # نام آیتم از فیلد مستقیم
+                item_name = ""
+                if transaction.item:
+                    if hasattr(transaction.item, 'name') and transaction.item.name:
+                        item_name = transaction.item.name
+                    elif hasattr(transaction.item, 'product_name') and transaction.item.product_name:
+                        item_name = transaction.item.product_name
+                    else:
+                        item_name = str(transaction.item)
+                
+                container = transaction.container
+                items_count = 1
+            
+            # ذخیره اطلاعات نمایشی در آبجکت تراکنش
+            transaction.display_item_name = item_name
+            transaction.display_quantity = total_quantity
+            transaction.display_unit_price = avg_unit_price
+            transaction.display_container = container
+            transaction.items_count = items_count
+            
+            # اگر total_amount صفر است، از مجموع آیتم‌ها محاسبه کن
+            if transaction.total_amount == Decimal('0') and transaction_items.exists():
+                transaction.display_total = sum(item.total_amount for item in transaction_items)
+            else:
+                transaction.display_total = transaction.total_amount
+            
+            transactions_with_details.append(transaction)
 
+        # لیست مشتریان و شرکت‌ها برای فیلتر
         customers = UserProfile.objects.filter(
             daily_transactions__isnull=False
         ).distinct().order_by('user__first_name')[:50]
@@ -580,32 +634,35 @@ def transaction_list(request):
             daily_transactions__isnull=False
         ).distinct().order_by('name')[:50]
 
+        # فرمت تاریخ‌ها برای نمایش در فرم
         start_date_str = start_date.strftime("%Y-%m-%d") if start_date else ""
         end_date_str = end_date.strftime("%Y-%m-%d") if end_date else ""
         
+        # تاریخ‌های پیش‌فرض
         thirty_days_ago = (datetime.now() - timedelta(days=30)).date()
+        
+        # context
         context = {
             "page_obj": page_obj,
-            "transactions": transactions_with_payments,
+            "transactions": transactions_with_details,
             "start_date": start_date_str,
             "end_date": end_date_str,
             "transaction_type_filter": transaction_type,
             "customer_filter": customer_id,
             "company_filter": company_id,
             "invoice_filter": invoice_number,
-            "status_filter": status_filter,
             "per_page": items_per_page,
             "total_count": total_count,
             "stats": stats,
             "customers": customers,
             "companies": companies,
-            "filter_applied": filter_applied,
             "today": datetime.now().date(),
             "thirty_days_ago": thirty_days_ago,
             "paginator": paginator,
             "current_page": page_obj.number,
         }
 
+        # پاسخ AJAX
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             data = {
                 'success': True,
@@ -620,14 +677,17 @@ def transaction_list(request):
                 'next_page_number': page_obj.next_page_number() if page_obj.has_next() else None,
             }
             return JsonResponse(data)
+        
         return render(request, "daily_sale/transaction_list.html", context)
+    
     except Exception as e:
         logger.error(f"Error in transaction_list view: {str(e)}", exc_info=True)
         
+        # حالت fallback در صورت خطا
         try:
             qs = DailySaleTransaction.objects.select_related(
                 "item", "customer__user", "company", "container"
-            ).order_by("-date", "-created_at")[:100]
+            ).prefetch_related("items__item").order_by("-date", "-created_at")[:100]
             
             paginator = Paginator(qs, 25)
             page_obj = paginator.page(1)
@@ -641,7 +701,7 @@ def transaction_list(request):
             
             context = {
                 "page_obj": page_obj,
-                "transactions": page_obj.object_list,
+                "transactions": [],
                 "start_date": "",
                 "end_date": "",
                 "stats": stats,
@@ -657,65 +717,15 @@ def transaction_list(request):
                 "error_message": "Unable to load transactions. Please contact support."
             })
 
-
-def export_transactions_to_csv(queryset):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="transactions_export.csv"'
-    writer = csv.writer(response)
-    writer.writerow([
-        smart_str('Invoice Number'),
-        smart_str('Date'),
-        smart_str('Customer'),
-        smart_str('Type'),
-        smart_str('Item'),
-        smart_str('Quantity'),
-        smart_str('Unit Price'),
-        smart_str('Discount'),
-        smart_str('Tax'),
-        smart_str('Total Amount'),
-        smart_str('Advance'),
-        smart_str('Balance'),
-        smart_str('Paid Amount'),
-        smart_str('Remaining Balance'),
-        smart_str('Status'),
-        smart_str('Description'),
-    ])
-
-    for transaction in queryset:
-        paid_amount = Payment.objects.filter(transaction=transaction).aggregate(
-            total=Sum('amount')
-        )['total'] or Decimal('0')
-        remaining = transaction.total_amount - paid_amount
-        
-        if paid_amount == Decimal('0'):
-            status = 'Unpaid'
-        elif remaining == Decimal('0'):
-            status = 'Paid'
-        else:
-            status = 'Partial'
-        
-        customer_name = transaction.customer.user.get_full_name() if transaction.customer and transaction.customer.user else 'N/A'
-        item_name = transaction.item.product_name if transaction.item else 'N/A'
-        writer.writerow([
-            smart_str(transaction.invoice_number or ''),
-            smart_str(transaction.date.strftime('%Y-%m-%d') if transaction.date else ''),
-            smart_str(customer_name),
-            smart_str(transaction.get_transaction_type_display()),
-            smart_str(item_name),
-            smart_str(transaction.quantity),
-            smart_str(transaction.unit_price),
-            smart_str(transaction.discount),
-            smart_str(transaction.tax),
-            smart_str(transaction.total_amount),
-            smart_str(transaction.advance),
-            smart_str(transaction.balance),
-            smart_str(paid_amount),
-            smart_str(remaining),
-            smart_str(status),
-            smart_str(transaction.description or ''),
-        ])
+@login_required
+def transaction_delete(request, pk):
+    try:
+        DailySaleTransaction.objects.filter(pk=pk).delete()
+        messages.success(request, "Deleted!")
+    except:
+        messages.error(request, "Error!")
     
-    return response
+    return redirect("daily_sale:transaction_list")
 
 @login_required
 def transaction_detail(request, pk):
@@ -820,237 +830,361 @@ def calculate_sales_trend(daily_series):
         logger.error(f"Error calculating trend: {e}")
         return {'trend': 'stable', 'percentage': 0}
 
+from django.db.models import Sum, Count, Avg, Q, F, DecimalField, IntegerField
+from django.db.models.functions import Coalesce
+from decimal import Decimal
+import json
+from datetime import datetime, timedelta
+import logging
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from daily_sale.models import DailySaleTransaction, Payment
+from django.db import transaction
+
+logger = logging.getLogger(__name__)
+
 @login_required
 def daily_summary(request):
+    """گزارش‌گیری کامل روزانه، هفتگی، ماهانه، سالانه"""
     try:
-        start_date_str = request.GET.get("start_date")
-        end_date_str = request.GET.get("end_date")
+        # پارامترهای جدید
+        report_type = request.GET.get('report_type', 'daily')  # daily, weekly, monthly, yearly
+        date_str = request.GET.get('date')
+        
         today = timezone.now().date()
-        default_end_date = today
-        default_start_date = today - timedelta(days=30)
-        start_date = default_start_date
-        end_date = default_end_date
-        if start_date_str:
-            try:
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                logger.warning(f"Invalid start_date: {start_date_str}")
-                pass
-        if end_date_str:
-            try:
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                logger.warning(f"Invalid end_date: {end_date_str}")
-                pass
-        if start_date > end_date:
-            start_date, end_date = end_date, start_date
         
-        if (end_date - start_date).days > 365:
-            start_date = end_date - timedelta(days=365)
-        
-        transactions = DailySaleTransaction.objects.filter(date__range=[start_date, end_date]).select_related('customer', 'company', 'item')
-        period_stats = transactions.aggregate(
-            total_sales=Sum('total_amount', filter=Q(transaction_type='sale')),
-            total_purchases=Sum('total_amount', filter=Q(transaction_type='purchase')),
-            total_returns=Sum('total_amount', filter=Q(transaction_type='return')),
-            total_transactions=Count('id'),
-            total_quantity=Sum('quantity', filter=Q(transaction_type='sale')),
-            avg_transaction=Avg('total_amount'),
-        )
-
-        cash_in_data = Payment.objects.filter(date__range=[start_date, end_date]).aggregate(total=Sum('amount'), count=Count('id'))
-        cash_in_total = cash_in_data['total'] or 0
-        cash_out_data = DailySaleTransaction.objects.filter(date__range=[start_date, end_date], transaction_type__in=['purchase', 'return']).aggregate(total=Sum('total_amount'), count=Count('id'))
-        cash_out_total = cash_out_data['total'] or 0
-        cash_out_count = cash_out_data['count'] or 0
-        net_profit = cash_in_total - cash_out_total
-        payment_stats = {
-            'fully_paid': transactions.filter(payment_status='paid').count(),
-            'partially_paid': transactions.filter(payment_status='partial').count(),
-            'unpaid': transactions.filter(payment_status='unpaid').count(),
-            'total_transactions': transactions.count(),
-            'total_collected': cash_in_total,
-            'total_outstanding': transactions.filter(Q(payment_status='unpaid') | Q(payment_status='partial')).aggregate(total=Sum('balance'))['total'] or 0,
-        }
-
-        if payment_stats['total_transactions'] > 0:
-            payment_stats['fully_paid_percentage'] = (payment_stats['fully_paid'] / payment_stats['total_transactions'] * 100)
-            payment_stats['partially_paid_percentage'] = (payment_stats['partially_paid'] / payment_stats['total_transactions'] * 100)
-            payment_stats['unpaid_percentage'] = (payment_stats['unpaid'] / payment_stats['total_transactions'] * 100)
+        # تاریخ هدف
+        if date_str:
+            try:
+                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                target_date = today
         else:
-            payment_stats['fully_paid_percentage'] = 0
-            payment_stats['partially_paid_percentage'] = 0
-            payment_stats['unpaid_percentage'] = 0
-
-        collection_rate = (payment_stats['total_collected'] / period_stats['total_sales'] * 100) if period_stats['total_sales'] > 0 else 0
+            target_date = today
+        
+        # تعیین بازه زمانی بر اساس نوع گزارش
+        if report_type == 'daily':
+            # گزارش روزانه
+            start_date = target_date
+            end_date = target_date
+            
+        elif report_type == 'weekly':
+            # گزارش هفتگی (شنبه تا جمعه)
+            week_start = target_date - timedelta(days=target_date.weekday())
+            week_end = week_start + timedelta(days=6)
+            start_date = week_start
+            end_date = week_end
+            
+        elif report_type == 'monthly':
+            # گزارش ماهانه
+            start_date = target_date.replace(day=1)
+            if target_date.month == 12:
+                end_date = target_date.replace(year=target_date.year+1, month=1, day=1) - timedelta(days=1)
+            else:
+                end_date = target_date.replace(month=target_date.month+1, day=1) - timedelta(days=1)
+                
+        elif report_type == 'yearly':
+            # گزارش سالانه
+            start_date = target_date.replace(month=1, day=1)
+            end_date = target_date.replace(month=12, day=31)
+        else:
+            report_type = 'daily'
+            start_date = target_date
+            end_date = target_date
+        
+        # محدودیت تاریخ
+        if end_date > today:
+            end_date = today
+        
+        # دریافت تراکنش‌ها از مدل شما
+        transactions = DailySaleTransaction.objects.filter(
+            date__range=[start_date, end_date]
+        ).select_related('customer', 'company', 'item')
+        
+        # محاسبات اصلی با output_field
+        # 1. آمار فروش
+        sales_stats = transactions.filter(transaction_type='sale').aggregate(
+            total_sales=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00')),
+            avg_sale=Coalesce(Avg('total_amount', output_field=DecimalField()), Decimal('0.00')),
+            count_sales=Count('id'),
+            total_quantity=Coalesce(Sum('quantity', output_field=DecimalField()), Decimal('0.00'))
+        )
+        
+        # 2. آمار خرید
+        purchase_stats = transactions.filter(transaction_type='purchase').aggregate(
+            total_purchases=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00')),
+            avg_purchase=Coalesce(Avg('total_amount', output_field=DecimalField()), Decimal('0.00')),
+            count_purchases=Count('id')
+        )
+        
+        # 3. آمار پرداخت‌ها
+        payments = Payment.objects.filter(date__range=[start_date, end_date])
+        payment_stats = payments.aggregate(
+            total_cash_in=Coalesce(Sum('amount', output_field=DecimalField()), Decimal('0.00')),
+            count_payments=Count('id')
+        )
+        
+        # 4. وضعیت پرداخت تراکنش‌ها
+        payment_status = {
+            'paid': transactions.filter(payment_status='paid').count(),
+            'partial': transactions.filter(payment_status='partial').count(),
+            'unpaid': transactions.filter(payment_status='unpaid').count(),
+            'total': transactions.count()
+        }
+        
+        # 5. مانده حساب
+        outstanding_result = transactions.filter(
+            Q(payment_status='unpaid') | Q(payment_status='partial')
+        ).aggregate(total=Coalesce(Sum('balance', output_field=DecimalField()), Decimal('0.00')))
+        total_outstanding = outstanding_result['total']
+        
+        # 6. سود خالص
+        cash_in = payment_stats['total_cash_in']
+        cash_out = purchase_stats['total_purchases']
+        net_profit = cash_in - cash_out
+        
+        # 7. نرخ وصول
+        total_sales = sales_stats['total_sales']
+        if total_sales and total_sales > 0:
+            collection_rate = (cash_in / total_sales * 100)
+        else:
+            collection_rate = 0
+        
+        # 8. مشتریان برتر - با استفاده از UserProfile
+        top_customers = transactions.filter(
+            transaction_type='sale', 
+            customer__isnull=False
+        ).values(
+            'customer__user__username', 
+            'customer__user__first_name', 
+            'customer__user__last_name'
+        ).annotate(
+            total_spent=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00')),
+            transaction_count=Count('id')
+        ).order_by('-total_spent')[:10]
+        
+        # 9. کالاهای پرفروش - استفاده از product_name به جای name
+        top_items = transactions.filter(
+            transaction_type='sale', 
+            item__isnull=False
+        ).values(
+            'item__product_name',  # اصلاح شده: product_name به جای name
+            'item__code'
+        ).annotate(
+            total_sold=Coalesce(Sum('quantity', output_field=DecimalField()), Decimal('0.00')),
+            total_revenue=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00'))
+        ).order_by('-total_revenue')[:10]
+        
+        # 10. سری زمانی برای چارت
         daily_series = []
-        date_range = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
-        for current_date in date_range:
-            day_transactions = transactions.filter(date=current_date)
-            day_sales = day_transactions.filter(transaction_type='sale').aggregate(total=Sum('total_amount'))['total'] or 0
-            day_cash_in = Payment.objects.filter(date=current_date).aggregate(total=Sum('amount'))['total'] or 0
-            day_cash_out = day_transactions.filter(transaction_type__in=['purchase', 'return']).aggregate(total=Sum('total_amount'))['total'] or 0
-
+        
+        # اگر گزارش روزانه
+        if report_type == 'daily':
             day_data = {
-                'date': current_date,
-                'total_sales': day_sales,
-                'cash_in': day_cash_in,
-                'cash_out': day_cash_out,
-                'profit': day_cash_in - day_cash_out,
-                'transactions_count': day_transactions.count(),
+                'date': start_date,
+                'total_sales': float(sales_stats['total_sales']),
+                'total_purchases': float(purchase_stats['total_purchases']),
+                'cash_in': float(cash_in),
+                'cash_out': float(cash_out),
+                'profit': float(net_profit),
+                'transactions_count': payment_status['total']
             }
             daily_series.append(day_data)
+            
+        # اگر گزارش هفتگی
+        elif report_type == 'weekly':
+            current_date = start_date
+            while current_date <= end_date:
+                day_trans = transactions.filter(date=current_date)
+                day_sales_result = day_trans.filter(transaction_type='sale').aggregate(
+                    total=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00'))
+                )
+                day_sales = day_sales_result['total']
+                
+                day_payments_result = payments.filter(date=current_date).aggregate(
+                    total=Coalesce(Sum('amount', output_field=DecimalField()), Decimal('0.00'))
+                )
+                day_payments = day_payments_result['total']
+                
+                daily_series.append({
+                    'date': current_date,
+                    'total_sales': float(day_sales),
+                    'cash_in': float(day_payments),
+                    'transactions_count': day_trans.count()
+                })
+                current_date += timedelta(days=1)
+                
+        # اگر گزارش ماهانه
+        elif report_type == 'monthly':
+            current_date = start_date
+            while current_date <= end_date:
+                day_trans = transactions.filter(date=current_date)
+                day_sales_result = day_trans.filter(transaction_type='sale').aggregate(
+                    total=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00'))
+                )
+                day_sales = day_sales_result['total']
+                
+                daily_series.append({
+                    'date': current_date,
+                    'total_sales': float(day_sales),
+                    'transactions_count': day_trans.count()
+                })
+                current_date += timedelta(days=1)
+                
+        # اگر گزارش سالانه
+        elif report_type == 'yearly':
+            import calendar
+            # ماه‌های سال
+            for month in range(1, 13):
+                month_start = start_date.replace(month=month, day=1)
+                if month_start > today:
+                    break
+                    
+                last_day = calendar.monthrange(month_start.year, month)[1]
+                month_end = month_start.replace(day=last_day)
+                if month_end > today:
+                    month_end = today
+                
+                month_trans = transactions.filter(date__range=[month_start, month_end])
+                month_sales_result = month_trans.filter(transaction_type='sale').aggregate(
+                    total=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00'))
+                )
+                month_sales = month_sales_result['total']
+                
+                daily_series.append({
+                    'date': month_start,
+                    'month_name': month_start.strftime('%B'),
+                    'total_sales': float(month_sales),
+                    'transactions_count': month_trans.count()
+                })
+        
+        # آماده‌سازی داده برای چارت
+        chart_labels = []
+        chart_data = []
+        
+        for item in daily_series:
+            if report_type == 'yearly':
+                chart_labels.append(item.get('month_name', ''))
+            else:
+                chart_labels.append(item['date'].strftime('%Y-%m-%d'))
+            chart_data.append(float(item['total_sales']))
+        
+        # محاسبه تاریخ‌های قبلی و بعدی برای ناوبری
+        prev_date = target_date
+        next_date = target_date
+        
+        if report_type == 'daily':
+            prev_date = target_date - timedelta(days=1)
+            next_date = target_date + timedelta(days=1)
+            if next_date > today:
+                next_date = target_date
+        elif report_type == 'weekly':
+            prev_date = target_date - timedelta(days=7)
+            next_date = target_date + timedelta(days=7)
+            if next_date > today:
+                next_date = target_date
+        elif report_type == 'monthly':
+            # ماه قبل
+            if target_date.month == 1:
+                prev_date = target_date.replace(year=target_date.year-1, month=12, day=1)
+            else:
+                prev_date = target_date.replace(month=target_date.month-1, day=1)
+            # ماه بعد
+            if target_date.month == 12:
+                next_date = target_date.replace(year=target_date.year+1, month=1, day=1)
+            else:
+                next_date = target_date.replace(month=target_date.month+1, day=1)
+            if next_date > today:
+                next_date = target_date
+        elif report_type == 'yearly':
+            prev_date = target_date.replace(year=target_date.year-1)
+            next_date = target_date.replace(year=target_date.year+1)
+            if next_date > today:
+                next_date = target_date
+        
+        # تبدیل Decimal به float برای نمایش در تمپلیت
         context = {
+            # تاریخ‌ها
             'start_date': start_date,
             'end_date': end_date,
-            'period_summary': period_stats,
-            'daily_series': daily_series,
-            'payment_stats': payment_stats,
-            'cash_in_total': cash_in_total,
-            'cash_out_total': cash_out_total,
+            'today': today,
+            'target_date': target_date,
+            'report_type': report_type,
+            
+            # آمار اصلی
+            'total_sales': sales_stats['total_sales'],
+            'total_purchases': purchase_stats['total_purchases'],
+            'total_transactions': payment_status['total'],
+            'total_quantity': sales_stats['total_quantity'],
+            
+            # آمار مالی
+            'cash_in_total': cash_in,
+            'cash_out_total': cash_out,
+            'net_profit': net_profit,
+            'total_outstanding': total_outstanding,
             'collection_rate': collection_rate,
+            
+            # آمار پرداخت
+            'payment_stats': payment_status,
+            'paid_count': payment_status['paid'],
+            'partial_count': payment_status['partial'],
+            'unpaid_count': payment_status['unpaid'],
+            
+            # مشتریان و کالاها
+            'top_customers': list(top_customers),
+            'top_items': list(top_items),
+            
+            # سری زمانی
+            'daily_series': daily_series,
+            
+            # داده چارت
+            'chart_labels': json.dumps(chart_labels),
+            'chart_data': json.dumps(chart_data),
+            
+            # برای ناوبری
+            'prev_date': prev_date,
+            'next_date': next_date,
+            
+            'error': False,
         }
-
+        
         return render(request, "daily_sale/daily_summary.html", context)
-
-    except Exception as e:
-        logger.error(f"Error in daily_summary: {str(e)}", exc_info=True)
-        return JsonResponse({'error': 'error'}, status=500)
         
     except Exception as e:
         logger.error(f"Error in daily_summary: {str(e)}", exc_info=True)
+        
         today = timezone.now().date()
-        start_date = today - timedelta(days=30)
-        
         context = {
-            'start_date': start_date,
+            'start_date': today,
             'end_date': today,
-            'period_summary': {
-                'total_sales': Decimal('0.00'),
-                'total_purchases': Decimal('0.00'),
-                'net_revenue': Decimal('0.00'),
-                'transactions_count': 0,
-                'items_sold': 0,
-                'customers_count': 0,
-            },
-            'daily_series': [],
+            'report_type': 'daily',
+            'target_date': today,
+            'today': today,
+            'total_sales': Decimal('0.00'),
+            'total_purchases': Decimal('0.00'),
+            'total_transactions': 0,
+            'total_quantity': Decimal('0.00'),
             'cash_in_total': Decimal('0.00'),
             'cash_out_total': Decimal('0.00'),
-            'payment_stats': {
-                'fully_paid': 0,
-                'partially_paid': 0,
-                'unpaid': 0,
-                'total_collected': Decimal('0.00'),
-                'total_outstanding': Decimal('0.00'),
-                'collection_rate': 0,
-                'avg_outstanding': Decimal('0.00'),
-                'fully_paid_percentage': 0,
-                'partially_paid_percentage': 0,
-                'unpaid_percentage': 0,
-            },
+            'net_profit': Decimal('0.00'),
+            'total_outstanding': Decimal('0.00'),
+            'collection_rate': 0,
+            'payment_stats': {'paid': 0, 'partial': 0, 'unpaid': 0, 'total': 0},
+            'paid_count': 0,
+            'partial_count': 0,
+            'unpaid_count': 0,
+            'top_customers': [],
+            'top_items': [],
+            'daily_series': [],
+            'chart_labels': json.dumps([]),
+            'chart_data': json.dumps([]),
+            'prev_date': today,
+            'next_date': today,
             'error': True,
-            'error_message': f'Error In Loading Data!: {str(e)}',
+            'error_message': f'خطا در بارگذاری گزارش: {str(e)}'
         }
         return render(request, "daily_sale/daily_summary.html", context)
-    
-@login_required
-@require_GET
-def generate_daily_report(request):
-    try:
-        start_date_str = request.GET.get("start_date")
-        end_date_str = request.GET.get("end_date")
-        
-        if not start_date_str or not end_date_str:
-            raise ValueError("start, and end date is nesseccery!")
-        
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        period_stats = DailySaleTransaction.objects.filter(
-            date__range=[start_date, end_date]
-        ).aggregate(
-            total_sales=Sum('total_amount'),
-            total_purchases=Sum('total_amount', filter=Q(transaction_type='purchase')),
-            total_profit=Sum('total_amount', filter=Q(transaction_type='sale')),
-            total_transactions=Count('id')
-        )
-        cash_in_total = Payment.objects.filter(date__range=[start_date, end_date]).aggregate(total=Sum('amount'))['total'] or 0
-        cash_out_total = DailySaleTransaction.objects.filter(
-            date__range=[start_date, end_date], transaction_type__in=['purchase', 'return']
-        ).aggregate(total=Sum('total_amount'))['total'] or 0
-        report_data = {
-            'start_date': start_date_str,
-            'end_date': end_date_str,
-            'total_sales': float(period_stats['total_sales'] or 0),
-            'total_purchases': float(period_stats['total_purchases'] or 0),
-            'net_profit': float(period_stats['total_profit'] or 0),
-            'cash_in_total': float(cash_in_total),
-            'cash_out_total': float(cash_out_total),
-        }
-        return HttpResponse(
-            json.dumps(report_data, indent=2, ensure_ascii=False),
-            content_type='application/json'
-        )
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-
-def get_real_time_daily_summary(request, start_date, end_date, today):
-    try:
-
-        period_summary = get_sales_summary(start_date, end_date)
-        daily_timeseries = sales_timeseries(start_date, end_date, group_by="day")
-    
-        cash_in_data = Payment.objects.filter(
-            date__range=[start_date, end_date]
-        ).aggregate(
-            total=Sum('amount'),
-            count=Count('id')
-        )
-        cash_in_total = cash_in_data['total'] or Decimal('0.00')
-        cash_out_data = DailySaleTransaction.objects.filter(
-            date__range=[start_date, end_date],
-            transaction_type__in=['purchase', 'return']
-        ).aggregate(
-            total=Sum('total_amount'),
-            count=Count('id')
-        )
-        cash_out_total = cash_out_data['total'] or Decimal('0.00')
-        chart_labels = []
-        chart_sales = []
-        for day in daily_timeseries:
-            chart_labels.append(day['date'].strftime('%b %d'))
-            chart_sales.append(float(day['total_sales']))
-        yesterday = today - timedelta(days=1)
-        week_start = today - timedelta(days=today.weekday())
-        month_start = today.replace(day=1)
-        last_month_end = month_start - timedelta(days=1)
-        last_month_start = last_month_end.replace(day=1)
-        year_start = today.replace(month=1, day=1)
-        
-        context = {
-            'start_date': start_date,
-            'end_date': end_date,
-            'period_summary': period_summary,
-            'daily_series': daily_timeseries,
-            'cash_in_total': cash_in_total,
-            'cash_out_total': cash_out_total,
-            'cash_in_count': cash_in_data['count'] or 0,
-            'cash_out_count': cash_out_data['count'] or 0,
-            'chart_labels': json.dumps(chart_labels),
-            'chart_sales': json.dumps(chart_sales),
-            'today': today,
-            'yesterday': yesterday,
-            'week_start': week_start,
-            'month_start': month_start,
-            'last_month_start': last_month_start,
-            'last_month_end': last_month_end,
-            'year_start': year_start,
-            'using_cached': False,
-        }
-        return render(request, "daily_sale/daily_summary.html", context)
-    except Exception as e:
-        logger.error(f"Error in get_real_time_daily_summary: {e}")
-        raise
 
 
 @login_required
@@ -1260,11 +1394,7 @@ def get_customer_debt_details(customer):
     
     return transactions_data
 
-
 class SimpleJSONEncoder(json.JSONEncoder):
-    """
-    JSON Encoder ساده برای انواع داده‌ای خاص
-    """
     def default(self, obj):
         if isinstance(obj, Decimal):
             return float(obj)
@@ -1276,41 +1406,54 @@ class SimpleJSONEncoder(json.JSONEncoder):
 
 
 @login_required
-def cleared_customers_view(request):
-    """
-    نمایش لیست مشتریانی که حساب خود را کامل پرداخت کرده‌اند
-    """
+def cleared_transactions(request):
     try:
-        # دریافت پارامترهای فیلتر
         search_query = request.GET.get('search', '')
         period = request.GET.get('period', 'month')
         sort_by = request.GET.get('sort', 'date_desc')
-        
-        # تاریخ امروز برای محاسبات
         today = timezone.now().date()
         
         # محاسبه بازه زمانی
         start_date, end_date = calculate_simple_date_range(period, today)
         
-        # دریافت لیست مشتریان
+        # دریافت تمام مشتریان
         customers = UserProfile.objects.filter(
             role=UserProfile.ROLE_CUSTOMER
         ).select_related('user')
+        
+        # اگر جستجو وجود دارد
+        if search_query:
+            customers = customers.filter(
+                Q(user__username__icontains=search_query) |
+                Q(user__first_name__icontains=search_query) |
+                Q(user__last_name__icontains=search_query) |
+                Q(phone__icontains=search_query) |
+                Q(user__email__icontains=search_query)
+            )
         
         cleared_customers = []
         total_cleared_amount = Decimal('0')
         total_transactions_count = 0
         
         for customer in customers:
-            # بررسی آیا مشتری تسویه شده است
-            customer_status = check_customer_clear_status(customer, start_date, end_date)
+            # بررسی وضعیت تسویه
+            customer_status = check_customer_clear_status_simple(customer, start_date, end_date)
             
-            if customer_status['is_cleared']:
+            if customer_status['is_cleared'] and customer_status['total_transactions'] > 0:
+                # نام مشتری
+                if customer.user:
+                    customer_name = customer.user.get_full_name()
+                    if not customer_name:
+                        customer_name = customer.user.username
+                    customer_email = customer.user.email
+                else:
+                    customer_email = ''
+                
                 customer_info = {
                     'customer_id': str(customer.id),
-                    'customer_name': customer.user.get_full_name() if customer.user else customer.display_name or f"Customer {customer.id}",
+                    'customer_name': customer_name,
                     'customer_phone': getattr(customer, 'phone', ''),
-                    'customer_email': customer.user.email if customer.user else '',
+                    'customer_email': customer_email,
                     
                     # اطلاعات مالی
                     'total_cleared_amount': customer_status['total_cleared_amount'],
@@ -1324,26 +1467,11 @@ def cleared_customers_view(request):
                     
                     # جزئیات تراکنش‌ها
                     'transactions': customer_status['transactions_details'],
-                    
-                    # برای نمایش
-                    'formatted_amount': format_currency(customer_status['total_cleared_amount']),
-                    'has_phone': bool(getattr(customer, 'phone', '')),
-                    'has_email': bool(customer.user and customer.user.email),
                 }
                 
                 cleared_customers.append(customer_info)
                 total_cleared_amount += customer_status['total_cleared_amount']
                 total_transactions_count += customer_status['total_transactions']
-        
-        # اعمال جستجو
-        if search_query:
-            search_lower = search_query.lower()
-            cleared_customers = [
-                c for c in cleared_customers
-                if (search_lower in c['customer_name'].lower() or
-                    (c['customer_phone'] and search_lower in c['customer_phone']) or
-                    (c['customer_email'] and search_lower in c['customer_email'].lower()))
-            ]
         
         # مرتب‌سازی
         if sort_by == 'date_desc':
@@ -1355,9 +1483,9 @@ def cleared_customers_view(request):
         elif sort_by == 'amount_asc':
             cleared_customers.sort(key=lambda x: x['total_cleared_amount'])
         elif sort_by == 'name_asc':
-            cleared_customers.sort(key=lambda x: x['customer_name'].lower())
+            cleared_customers.sort(key=lambda x: (x['customer_name'] or '').lower())
         elif sort_by == 'name_desc':
-            cleared_customers.sort(key=lambda x: x['customer_name'].lower(), reverse=True)
+            cleared_customers.sort(key=lambda x: (x['customer_name'] or '').lower(), reverse=True)
         
         # محاسبه آمار
         stats = {
@@ -1380,10 +1508,24 @@ def cleared_customers_view(request):
             'end_date': end_date,
             'today': today,
             'customers_count': len(cleared_customers),
-            'cleared_customers_json': json.dumps(cleared_customers, cls=SimpleJSONEncoder),
+            'periods': [
+                ('week', 'Last Week'),
+                ('month', 'Last Month'),
+                ('quarter', 'Last Quarter'),
+                ('year', 'Last Year'),
+                ('all', 'All Time')
+            ],
+            'sort_options': [
+                ('date_desc', 'Newest First'),
+                ('date_asc', 'Oldest First'),
+                ('amount_desc', 'Highest Amount'),
+                ('amount_asc', 'Lowest Amount'),
+                ('name_asc', 'Name A-Z'),
+                ('name_desc', 'Name Z-A')
+            ]
         }
         
-        return render(request, 'daily_sale/cleared_customers.html', context)
+        return render(request, 'daily_sale/cleared_transactions.html', context)
         
     except Exception as e:
         logger.error(f"Error in cleared_customers_view: {str(e)}", exc_info=True)
@@ -1397,22 +1539,26 @@ def cleared_customers_view(request):
                 'total_customers': 0,
                 'total_amount': Decimal('0'),
                 'total_transactions': 0,
-            }
+                'avg_amount_per_customer': Decimal('0'),
+            },
+            'periods': [],
+            'sort_options': []
         }
         
-        return render(request, 'daily_sale/cleared_customers.html', context)
+        return render(request, 'daily_sale/cleared_transactions.html', context)
 
 
-def check_customer_clear_status(customer, start_date, end_date):
+def check_customer_clear_status_simple(customer, start_date, end_date):
     """
-    بررسی وضعیت تسویه مشتری
+    بررسی وضعیت تسویه مشتری - نسخه ساده‌تر
     """
     try:
-        # دریافت تمام تراکنش‌های مشتری در بازه زمانی
-        transactions = DailySaleTransaction.objects.filter(
-            customer=customer,
-            date__range=[start_date, end_date]
-        )
+        # دریافت تراکنش‌های فروش مشتری در بازه زمانی
+        # استفاده از daily_transactions که در لیست choices دیدیم
+        transactions = customer.daily_transactions.filter(
+            date__range=[start_date, end_date],
+            transaction_type='sale'
+        ).order_by('date')
         
         if not transactions.exists():
             return {
@@ -1426,24 +1572,25 @@ def check_customer_clear_status(customer, start_date, end_date):
             }
         
         total_cleared = Decimal('0')
-        total_transactions_count = 0
+        transactions_details = []
         last_payment_date = None
         first_transaction_date = None
-        transactions_details = []
         
-        for transaction in transactions:
-            # محاسبه پرداخت‌های این تراکنش
+        # فقط تراکنش‌هایی که وضعیت پرداخت 'paid' دارند
+        paid_transactions = transactions.filter(payment_status='paid')
+        
+        for transaction in paid_transactions:
+            # مبلغ قابل پرداخت (بعد از تخفیف)
+            payable_amount = transaction.total_amount or Decimal('0')
+            
+            # محاسبه مجموع پرداخت‌ها
             total_paid = Payment.objects.filter(
                 transaction=transaction
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             
-            # محاسبه بدهی باقی‌مانده
-            remaining = (transaction.total_amount or Decimal('0')) - total_paid - (transaction.discount or Decimal('0'))
-            
-            # اگر تسویه شده باشد
-            if remaining <= Decimal('0') and transaction.total_amount > Decimal('0'):
-                total_cleared += transaction.total_amount
-                total_transactions_count += 1
+            # اگر تسویه کامل شده باشد (پرداخت >= مبلغ قابل پرداخت)
+            if total_paid >= payable_amount:
+                total_cleared += payable_amount
                 
                 # تاریخ آخرین پرداخت
                 last_payment = Payment.objects.filter(
@@ -1451,34 +1598,47 @@ def check_customer_clear_status(customer, start_date, end_date):
                 ).order_by('-date').first()
                 
                 if last_payment:
-                    if not last_payment_date or last_payment.date > last_payment_date:
-                        last_payment_date = last_payment.date
+                    payment_date = last_payment.date
+                    if isinstance(payment_date, datetime):
+                        payment_date = payment_date.date()
+                    
+                    if not last_payment_date or payment_date > last_payment_date:
+                        last_payment_date = payment_date
                 
-                # تاریخ اولین تراکنش
-                if not first_transaction_date or transaction.date < first_transaction_date:
-                    first_transaction_date = transaction.date
+                # تاریخ تراکنش
+                transaction_date = transaction.date
+                if isinstance(transaction_date, datetime):
+                    transaction_date = transaction_date.date()
+                
+                if not first_transaction_date or transaction_date < first_transaction_date:
+                    first_transaction_date = transaction_date
                 
                 # جزئیات تراکنش
                 transaction_detail = {
+                    'id': str(transaction.id),
                     'invoice_number': transaction.invoice_number or f"TRX-{transaction.id}",
-                    'date': transaction.date,
-                    'total_amount': transaction.total_amount,
+                    'date': transaction_date,
+                    'total_amount': transaction.total_amount or Decimal('0'),
                     'total_paid': total_paid,
                     'discount': transaction.discount or Decimal('0'),
+                    'payable_amount': payable_amount,
                     'status': 'Paid',
                     'payment_count': Payment.objects.filter(transaction=transaction).count(),
+                    'remaining': payable_amount - total_paid,
                 }
                 transactions_details.append(transaction_detail)
         
         # محاسبه روزهای از آخرین پرداخت
         clear_days = 0
         if last_payment_date:
-            clear_days = (timezone.now().date() - last_payment_date.date()).days
+            if isinstance(last_payment_date, datetime):
+                last_payment_date = last_payment_date.date()
+            clear_days = (timezone.now().date() - last_payment_date).days
         
         return {
-            'is_cleared': total_transactions_count > 0,
+            'is_cleared': len(transactions_details) > 0,
             'total_cleared_amount': total_cleared,
-            'total_transactions': total_transactions_count,
+            'total_transactions': len(transactions_details),
             'last_payment_date': last_payment_date,
             'first_transaction_date': first_transaction_date,
             'clear_days': clear_days,
@@ -1497,7 +1657,6 @@ def check_customer_clear_status(customer, start_date, end_date):
             'transactions_details': []
         }
 
-
 def calculate_simple_date_range(period, today):
     """
     محاسبه بازه زمانی ساده
@@ -1509,93 +1668,14 @@ def calculate_simple_date_range(period, today):
     elif period == 'week':
         return today - timedelta(days=7), today
     elif period == 'month':
+        # دقیق‌تر: 30 روز قبل
         return today - timedelta(days=30), today
     elif period == 'quarter':
         return today - timedelta(days=90), today
     elif period == 'year':
         return today - timedelta(days=365), today
-    else:  # 'all'
-        return today - timedelta(days=365*5), today  # 5 years
-
-
-def format_currency(amount):
-    """
-    فرمت کردن مبلغ
-    """
-    try:
-        return f"AED {amount:,.2f}"
-    except:
-        return f"AED {amount}"
-
-
-# ویوی برای جزئیات مشتری
-@login_required
-def cleared_transactions(request, customer_id):
-    """
-    نمایش جزئیات یک مشتری تسویه‌شده
-    """
-    try:
-        customer = UserProfile.objects.get(id=customer_id, role=UserProfile.ROLE_CUSTOMER)
-        
-        # دریافت تمام تراکنش‌های تسویه‌شده مشتری
-        transactions = DailySaleTransaction.objects.filter(
-            customer=customer
-        ).order_by('-date')
-        
-        cleared_transactions = []
-        total_cleared = Decimal('0')
-        
-        for transaction in transactions:
-            total_paid = Payment.objects.filter(
-                transaction=transaction
-            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            
-            remaining = (transaction.total_amount or Decimal('0')) - total_paid - (transaction.discount or Decimal('0'))
-            
-            if remaining <= Decimal('0') and transaction.total_amount > Decimal('0'):
-                # اطلاعات پرداخت‌ها
-                payments = Payment.objects.filter(transaction=transaction).order_by('date')
-                payment_details = []
-                
-                for payment in payments:
-                    payment_details.append({
-                        'date': payment.date,
-                        'amount': payment.amount,
-                        'method': payment.method,
-                        'reference': payment.reference or '',
-                    })
-                
-                transaction_data = {
-                    'invoice_number': transaction.invoice_number or f"TRX-{transaction.id}",
-                    'date': transaction.date,
-                    'total_amount': transaction.total_amount,
-                    'discount': transaction.discount or Decimal('0'),
-                    'total_paid': total_paid,
-                    'payment_details': payment_details,
-                    'payment_count': len(payment_details),
-                    'description': transaction.description or '',
-                    'item': transaction.item.product_name if transaction.item else 'N/A',
-                }
-                
-                cleared_transactions.append(transaction_data)
-                total_cleared += transaction.total_amount
-        
-        context = {
-            'customer': customer,
-            'customer_name': customer.user.get_full_name() if customer.user else customer.display_name,
-            'customer_phone': getattr(customer, 'phone', ''),
-            'customer_email': customer.user.email if customer.user else '',
-            'cleared_transactions': cleared_transactions,
-            'total_cleared': total_cleared,
-            'transactions_count': len(cleared_transactions),
-        }
-        
-        return render(request, 'daily_sale/cleared_transactions.html', context)
-        
-    except UserProfile.DoesNotExist:
-        return render(request, 'daily_sale/error.html', {
-            'error_message': 'Customer not found'
-        })
+    else:
+        return today - timedelta(days=365*10), today 
         
 @require_GET
 @login_required
