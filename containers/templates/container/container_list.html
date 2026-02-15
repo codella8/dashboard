@@ -182,7 +182,7 @@
 
               <td class="data-cell">
                 <div class="metric-display value-metric">
-                  <span class="metric-value">${{ container.total_inventory_value|default:0|intcomma }}</span>
+                  <span class="metric-value">AED {{ container.total_inventory_value|default:0|intcomma }}</span>
                 </div>
               </td>
             </tr>
@@ -283,17 +283,6 @@
         if (e.key === 'Enter') {
           e.preventDefault();
           searchForm.submit();
-        }
-      });
-    }
-
-    // Add loading state to search form
-    if (searchForm) {
-      searchForm.addEventListener('submit', function () {
-        const searchBtn = this.querySelector('.search-btn');
-        if (searchBtn) {
-          searchBtn.innerHTML = '<span class="spinner-small"></span> Searching...';
-          searchBtn.disabled = true;
         }
       });
     }

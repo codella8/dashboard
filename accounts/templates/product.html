@@ -7,8 +7,6 @@
 
 <div class="product-details-container">
     <div class="container">
-
-        <!-- Header with Back Button -->
         <div class="d-flex justify-content-between align-items-center mb-5">
             <a href="{% url 'accounts:home' %}" class="product-back-btn">
                 <i class="fas fa-arrow-left"></i>
@@ -113,29 +111,4 @@
     </div>
 </div>
 
-{% endblock %}
-
-{% block extra_js %}
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Add animation to feature cards on hover
-        const featureCards = document.querySelectorAll('.feature-card');
-
-        featureCards.forEach(card => {
-            card.addEventListener('mouseenter', function () {
-                this.style.transform = 'translateY(-5px)';
-            });
-
-            card.addEventListener('mouseleave', function () {
-                this.style.transform = 'translateY(0)';
-            });
-        });
-
-        // Smooth scroll for page load
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-    });
-</script>
 {% endblock %}

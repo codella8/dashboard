@@ -209,34 +209,6 @@
     <div class="saraf-tab-content active" id="saraf-transactions-tab">
       <div class="saraf-tab-header">
         <h3>Transaction History</h3>
-        <div class="saraf-tab-actions">
-          <form method="GET" class="saraf-filter-form">
-            <div class="saraf-filter-group">
-              <label for="saraf-date-filter">Period:</label>
-              <select id="saraf-date-filter" name="date_filter" class="saraf-filter-select" onchange="this.form.submit()">
-                <option value="all" {% if date_filter == 'all' %}selected{% endif %}>All Time</option>
-                <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Today</option>
-                <option value="week" {% if date_filter == 'week' %}selected{% endif %}>Last 7 Days</option>
-                <option value="month" {% if date_filter == 'month' %}selected{% endif %}>Last 30 Days</option>
-                <option value="year" {% if date_filter == 'year' %}selected{% endif %}>Last Year</option>
-                <option value="custom" {% if start_date or end_date %}selected{% endif %}>Custom Range</option>
-              </select>
-            </div>
-
-            {% if start_date or end_date %}
-            <div class="saraf-filter-group saraf-custom-range">
-              <label for="saraf-start-date">From:</label>
-              <input type="date" id="saraf-start-date" name="start_date" class="saraf-date-input" value="{{ start_date|default:'' }}">
-
-              <label for="saraf-end-date">To:</label>
-              <input type="date" id="saraf-end-date" name="end_date" class="saraf-date-input" value="{{ end_date|default:'' }}">
-
-              <button type="submit" class="saraf-filter-btn">Apply</button>
-              <a href="?" class="saraf-clear-btn">Clear</a>
-            </div>
-            {% endif %}
-          </form>
-        </div>
       </div>
 
       {% if transactions %}
@@ -724,10 +696,6 @@ document.addEventListener('DOMContentLoaded', function() {
     alert('Export feature will be implemented soon!');
   };
   
-  // Refresh activity
-  window.refreshSarafActivity = function() {
-    location.reload();
-  };
   
   // Transaction modal functionality
   const viewButtons = document.querySelectorAll('.saraf-view-icon');

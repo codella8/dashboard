@@ -1,7 +1,6 @@
 # containers/admin.py
 from django.contrib import admin
 from .models import Saraf, SarafTransaction, Container, Inventory_List, ContainerTransaction
-from django.utils.html import format_html
 from django.http import HttpResponse
 import csv
 from django.utils.translation import gettext_lazy as _
@@ -71,7 +70,7 @@ class SarafTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = "transaction_time"
     actions = ["export_selected_csv"]
 
-    def export_selected_csv(self, request, queryset):
+    def export_selected_csv(self, queryset):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=saraf_transactions.csv"
         writer = csv.writer(response)

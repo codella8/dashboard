@@ -3,7 +3,6 @@ import csv
 from django.contrib import admin
 from django.http import HttpResponse
 from django.utils.translation import gettext_lazy as _
-from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth import get_user_model
 from . import models
 from .models import Company, UserProfile
@@ -11,7 +10,7 @@ from .models import Company, UserProfile
 User = get_user_model()
 def export_as_csv(fields):
     """Reusable export action"""
-    def export(modeladmin, request, queryset):
+    def export(modeladmin, queryset):
         model = modeladmin.model._meta
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = f'attachment; filename={model.model_name}.csv'

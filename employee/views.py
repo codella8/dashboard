@@ -25,7 +25,7 @@ def employee_list(request):
     status_filter = request.GET.get('status', 'all')
     employment_type = request.GET.get('type', 'all')
     sort_by = request.GET.get('sort', '-created_at')
-    page_number = request.GET.get('page', 1)
+    page_number = request.GET.get('page', 4)
 
     employees = Employee.objects.filter(is_active=True).select_related(
         'employee__user'

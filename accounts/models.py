@@ -3,7 +3,6 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.core.validators import RegexValidator, EmailValidator
-from django.core.exceptions import ValidationError
 
 class Company(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

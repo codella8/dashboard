@@ -108,13 +108,13 @@
                     <h2 class="items-title">
                         <i class="bi bi-cart"></i>Items
                     </h2>
-                    <button type="button" id="add-item-btn" class="btn-add-item">
+                    <button type="button" id="add-item-btn" class="btn-add-items">
                         <i class="bi bi-plus-circle"></i> Add Item
                     </button>
                 </div>
 
-                <div class="table-container">
-                    <table class="items-table">
+                <div class="table-container text-dark">
+                    <table class="items-table text-dark">
                         <thead>
                             <tr>
                                 <th>ITEM</th>
@@ -188,7 +188,7 @@
                         <i class="bi bi-calculator"></i> Amounts Preview
                     </h2>
                 </div>
-                <div class="calculation-list">
+                <div class="calculation-list ">
                     <div class="calculation-item">
                         <span class="calculation-label">
                             <i class="bi bi-cart3"></i> Subtotal:
@@ -585,7 +585,7 @@
                 return false;
             }
 
-            console.log('📦 Items to save (with UUIDs):', items);
+            console.log('Items to save (with UUIDs):', items);
 
             $('#id_items_data').val(JSON.stringify(items));
             showToast('Saving transaction...', 'info');
@@ -602,7 +602,7 @@
         if (!$('#id_due_date').val()) $('#id_due_date').val(dueDate);
 
         setTimeout(calculate, 500);
-        console.log("✅ Form ready!");
+        console.log("Form ready!");
     });
 
     document.addEventListener('DOMContentLoaded', function () {

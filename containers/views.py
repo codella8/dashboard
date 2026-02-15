@@ -6,14 +6,12 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, F, Count, DecimalField, Max, Min, Avg
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Saraf, Container, ContainerTransaction, Inventory_List
+from .models import Saraf, Container, Inventory_List
 from . import report
-from django.utils.dateparse import parse_date
 from django.urls import reverse_lazy
 from django import forms
 from django.db.models.functions import Coalesce
 from decimal import Decimal
-from accounts.models import UserProfile
 from collections import defaultdict
 
 class CompanyAccessMixin:

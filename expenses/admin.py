@@ -15,9 +15,8 @@ class ExpenseAdmin(admin.ModelAdmin):
         "date",
         "title",
         "category",
-        "payment_method",
         "total_amount",
     )
-    list_filter = ("category", "payment_method", "date")
+    list_filter = ("category",  "date")
     search_fields = ("title", "paid_to")
     readonly_fields = ("created_at",)

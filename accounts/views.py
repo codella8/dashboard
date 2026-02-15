@@ -125,7 +125,7 @@ def dashboard(request):
         },
         {
             'name': 'Expenses', 
-            'url': 'expenses:expenses_dashboard/', 
+            'url': 'expenses:expense_list/', 
             'icon': 'fas fa-money-bill-wave', 
             'description': 'Expense tracking and management'
         },

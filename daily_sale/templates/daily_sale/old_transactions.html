@@ -2,32 +2,31 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Oldtransactions | Almuqbil{% endblock %}
+{% block title %}Outstanding Customers | Al Maqbal{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-  <!-- Page Header -->
+  <!-- Header -->
   <div class="card shadow mb-4">
     <div class="card-header bg-danger text-white">
       <div class="d-flex justify-content-between align-items-center">
         <div>
           <h4 class="mb-0">
             <i class="fas fa-exclamation-triangle me-2"></i>
-            Old transactions List
+            Old Transactions
           </h4>
-          <p class="mb-0 mt-2">Customers with unpaid balances</p>
         </div>
         <div class="text-end">
           <h3 class="mb-0">{{ customers_count }} Customers</h3>
-          <small>Total Count</small>
+          <small>With Old Tranactions balance</small>
         </div>
       </div>
     </div>
 
-    <!-- Search -->
+    <!-- Search and Filters -->
     <div class="card-body">
       <form method="get" class="row g-3">
-        <div class="col-md-10">
+        <div class="col-md-6">
           <div class="input-group">
             <span class="input-group-text">
               <i class="fas fa-search"></i>
@@ -36,19 +35,22 @@
               value="{{ search_query }}">
           </div>
         </div>
-        <div class="col-md-2">
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="fas fa-filter me-1"></i> Search
-          </button>
-        </div>
       </form>
     </div>
   </div>
 
-  <!-- Summary Cards -->
+  {% if error %}
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Error:</strong> {{ error_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
+
+  <!-- Stats Cards -->
   <div class="row mb-4">
     <div class="col-md-3">
-      <div class="card border-start-danger border-start-3">
+      <div class="card border-start-danger border-start-3 shadow-sm hover-lift">
         <div class="card-body">
           <div class="d-flex align-items-center">
             <div class="flex-grow-1">
@@ -66,7 +68,7 @@
     </div>
 
     <div class="col-md-3">
-      <div class="card border-start-success border-start-3">
+      <div class="card border-start-success border-start-3 shadow-sm hover-lift">
         <div class="card-body">
           <div class="d-flex align-items-center">
             <div class="flex-grow-1">
@@ -84,11 +86,11 @@
     </div>
 
     <div class="col-md-3">
-      <div class="card border-start-warning border-start-3">
+      <div class="card border-start-warning border-start-3 shadow-sm hover-lift">
         <div class="card-body">
           <div class="d-flex align-items-center">
             <div class="flex-grow-1">
-              <h6 class="text-muted mb-1">Transactions</h6>
+              <h6 class="text-muted mb-1">Old Transactions</h6>
               <h4 class="mb-0 text-warning">
                 {{ total_summary.total_transactions }}
               </h4>
@@ -102,11 +104,11 @@
     </div>
 
     <div class="col-md-3">
-      <div class="card border-start-info border-start-3">
+      <div class="card border-start-info border-start-3 shadow-sm hover-lift">
         <div class="card-body">
           <div class="d-flex align-items-center">
             <div class="flex-grow-1">
-              <h6 class="text-muted mb-1">Outstanding Customers</h6>
+              <h6 class="text-muted mb-1">Customers</h6>
               <h4 class="mb-0 text-info">
                 {{ total_summary.total_customers }}
               </h4>
@@ -123,10 +125,20 @@
   <!-- Customers List -->
   <div class="card shadow">
     <div class="card-header bg-white">
-      <h5 class="mb-0">
-        <i class="fas fa-list me-2"></i>
-        Customers with Outstanding Balances
-      </h5>
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          <i class="fas fa-users me-2"></i>
+          Outstanding Customers List ({{ customers_count }})
+        </h5>
+        <div class="btn-group">
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="exportToExcel()">
+            <i class="fas fa-file-excel me-1"></i> Export
+          </button>
+          <a href="?" class="btn btn-outline-secondary btn-sm ms-2">
+            <i class="fas fa-sync-alt me-1"></i> Refresh
+          </a>
+        </div>
+      </div>
     </div>
 
     <div class="card-body p-0">
@@ -135,82 +147,138 @@
         <table class="table table-hover mb-0">
           <thead class="table-light">
             <tr>
-              <th>#</th>
+              <th width="50">#</th>
               <th>Customer</th>
-              <th>Contact</th>
-              <th class="text-end">Total Debt</th>
-              <th class="text-end">Paid Amount</th>
-              <th class="text-end">Balance</th>
-              <th>Transactions</th>
-              <th class="text-center">Actions</th>
+              <th width="150">Contact</th>
+              <th width="150" class="text-end">Total Amount</th>
+              <th width="150" class="text-end">Paid</th>
+              <th width="150" class="text-end">Balance</th>
+              <th width="120" class="text-center">Transactions</th>
+              <th width="180" class="text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for customer in outstanding_customers %}
-            <tr
-              class="{% if customer.total_debt > 10000 %}table-danger{% elif customer.total_debt > 5000 %}table-warning{% endif %}">
-              <td>{{ forloop.counter }}</td>
+            <tr id="customer-row-{{ customer.customer_id }}" class="customer-row 
+              {% if customer.balance_type == 'debt' %}table-danger-light
+              {% elif customer.balance_type == 'overpayment' %}table-success-light
+              {% endif %}">
+              <td class="text-muted">{{ forloop.counter }}</td>
+
+              <!-- Customer Info -->
               <td>
-                <strong>{{ customer.customer_name }}</strong>
-                {% if customer.customer_email %}
-                <br>
-                <small class="text-muted">{{ customer.customer_email }}</small>
+                <div class="d-flex flex-column">
+                  <strong class="customer-name mb-1">{{ customer.customer_name }}</strong>
+                  {% if customer.customer_email %}
+                  <small class="text-muted text-truncate" style="max-width: 200px;">
+                    <i class="fas fa-envelope me-1"></i>{{ customer.customer_email }}
+                  </small>
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- Contact -->
+              <td>
+                {% if customer.customer_phone %}
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-phone me-2 text-primary"></i>
+                  <span>{{ customer.customer_phone }}</span>
+                </div>
+                {% else %}
+                <span class="text-muted">
+                  <i class="fas fa-phone-slash me-1"></i> No Phone
+                </span>
                 {% endif %}
               </td>
+
+              <!-- Total Amount -->
               <td class="text-end">
-                <span class="text-danger fw-bold">
+                <span class="fw-bold">
                   AED {{ customer.total_debt|floatformat:0|intcomma }}
                 </span>
               </td>
+
+              <!-- Paid -->
               <td class="text-end text-success">
-                AED {{ customer.total_paid|floatformat:0|intcomma }}
-              </td>
-              <td class="text-end">
                 <span class="fw-bold">
+                  AED {{ customer.total_paid|floatformat:0|intcomma }}
+                </span>
+              </td>
+
+              <!-- Balance -->
+              <td class="text-end">
+                {% if customer.balance_type == 'debt' %}
+                <span class="text-danger fw-bold balance-amount">
                   AED {{ customer.remaining_balance|floatformat:0|intcomma }}
                 </span>
+                {% elif customer.balance_type == 'overpayment' %}
+                <span class="text-success fw-bold balance-amount">
+                  AED {{ customer.remaining_balance|floatformat:0|intcomma }}
+                </span>
+                {% else %}
+                <span class="text-secondary fw-bold balance-amount">
+                  AED {{ customer.remaining_balance|floatformat:0|intcomma }}
+                </span>
+                {% endif %}
               </td>
-              <td>
-                <span class="badge bg-info">
-                  {{ customer.debt_transactions_count }} Transaction{{ customer.debt_transactions_count|pluralize }}
+
+              <!-- Transactions -->
+              <td class="text-center">
+                <span class="badge bg-info rounded-pill px-3 py-2 transaction-count">
+                  <i class="fas fa-receipt me-1"></i>
+                  {{ customer.debt_transactions_count }}
                 </span>
               </td>
+
+              <!-- Actions -->
               <td class="text-center">
                 <div class="btn-group btn-group-sm">
                   <button type="button" class="btn btn-outline-primary"
-                    onclick="viewCustomerDetails('{{ customer.customer_id }}')" title="View Details">
+                    onclick="toggleCustomerDetails('{{ customer.customer_id }}')" title="View Details"
+                    id="details-btn-{{ customer.customer_id }}">
                     <i class="fas fa-eye"></i>
                   </button>
-                  
+
                   <a href="{% url 'daily_sale:transaction_list' %}?customer={{ customer.customer_id }}"
                     class="btn btn-outline-info" title="View Transactions">
                     <i class="fas fa-receipt"></i>
                   </a>
+
+                  {% if customer.customer_phone %}
+                  <a href="tel:{{ customer.customer_phone }}" class="btn btn-outline-success" title="Call">
+                    <i class="fas fa-phone"></i>
+                  </a>
+                  {% endif %}
                 </div>
               </td>
             </tr>
 
-            <!-- Customer Details Row (Collapsible) -->
+            <!-- Details Row (Hidden) -->
+            {% if customer.transactions %}
             <tr class="customer-details-row" id="details-{{ customer.customer_id }}" style="display: none;">
               <td colspan="8" class="bg-light">
                 <div class="p-3">
-                  <h6 class="mb-3">
-                    <i class="fas fa-file-invoice-dollar me-2"></i>
-                    Outstanding Transaction Details
-                  </h6>
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">
+                      <i class="fas fa-file-invoice-dollar me-2"></i>
+                      {{ customer.customer_name }} Transaction Details
+                    </h6>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                      onclick="toggleCustomerDetails('{{ customer.customer_id }}')">
+                      <i class="fas fa-times"></i> Close
+                    </button>
+                  </div>
 
-                  {% if customer.transactions %}
                   <div class="table-responsive">
                     <table class="table table-sm table-bordered">
                       <thead>
-                        <tr class="table-secondary text-dark">
-                          <th>Invoice #</th>
+                        <tr class="table-secondary">
+                          <th>Invoice No.</th>
                           <th>Date</th>
-                          <th>Total Amount</th>
-                          <th>Paid</th>
-                          <th>Balance</th>
-                          <th>Products</th>
-                          <th>Payments</th>
+                          <th class="text-end">Total Amount</th>
+                          <th class="text-end">Paid</th>
+                          <th class="text-end">Balance</th>
+                          <th class="text-center">Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -229,77 +297,56 @@
                           <td class="text-end text-danger fw-bold">
                             AED {{ transaction.remaining_debt|floatformat:0|intcomma }}
                           </td>
-                          <td>
-                            {% if transaction.products %}
-                            <div class="products-list">
-                              {% for product in transaction.products %}
-                              <div class="product-item mb-1">
-                                <span class="badge bg-light text-dark">
-                                  {{ product.product_name }}
-                                  {% if product.product_code %}
-                                  ({{ product.product_code }})
-                                  {% endif %}
-                                </span>
-                                <small class="text-muted ms-2">
-                                  Qty: {{ product.quantity }} ×
-                                  AED {{ product.unit_price|floatformat:0|intcomma }}
-                                  = AED {{ product.total_amount|floatformat:0|intcomma }}
-                                </small>
-                              </div>
-                              {% endfor %}
-                            </div>
+                          <td class="text-center">
+                            {% if transaction.payment_status_display == 'Paid' %}
+                            <span class="badge bg-success">Paid</span>
+                            {% elif transaction.payment_status_display == 'Partial' %}
+                            <span class="badge bg-warning">Partial</span>
                             {% else %}
-                            <span class="text-muted">No products</span>
-                            {% endif %}
-                          </td>
-                          <td>
-                            {% if transaction.payments %}
-                            <div class="payments-list">
-                              {% for payment in transaction.payments %}
-                              <div class="payment-item mb-1">
-                                <span class="badge bg-success">
-                                  {{ payment.date|date:"Y-m-d" }}
-                                </span>
-                                <small class="text-muted ms-2">
-                                  {{ payment.method }}:
-                                  AED {{ payment.amount|floatformat:0|intcomma }}
-                                </small>
-                              </div>
-                              {% endfor %}
-                            </div>
-                            {% else %}
-                            <span class="text-muted">No payments</span>
+                            <span class="badge bg-danger">Unpaid</span>
                             {% endif %}
                           </td>
                         </tr>
                         {% endfor %}
                       </tbody>
+                      <tfoot>
+                        <tr class="table-light">
+                          <td colspan="2" class="text-end"><strong>Total:</strong></td>
+                          <td class="text-end">
+                            <strong>AED {{ customer.total_debt|floatformat:0|intcomma }}</strong>
+                          </td>
+                          <td class="text-end text-success">
+                            <strong>AED {{ customer.total_paid|floatformat:0|intcomma }}</strong>
+                          </td>
+                          <td class="text-end text-danger">
+                            <strong>AED {{ customer.remaining_balance|floatformat:0|intcomma }}</strong>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
-                  {% else %}
-                  <div class="alert alert-info mb-0">
-                    <i class="fas fa-info-circle me-2"></i>
-                    No outstanding transactions found for this customer.
-                  </div>
-                  {% endif %}
                 </div>
               </td>
             </tr>
+            {% endif %}
             {% endfor %}
           </tbody>
           <tfoot class="table-light">
             <tr>
-              <th colspan="3" class="text-end">TOTALS:</th>
-              <th class="text-end text-danger">
-                AED {{ total_summary.total_debt|floatformat:0|intcomma }}
+              <th colspan="3" class="text-end">Total:</th>
+              <th class="text-end">
+                <strong>AED {{ total_summary.total_debt|floatformat:0|intcomma }}</strong>
               </th>
               <th class="text-end text-success">
-                AED {{ total_summary.total_paid|floatformat:0|intcomma }}
+                <strong>AED {{ total_summary.total_paid|floatformat:0|intcomma }}</strong>
               </th>
-              <th class="text-end">
-                AED {{ total_summary.total_debt|floatformat:0|intcomma }}
+              <th class="text-end text-danger">
+                <strong>AED {{ total_summary.total_debt|floatformat:0|intcomma}}</strong>
               </th>
-              <th>{{ total_summary.total_transactions }}</th>
+              <th class="text-center">
+                <strong>{{ total_summary.total_transactions }}</strong>
+              </th>
               <th></th>
             </tr>
           </tfoot>
@@ -308,297 +355,156 @@
       {% else %}
       <div class="text-center py-5">
         <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
-        <h4 class="text-success">No Outstanding Customers</h4>
-        <p class="text-muted">All customers have cleared their payments.</p>
-        <button type="button" class="btn btn-primary" onclick="window.location.reload()">
-          <i class="fas fa-sync-alt me-1"></i> Refresh
-        </button>
+        <h4 class="text-success">No Outstanding Customers Found</h4>
+        <p class="text-muted mb-4">All customers have cleared their accounts.</p>
+        <div class="d-flex justify-content-center gap-2">
+          <a href="{% url 'daily_sale:transaction_list' %}" class="btn btn-outline-primary">
+            <i class="fas fa-receipt me-1"></i> View All Transactions
+          </a>
+        </div>
       </div>
       {% endif %}
     </div>
 
     {% if outstanding_customers %}
     <div class="card-footer">
-      <div class="row">
+      <div class="row align-items-center">
         <div class="col-md-6">
           <small class="text-muted">
-            Showing {{ outstanding_customers|length }} customer{{ outstanding_customers|length|pluralize }}
+            <i class="fas fa-info-circle me-1"></i>
+            Showing {{ customers_count }} customers
           </small>
         </div>
         <div class="col-md-6 text-end">
-          <button type="button" class="btn btn-outline-danger btn-sm" onclick="exportToExcel()">
-            <i class="fas fa-file-excel me-1"></i> Export to Excel
-          </button>
-          <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="sendReminders()">
-            <i class="fas fa-bell me-1"></i> Send Reminders
-          </button>
+          <small class="text-muted">
+            Date: {% now "Y/m/d" %}
+          </small>
         </div>
       </div>
     </div>
     {% endif %}
   </div>
 </div>
-
-<!-- Customer Details Modal -->
-<div class="modal fade" id="customerModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="fas fa-user-circle me-2"></i>
-          Customer Details
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="customerModalBody">
-        <!-- Content loaded via AJAX -->
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Add Payment Modal -->
-<div class="modal fade" id="paymentModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="fas fa-money-bill-wave me-2"></i>
-          Add Payment
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="paymentModalBody">
-        <!-- Form loaded via AJAX -->
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  // Global variables
+  // Outstanding Customers - Main JavaScript
   let currentOpenDetails = null;
 
-  // View customer details
-  function viewCustomerDetails(customerId) {
-    // Toggle details row
+  // Toggle customer details
+  function toggleCustomerDetails(customerId) {
     const detailsRow = document.getElementById(`details-${customerId}`);
+    const detailsBtn = document.getElementById(`details-btn-${customerId}`);
 
+    if (!detailsRow) return;
+
+    // Close previous details
     if (currentOpenDetails && currentOpenDetails !== detailsRow) {
       currentOpenDetails.style.display = 'none';
+      const prevBtn = document.getElementById(`details-btn-${currentOpenDetails.id.split('-')[1]}`);
+      if (prevBtn) {
+        prevBtn.innerHTML = '<i class="fas fa-eye"></i>';
+        prevBtn.classList.remove('btn-primary');
+        prevBtn.classList.add('btn-outline-primary');
+      }
     }
 
+    // Toggle current
     if (detailsRow.style.display === 'none') {
       detailsRow.style.display = 'table-row';
+      if (detailsBtn) {
+        detailsBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+        detailsBtn.classList.remove('btn-outline-primary');
+        detailsBtn.classList.add('btn-primary');
+      }
       currentOpenDetails = detailsRow;
     } else {
       detailsRow.style.display = 'none';
+      if (detailsBtn) {
+        detailsBtn.innerHTML = '<i class="fas fa-eye"></i>';
+        detailsBtn.classList.remove('btn-primary');
+        detailsBtn.classList.add('btn-outline-primary');
+      }
       currentOpenDetails = null;
     }
-  }
-
-  // Add payment
-  function addPayment(customerId) {
-    fetch(`/api/customers/${customerId}/payment-form/`)
-      .then(response => response.text())
-      .then(html => {
-        document.getElementById('paymentModalBody').innerHTML = html;
-        const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal'));
-        paymentModal.show();
-
-        // Setup form submission
-        const form = document.getElementById('paymentModalBody').querySelector('form');
-        if (form) {
-          form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            processPayment(customerId, new FormData(form));
-          });
-        }
-      })
-      .catch(error => {
-        console.error('Error loading payment form:', error);
-        alert('Error loading payment form');
-      });
-  }
-
-  // Process payment
-  function processPayment(customerId, formData) {
-    fetch(`/api/customers/${customerId}/add-payment/`, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'X-CSRFToken': getCookie('csrftoken')
-      }
-    })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          alert('Payment added successfully!');
-          bootstrap.Modal.getInstance(document.getElementById('paymentModal')).hide();
-          window.location.reload();
-        } else {
-          alert('Error: ' + (data.error || 'Payment failed'));
-        }
-      })
-      .catch(error => {
-        console.error('Error processing payment:', error);
-        alert('Error processing payment');
-      });
   }
 
   // Export to Excel
   function exportToExcel() {
-    // Create a simple export
-    let csv = 'Customer Name,Phone,Email,Total Debt,Paid Amount,Balance,Transactions\n';
+    try {
+      let csv = 'Customer Name,Email,Phone,Total Amount,Paid,Balance,Transactions\n';
 
-    document.querySelectorAll('tbody tr:not(.customer-details-row)').forEach(row => {
-      const cells = row.querySelectorAll('td');
-      if (cells.length >= 7) {
-        const customerName = cells[1].querySelector('strong')?.textContent || '';
-        const phone = cells[2].textContent.trim();
-        const email = cells[1].querySelector('small')?.textContent || '';
-        const totalDebt = cells[3].textContent.replace('AED', '').trim();
-        const paid = cells[4].textContent.replace('AED', '').trim();
-        const balance = cells[5].textContent.replace('AED', '').trim();
-        const transactions = cells[6].textContent.trim();
+      // Collect data
+      document.querySelectorAll('tbody tr.customer-row').forEach((row, index) => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 7) {
+          const customerName = cells[1].querySelector('.customer-name')?.textContent?.trim() || '';
+          const email = cells[1].querySelector('small.text-muted')?.textContent?.trim().replace('✉', '') || '';
+          const phone = cells[2].textContent.replace(/[^\d]/g, '').trim();
+          const totalAmount = cells[3].textContent.replace('AED', '').replace(/,/g, '').trim();
+          const paid = cells[4].textContent.replace('AED', '').replace(/,/g, '').trim();
+          const balance = cells[5].textContent.replace('AED', '').replace(/,/g, '').trim();
+          const transactions = cells[6].textContent.replace(/[^\d]/g, '').trim();
 
-        csv += `"${customerName}","${phone}","${email}","${totalDebt}","${paid}","${balance}","${transactions}"\n`;
-      }
-    });
-
-    // Add totals
-    const totalRow = document.querySelector('tfoot tr');
-    if (totalRow) {
-      const totalCells = totalRow.querySelectorAll('th');
-      csv += `\nTOTALS,,,,${totalCells[3]?.textContent.replace('AED', '').trim()},${totalCells[4]?.textContent.replace('AED', '').trim()},${totalCells[5]?.textContent.replace('AED', '').trim()},${totalCells[6]?.textContent.trim()}\n`;
-    }
-
-    // Download CSV
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `outstanding_customers_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    alert('Export completed! File downloaded as CSV.');
-  }
-
-  // Send reminders
-  function sendReminders() {
-    if (confirm('Send payment reminders to all customers with outstanding balances?')) {
-      fetch('/api/send-reminders/', {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': getCookie('csrftoken'),
-          'Content-Type': 'application/json'
+          csv += `"${customerName}","${email}","${phone}","${totalAmount}","${paid}","${balance}","${transactions}"\n`;
         }
-      })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            alert(`Reminders sent to ${data.count} customers`);
-          } else {
-            alert('Error sending reminders: ' + (data.error || 'Unknown error'));
-          }
-        })
-        .catch(error => {
-          console.error('Error sending reminders:', error);
-          alert('Error sending reminders');
-        });
+      });
+
+      // Create and download file
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = new Date().toISOString().split('T')[0];
+      a.download = `outstanding_customers_${date}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      showNotification('File downloaded successfully', 'success');
+    } catch (error) {
+      console.error('Export error:', error);
+      showNotification('Error creating file', 'error');
     }
   }
 
-  // Utility function to get CSRF token
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
+  // Show notification
+  function showNotification(message, type = 'info') {
+    const alertClass = type === 'error' ? 'danger' : type;
+
+    // Remove existing notifications
+    document.querySelectorAll('.custom-notification').forEach(n => n.remove());
+
+    // Create notification
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${alertClass} alert-dismissible fade show custom-notification`;
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      min-width: 300px;
+      animation: slideIn 0.3s ease-out;
+    `;
+
+    notification.innerHTML = `
+      <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+      ${message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
       }
-    }
-    return cookieValue;
+    }, 3000);
   }
-
-  // Keyboard shortcuts
-  document.addEventListener('keydown', function (e) {
-    // Ctrl + E to export
-    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
-      e.preventDefault();
-      exportToExcel();
-    }
-    // Esc to close details
-    if (e.key === 'Escape' && currentOpenDetails) {
-      currentOpenDetails.style.display = 'none';
-      currentOpenDetails = null;
-    }
-  });
 </script>
 
-<style>
-  .customer-details-row {
-    background-color: #f8f9fa !important;
-  }
-
-  .customer-details-row td {
-    padding: 0 !important;
-    border-top: 2px solid #dee2e6;
-  }
-
-  .products-list .product-item {
-    border-bottom: 1px dashed #dee2e6;
-    padding-bottom: 4px;
-    margin-bottom: 4px;
-  }
-
-  .products-list .product-item:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-  }
-
-  .payments-list .payment-item {
-    border-bottom: 1px dashed #dee2e6;
-    padding-bottom: 4px;
-    margin-bottom: 4px;
-  }
-
-  .payments-list .payment-item:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-  }
-
-  /* Hover effects */
-  .table-hover tbody tr:hover {
-    background-color: rgba(0, 123, 255, 0.05);
-  }
-
-  .table-danger {
-    background-color: rgba(220, 53, 69, 0.05) !important;
-  }
-
-  .table-warning {
-    background-color: rgba(255, 193, 7, 0.05) !important;
-  }
-
-  /* Responsive adjustments */
-  @media (max-width: 768px) {
-    .table-responsive {
-      font-size: 0.9rem;
-    }
-
-    .btn-group-sm .btn {
-      padding: 0.25rem 0.5rem;
-    }
-  }
-</style>
 {% endblock %}

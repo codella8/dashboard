@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}INVOICE {{ transaction.invoice_number }} | Almuqbil Motors{% endblock %}
+{% block title %}Almuqbil | INVOICE {{ transaction.invoice_number }}{% endblock %}
 
 {% block content %}
 <div class="invoice-container fade-in">
@@ -26,8 +26,7 @@
                     <i class="fas fa-car"></i>
                 </div>
                 <div>
-                    <div class="company-name">ALMUQBIL MOTORS</div>
-                    <div class="company-tagline">Premium Automotive Solutions</div>
+                    <div class="company-name">ALMUQBIL Company</div>
                 </div>
             </div>
 
@@ -113,10 +112,6 @@
             <div class="info-row">
                 <span class="info-label">Company:</span>
                 <span class="info-value">{{ transaction.company.name|default:"Almuqbil Motors" }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Tax ID:</span>
-                <span class="info-value">VAT {{ transaction.company.tax_number|default:"123456789" }}</span>
             </div>
             <div class="info-row">
                 <span class="info-label">Tax Rate:</span>
@@ -274,7 +269,7 @@
                 </div>
 
                 <div class="info-row">
-                    <span class="info-label">Days Outstanding:</span>
+                    <span class="info-label">Days Passed:</span>
                     <span class="info-value {% if days_passed > 30 %}text-danger{% endif %}">
                         {% if days_passed > 30 %}
                         <i class="fas fa-exclamation-triangle"></i>

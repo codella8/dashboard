@@ -26,7 +26,7 @@
                     <i class="fas fa-car"></i>
                 </div>
                 <div>
-                    <div class="company-name">ALMUQBIL MOTORS</div>
+                    <div class="company-name">ALMUQBIL COMPANY</div>
                     <div class="company-tagline">Premium Automotive Solutions</div>
                 </div>
             </div>
@@ -42,7 +42,7 @@
     <div class="invoice-info-grid">
         <div class="info-card">
             <div class="info-card-title">
-                <i class="fas fa-user-tie"></i> BILL TO
+                BILL TO
             </div>
             <div class="info-row">
                 <span class="info-label">Customer:</span>
@@ -113,10 +113,6 @@
             <div class="info-row">
                 <span class="info-label">Company:</span>
                 <span class="info-value">{{ transaction.company.name|default:"Almuqbil Motors" }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Tax ID:</span>
-                <span class="info-value">VAT {{ transaction.company.tax_number|default:"123456789" }}</span>
             </div>
             <div class="info-row">
                 <span class="info-label">Tax Rate:</span>

@@ -529,13 +529,6 @@ def transaction_list(request):
         
         stats['items_sold'] = items_sold
 
-        # میانگین تراکنش
-        if total_count > 0:
-            avg_transaction = (sales_total + purchases_total + returns_total) / total_count
-        else:
-            avg_transaction = Decimal('0')
-        stats['avg_transaction'] = avg_transaction
-
         # صفحه‌بندی
         paginator = Paginator(qs, items_per_page)
         page_number = request.GET.get("page", 1)
@@ -1189,210 +1182,152 @@ def daily_summary(request):
 
 @login_required
 def outstanding_view(request):
-    """
-    ویوی ساده برای نمایش مشتریان بدهکار با جزئیات محصولات
-    """
     try:
-        # دریافت پارامترهای فیلتر
         search_query = request.GET.get('search', '')
+        non_zero_transactions = DailySaleTransaction.objects.filter(
+            balance__isnull=False,
+            customer__isnull=False
+        ).exclude(balance=0).select_related('customer', 'customer__user')
+    
+    
+        if non_zero_transactions.count() == 0:
+            context = {
+                'outstanding_customers': [],
+                'total_summary': {
+                    'total_debt': 0,
+                    'total_paid': 0,
+                    'total_customers': 0,
+                    'total_transactions': 0,
+                },
+                'search_query': search_query,
+                'customers_count': 0,
+                'info_message': 'All Customers cleared There Account!',
+            }
+            return render(request, 'daily_sale/old_transactions.html', context)
         
-        # لیست مشتریان
-        customers = UserProfile.objects.filter(
-            role=UserProfile.ROLE_CUSTOMER
-        ).select_related('user')
+        customers_dict = {}
         
-        outstanding_customers = []
-        
-        for customer in customers:
-            # محاسبه بدهی کل مشتری
-            customer_data = calculate_customer_debt(customer)
+        for trans in non_zero_transactions:
+            customer = trans.customer
+            customer_id = str(customer.id)
             
-            if customer_data and customer_data['total_debt'] > 0:
-                # دریافت جزئیات تراکنش‌های بدهکار
-                transactions_data = get_customer_debt_details(customer)
+            if customer_id not in customers_dict:
+                # نام مشتری
+                customer_name = customer.full_name
+                if not customer_name and customer.user:
+                    customer_name = customer.user.get_full_name()
+                    if not customer_name:
+                        customer_name = customer.user.username
+                if not customer_name:
+                    customer_name = f"مشتری {customer.id}"
                 
-                customer_info = {
-                    'customer_id': str(customer.id),
-                    'customer_name': customer.user.get_full_name() if customer.user else customer.display_name or f"مشتری {customer.id}",
-                    'customer_phone': getattr(customer, 'phone', ''),
+                customers_dict[customer_id] = {
+                    'customer_id': customer_id,
+                    'customer_name': customer_name,
+                    'customer_phone': customer.phone or '',
                     'customer_email': customer.user.email if customer.user else '',
-                    
-                    # اطلاعات مالی کلی
-                    'total_debt': customer_data['total_debt'],
-                    'total_paid': customer_data['total_paid'],
-                    'remaining_balance': customer_data['remaining_balance'],
-                    
-                    # جزئیات تراکنش‌ها
-                    'transactions': transactions_data,
-                    
-                    # تعداد تراکنش‌های بدهکار
-                    'debt_transactions_count': len(transactions_data),
-                    
-                    # مجموع مبالغ محصولات
-                    'products_total': sum(t['product_amount'] for t in transactions_data),
+                    'transactions': [],
+                    'total_debt': Decimal('0'),
+                    'total_paid': Decimal('0'),
+                    'remaining_balance': Decimal('0'),
+                    'total_positive_balance': Decimal('0'),  
+                    'total_negative_balance': Decimal('0'), 
                 }
-                
-                outstanding_customers.append(customer_info)
+
+            trans_paid = trans.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            payment_status_display = trans.get_payment_status_display()
+            if payment_status_display == 'paid':
+                payment_status_display = 'Paid'
+            elif payment_status_display == 'partial paid':
+                payment_status_display = 'Partial'
+            elif payment_status_display == 'unpaid':
+                payment_status_display = 'Unpaid'
+            
+            customers_dict[customer_id]['transactions'].append({
+                'invoice_number': trans.invoice_number or f"TRX-{trans.id}",
+                'transaction_date': trans.date,
+                'total_amount': trans.total_amount,
+                'total_paid': trans_paid,
+                'remaining_debt': trans.balance,
+                'balance_type': 'debt' if trans.balance > 0 else 'overpayment',
+                'payment_status': trans.payment_status,
+                'payment_status_display': payment_status_display,
+            })
+            
+            # جمع‌آوری مبالغ
+            customers_dict[customer_id]['total_debt'] += trans.total_amount
+            customers_dict[customer_id]['total_paid'] += trans_paid
+            customers_dict[customer_id]['remaining_balance'] += trans.balance
+            
+            # تفکیک بدهی و اضافه پرداخت
+            if trans.balance > 0:
+                customers_dict[customer_id]['total_positive_balance'] += trans.balance
+            else:
+                customers_dict[customer_id]['total_negative_balance'] += trans.balance
         
-        # اعمال جستجو
-        if search_query:
-            search_lower = search_query.lower()
-            outstanding_customers = [
-                c for c in outstanding_customers
-                if (search_lower in c['customer_name'].lower() or
-                    (c['customer_phone'] and search_lower in c['customer_phone']) or
-                    (c['customer_email'] and search_lower in c['customer_email'].lower()))
-            ]
+        # 3. تبدیل به لیست
+        outstanding_customers = list(customers_dict.values())
+
         
-        # مرتب‌سازی بر اساس بدهی (بیشترین بدهی اول)
-        outstanding_customers.sort(key=lambda x: x['total_debt'], reverse=True)
+        # 4. اضافه کردن اطلاعات اضافی
+        for customer in outstanding_customers:
+            customer['debt_transactions_count'] = len(customer['transactions'])
+            customer['total_discount'] = Decimal('0')
+            
+            # محاسبه مانده کل (ممکن است منفی باشد)
+            total_balance = customer['remaining_balance']
+            
+            # تعیین نوع مانده
+            if total_balance > 0:
+                customer['balance_type'] = 'debt'
+                customer['balance_class'] = 'danger'
+                customer['balance_text'] = f'بدهکار: AED {total_balance}'
+            elif total_balance < 0:
+                customer['balance_type'] = 'overpayment'
+                customer['balance_class'] = 'success'
+                customer['balance_text'] = f'اضافه پرداخت: AED {abs(total_balance)}'
+            else:
+                customer['balance_type'] = 'cleared'
+                customer['balance_class'] = 'info'
+                customer['balance_text'] = 'تسویه شده'
+        # 5. محاسبه آمار
+        total_positive = sum(c['total_positive_balance'] for c in outstanding_customers)
+        total_debt= sum(c['total_negative_balance'] for c in outstanding_customers)
+        net_balance = total_positive + total_debt
+        total_paid = sum(c['total_paid'] for c in outstanding_customers)
         
-        # محاسبه مجموع کل
-        total_summary = {
-            'total_debt': sum(c['total_debt'] for c in outstanding_customers),
-            'total_paid': sum(c['total_paid'] for c in outstanding_customers),
-            'total_customers': len(outstanding_customers),
-            'total_transactions': sum(c['debt_transactions_count'] for c in outstanding_customers),
-        }
-        
+        # 6. Context
         context = {
             'outstanding_customers': outstanding_customers,
-            'total_summary': total_summary,
+            'total_summary': {
+                'total_debt': total_debt,  # فقط بدهی‌های مثبت
+                'total_overpayment': abs(total_debt),  # اضافه پرداخت‌ها
+                'net_balance': net_balance,
+                'total_paid': total_paid,
+                'total_customers': len(outstanding_customers),
+                'total_transactions': sum(c['debt_transactions_count'] for c in outstanding_customers),
+                'debt_customers': sum(1 for c in outstanding_customers if c['balance_type'] == 'debt'),
+                'overpayment_customers': sum(1 for c in outstanding_customers if c['balance_type'] == 'overpayment'),
+            },
             'search_query': search_query,
             'customers_count': len(outstanding_customers),
+            'has_data': len(outstanding_customers) > 0,
         }
         
         return render(request, 'daily_sale/old_transactions.html', context)
         
     except Exception as e:
-        logger.error(f"خطا در نمایش مشتریان بدهکار: {str(e)}", exc_info=True)
+        import traceback
+        traceback.print_exc()
         
-        context = {
+        return render(request, 'daily_sale/old_transactions.html', {
             'error': True,
-            'error_message': f'خطا در بارگذاری داده‌ها: {str(e)}',
+            'error_message': 'خطا در دریافت داده‌ها.',
             'outstanding_customers': [],
             'customers_count': 0,
-        }
-        
-        return render(request, 'daily_sale/old_transactions.html', context)
-
-
-def calculate_customer_debt(customer):
-    """
-    محاسبه بدهی کل یک مشتری
-    """
-    try:
-        # دریافت تمام تراکنش‌های مشتری
-        transactions = DailySaleTransaction.objects.filter(customer=customer)
-        
-        if not transactions.exists():
-            return None
-        
-        # محاسبه مجموع مبالغ
-        total_amount = transactions.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-        total_discount = transactions.aggregate(total=Sum('discount'))['total'] or Decimal('0')
-        
-        # محاسبه مجموع پرداخت‌ها
-        total_payments = Payment.objects.filter(
-            transaction__customer=customer
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-        
-        # محاسبه بدهی باقی‌مانده
-        remaining_balance = total_amount - total_payments - total_discount
-        
-        if remaining_balance <= 0:
-            return None
-        
-        return {
-            'total_debt': total_amount,
-            'total_paid': total_payments,
-            'total_discount': total_discount,
-            'remaining_balance': remaining_balance,
-        }
-        
-    except Exception as e:
-        logger.error(f"خطا در محاسبه بدهی مشتری {customer.id}: {str(e)}")
-        return None
-
-
-def get_customer_debt_details(customer):
-    """
-    دریافت جزئیات تراکنش‌های بدهکار مشتری با اطلاعات محصول
-    """
-    transactions_data = []
-    
-    try:
-        # دریافت تراکنش‌هایی که بدهی دارند
-        transactions = DailySaleTransaction.objects.filter(
-            customer=customer
-        ).prefetch_related('items', 'payments')
-        
-        for transaction in transactions:
-            # محاسبه مجموع پرداخت‌های این تراکنش
-            transaction_payments = Payment.objects.filter(transaction=transaction)
-            total_paid = transaction_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            
-            # محاسبه بدهی این تراکنش
-            transaction_debt = transaction.total_amount - total_paid - (transaction.discount or Decimal('0'))
-            
-            # فقط تراکنش‌های بدهکار
-            if transaction_debt > 0:
-                # دریافت اطلاعات محصولات
-                products_info = []
-                items = transaction.items.all()
-                
-                for item in items:
-                    product_info = {
-                        'product_name': item.item.product_name if item.item else "نامشخص",
-                        'product_code': item.item.code if item.item else "",
-                        'quantity': item.quantity,
-                        'unit_price': item.unit_price,
-                        'subtotal': item.quantity * item.unit_price,
-                        'discount': item.discount or Decimal('0'),
-                        'tax_amount': item.tax_amount or Decimal('0'),
-                        'total_amount': item.total_amount or Decimal('0'),
-                    }
-                    products_info.append(product_info)
-                
-                # اطلاعات پرداخت‌ها
-                payments_info = []
-                for payment in transaction_payments:
-                    payment_info = {
-                        'amount': payment.amount,
-                        'method': payment.get_method_display(),
-                        'date': payment.date,
-                        'note': payment.note or '',
-                    }
-                    payments_info.append(payment_info)
-                
-                transaction_info = {
-                    'invoice_number': transaction.invoice_number or f"TRX-{transaction.id}",
-                    'transaction_date': transaction.date,
-                    'total_amount': transaction.total_amount,
-                    'discount': transaction.discount or Decimal('0'),
-                    'total_paid': total_paid,
-                    'remaining_debt': transaction_debt,
-                    'payment_status': transaction.get_payment_status_display(),
-                    
-                    # اطلاعات محصولات
-                    'products': products_info,
-                    'products_count': len(products_info),
-                    'product_amount': sum(p['total_amount'] for p in products_info),
-                    
-                    # اطلاعات پرداخت‌ها
-                    'payments': payments_info,
-                    'payments_count': len(payments_info),
-                    
-                    # سایر اطلاعات
-                    'note': transaction.note or '',
-                }
-                
-                transactions_data.append(transaction_info)
-                
-    except Exception as e:
-        logger.error(f"خطا در دریافت جزئیات بدهی مشتری {customer.id}: {str(e)}")
-    
-    return transactions_data
+            'has_data': False,
+        })
 
 class SimpleJSONEncoder(json.JSONEncoder):
     def default(self, obj):

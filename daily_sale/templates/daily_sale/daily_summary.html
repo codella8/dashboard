@@ -2,11 +2,10 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Financial Report | Almuqbil Motors{% endblock %}
+{% block title %}Almuqbil | DaillySale {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-  <!-- گزارش هدر -->
   <div class="card shadow mb-4">
     <div class="card-header bg-primary text-white py-3">
       <div class="row align-items-center">
@@ -36,7 +35,6 @@
           </p>
         </div>
         <div class="col-md-6 text-end">
-          <!-- گزارش انتخاب نوع -->
           <div class="btn-group">
             <a href="?report_type=daily&date={{ target_date|date:'Y-m-d' }}"
               class="btn btn-outline-light {% if report_type == 'daily' %}active{% endif %}">
@@ -67,7 +65,7 @@
   </div>
   {% endif %}
 
-  <!-- تاریخ ناوبری -->
+  <!-- navbar date -->
   <div class="card shadow mb-4">
     <div class="card-body">
       <div class="row text-center">
@@ -120,8 +118,6 @@
       </div>
     </div>
   </div>
-
-  <!-- کارت‌های آمار اصلی -->
   <div class="row mb-4">
     <!-- Total Sales -->
     <div class="col-xl-3 col-md-6 mb-4">
@@ -211,7 +207,7 @@
           <div class="row no-gutters align-items-center">
             <div class="col mr-2">
               <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
-                Outstanding Balance
+                Old Transactions
               </div>
               <div class="h5 mb-0 font-weight-bold text-gray-800">
                 {{ total_outstanding|floatformat:0|intcomma }}
@@ -473,7 +469,6 @@
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // داده‌های چارت از context
   const chartLabels = JSON.parse('{{ chart_labels|safe }}');
   const chartData = JSON.parse('{{ chart_data|safe }}');
 

@@ -1,3 +1,4 @@
+# expenses/models.py
 from django.db import models
 from django.core.validators import MinValueValidator
 from decimal import Decimal
@@ -18,11 +19,6 @@ class ExpenseCategory(models.Model):
 
 
 class Expense(models.Model):
-    PAYMENT_METHODS = [
-        ("cash", "Cash"),
-        ("bank", "Bank Transfer"),
-        ("card", "POS / Card"),
-    ]
 
     date = models.DateField()
     category = models.ForeignKey(
@@ -30,29 +26,21 @@ class Expense(models.Model):
         on_delete=models.PROTECT,
         related_name="expenses"
     )
-
     title = models.CharField(max_length=200)
     quantity = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        default=1,
-        validators=[MinValueValidator(Decimal("0.01"))]
+        default=0,
+        validators=[MinValueValidator(Decimal("0"))]
     )
     unit_price = models.DecimalField(
         max_digits=14,
         decimal_places=2,
         validators=[MinValueValidator(0)]
     )
-
-    payment_method = models.CharField(
-        max_length=20,
-        choices=PAYMENT_METHODS,
-        default="cash"
-    )
-
     paid_to = models.CharField(max_length=200, blank=True)
+    resived_from = models.CharField(max_length=200, blank=True, default='')
     description = models.TextField(blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -69,4 +57,4 @@ class Expense(models.Model):
         return self.quantity * self.unit_price
 
     def __str__(self):
-        return f"{self.title} - {self.total_amount}"
+        return f"{self.title} - {self.total_amount:,.0f}AED"

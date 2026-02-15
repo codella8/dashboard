@@ -1,5 +1,6 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,12 +17,16 @@
     
     <!-- Custom CSS -->
     <link href="/static/css/expenses_style.css" rel="stylesheet">
+
 </head>
 <body>
     <!-- Navigation -->
-    {% include 'navbar.html' %}
+    {% include 'expense/navbar.html' %}
 
     <div class="container-fluid">
+        {% block content %}
+        <!-- Content will be inserted here -->
+        {% endblock %}
     </div>
 
     <!-- Bootstrap JS -->
