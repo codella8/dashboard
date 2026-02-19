@@ -115,6 +115,12 @@
                     Edit Profile
                 </a>
             </li>
+            <li>
+                <a class="dropdown-item luxury-dropdown-item" href="{% url 'daily_sale:customer_detail' %}">
+                    <i class="bi bi-cart me-2"></i>
+                    Cart
+                </a>
+            </li>
 
             {% if user.is_staff %}
             <li class="nav-item">

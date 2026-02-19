@@ -74,39 +74,88 @@ def customer_detail(request, customer_id=None):
     else:
         payment_form = PaymentForm()
 
+    # محاسبه وضعیت بدهی با بررسی کامل
     recompute_outstanding_for_customer(customer.id)
     outstanding = get_customer_outstanding_summary(customer.id)
-    total_debt = outstanding.get('total_debt', Decimal('0.00'))
-    transactions_count = outstanding.get('transactions_count', 0)
-    last_transaction = outstanding.get('last_transaction')
+    
+    # بررسی اینکه outstanding یک دیکشنری معتبر هست یا نه
+    if outstanding and isinstance(outstanding, dict):
+        total_debt = outstanding.get('total_debt', Decimal('0.00'))
+        transactions_count = outstanding.get('transactions_count', 0)
+        last_transaction = outstanding.get('last_transaction')
+    else:
+        # مقادیر پیش‌فرض در صورت عدم وجود داده معتبر
+        total_debt = Decimal('0.00')
+        transactions_count = 0
+        last_transaction = None
+        logger.warning(f"Invalid outstanding data for customer {customer.id}: {outstanding}")
+    
+    # دریافت تراکنش‌ها
     transactions = DailySaleTransaction.objects.filter(customer=customer).select_related('item').order_by('-date')
+    
+    # پردازش تراکنش‌ها برای نمایش
     tx_data = []
+    total_sales = Decimal('0.00')
+    total_tax = Decimal('0.00')
+    total_paid = Decimal('0.00')
+    total_remaining = Decimal('0.00')
+    
     for tx in transactions:
+        # مبلغ پرداخت شده
         paid_amount = Payment.objects.filter(transaction=tx).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        
+        # مبلغ باقی‌مانده
         remaining_amount = (tx.total_amount or Decimal('0.00')) - paid_amount
-
-        tax_amount = (tx.total_amount or Decimal('0.00')) * Decimal(tx.tax_rate if hasattr(tx, 'tax_rate') else 0)
+        
+        # محاسبه مالیات
+        tax_rate = getattr(tx, 'tax_rate', 0)
+        if tax_rate is None:
+            tax_rate = 0
+        tax_amount = (tx.total_amount or Decimal('0.00')) * Decimal(str(tax_rate))
+        
         total_with_tax = (tx.total_amount or Decimal('0.00')) + tax_amount
-
+        
+        # جمع‌آوری آمار
+        total_sales += tx.total_amount or Decimal('0.00')
+        total_tax += tax_amount
+        total_paid += paid_amount
+        total_remaining += remaining_amount
+        
+        # نوع تراکنش
+        tx_type = tx.transaction_type
+        if hasattr(tx, 'get_transaction_type_display'):
+            tx_type = tx.get_transaction_type_display()
+        
+        # نام آیتم
+        item_name = '-'
+        if tx.item:
+            if hasattr(tx.item, 'name') and tx.item.name:
+                item_name = tx.item.name
+            elif hasattr(tx.item, 'product_name') and tx.item.product_name:
+                item_name = tx.item.product_name
+            else:
+                item_name = str(tx.item)
+        
         tx_data.append({
             'id': tx.id,
             'date': tx.date,
-            'type': tx.get_transaction_type_display() if hasattr(tx, 'get_transaction_type_display') else tx.transaction_type,
-            'item': tx.item.name if tx.item else '-',
+            'type': tx_type,
+            'item': item_name,
             'quantity': tx.quantity,
             'unit_price': tx.item.unit_price if tx.item else Decimal('0.00'),
-            'total_amount': tx.total_amount,
+            'total_amount': tx.total_amount or Decimal('0.00'),
             'tax_amount': tax_amount,
             'total_with_tax': total_with_tax,
             'paid_amount': paid_amount,
             'remaining_amount': remaining_amount,
-            'note': tx.note,
+            'note': tx.note or '',
         })
 
-    total_sales = sum(tx['total_amount'] or Decimal('0.00') for tx in tx_data)
-    total_tax = sum(tx['tax_amount'] for tx in tx_data)
-    total_paid = sum(tx['paid_amount'] for tx in tx_data)
-    total_remaining = sum(tx['remaining_amount'] for tx in tx_data)
+    # محاسبه نرخ مالیات (برای نمایش)
+    first_tx = transactions.first()
+    tax_rate_display = 0
+    if first_tx and hasattr(first_tx, 'tax_rate') and first_tx.tax_rate:
+        tax_rate_display = first_tx.tax_rate * 100
 
     context = {
         'customer': customer,
@@ -117,11 +166,12 @@ def customer_detail(request, customer_id=None):
         'total_remaining': total_remaining,
         'transactions_count': transactions_count,
         'last_transaction': last_transaction,
-        'tax_rate': (getattr(transactions.first(), 'tax_rate', 0) * 100) if transactions else 0,
+        'tax_rate': tax_rate_display,
         'is_self_view': is_self_view,
         'is_admin': request.user.is_staff,
         'payment_form': payment_form,
     }
+    
     return render(request, 'daily_sale/customer_detail.html', context)
 
 @login_required
@@ -272,7 +322,7 @@ def transaction_create(request):
                 
                 messages.success(
                     request,
-                    f"✅ تراکنش #{transaction.invoice_number} با موفقیت ایجاد شد ({items_created} قلم کالا)"
+                    f"transaction is created successfully!"
                 )
                 
                 logger.info("=" * 50)
