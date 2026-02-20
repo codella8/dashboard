@@ -1,180 +1,111 @@
-# daily_sale/signals.py
 import logging
-from django.db.models.signals import pre_save, post_save, post_delete, pre_delete
-from django.dispatch import receiver
-from django.db.models import Sum
 from decimal import Decimal
-from .models import (
-    DailySaleTransaction,
-    Payment,
-    DailySummary,
-    OutstandingCustomer,
-)
-from .utils import (
-    recompute_daily_summary_for_date,
-    recompute_outstanding_for_customer,
-)
+from django.db.models.signals import pre_save, post_save, post_delete
+from django.dispatch import receiver
+from django.db import transaction as db_transaction
+from django.db.models import Sum
+from .models import DailySaleTransaction, Payment, DailySummary, OutstandingCustomer
+from .utils import recompute_daily_summary_for_date, recompute_outstanding_for_customer
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------
+# Pre-save: ذخیره مقادیر قبلی برای مقایسه
+# ---------------------------
 @receiver(pre_save, sender=DailySaleTransaction)
 def dst_pre_save(sender, instance, **kwargs):
-    if not instance.pk:
+    if instance.pk:
+        try:
+            old = DailySaleTransaction.objects.only("date", "customer_id").get(pk=instance.pk)
+            instance._old_date = old.date
+            instance._old_customer_id = old.customer_id
+        except DailySaleTransaction.DoesNotExist:
+            instance._old_date = None
+            instance._old_customer_id = None
+    else:
         instance._old_date = None
         instance._old_customer_id = None
-        return
 
-    try:
-        old = DailySaleTransaction.objects.only("date", "customer_id").get(pk=instance.pk)
-        instance._old_date = old.date
-        instance._old_customer_id = old.customer_id
-    except DailySaleTransaction.DoesNotExist:
-        instance._old_date = None
-        instance._old_customer_id = None
-
-
+# ---------------------------
+# Post-save تراکنش
+# ---------------------------
 @receiver(post_save, sender=DailySaleTransaction)
 def dst_post_save(sender, instance, created, **kwargs):
     try:
-        dates_to_update = set()
+        dates_to_update = {instance.date}
+        if getattr(instance, "_old_date", None) and instance._old_date != instance.date:
+            dates_to_update.add(instance._old_date)
 
-        if instance.date:
-            dates_to_update.add(instance.date)
+        customers_to_update = {instance.customer_id}
+        if getattr(instance, "_old_customer_id", None) and instance._old_customer_id != instance.customer_id:
+            customers_to_update.add(instance._old_customer_id)
 
-        old_date = getattr(instance, "_old_date", None)
-        if old_date and old_date != instance.date:
-            dates_to_update.add(old_date)
+        with db_transaction.atomic():
+            for d in dates_to_update:
+                recompute_daily_summary_for_date(d)
+            for cid in customers_to_update:
+                recompute_outstanding_for_customer(cid)
 
-        for d in dates_to_update:
-            recompute_daily_summary_for_date(d)
+        logger.info("Transaction %s processed successfully", instance.invoice_number)
 
-        customers_to_update = set()
+    except Exception:
+        logger.exception("Error processing DailySaleTransaction post_save (%s)", instance.invoice_number)
 
-        if instance.customer_id:
-            customers_to_update.add(instance.customer_id)
-
-        old_customer_id = getattr(instance, "_old_customer_id", None)
-        if old_customer_id and old_customer_id != instance.customer_id:
-            customers_to_update.add(old_customer_id)
-
-        for cid in customers_to_update:
-            recompute_outstanding_for_customer(cid)
-
-        logger.info(
-            "Transaction %s processed successfully",
-            instance.invoice_number,
-        )
-
-    except Exception as exc:
-        logger.exception(
-            "Error processing DailySaleTransaction post_save (%s)",
-            instance.invoice_number,
-        )
-
-
-@receiver(pre_delete, sender=DailySaleTransaction)
-def dst_pre_delete(sender, instance, **kwargs):
-    instance._delete_date = instance.date
-    instance._delete_customer_id = instance.customer_id
-
-
+# ---------------------------
+# Post-delete تراکنش
+# ---------------------------
 @receiver(post_delete, sender=DailySaleTransaction)
 def dst_post_delete(sender, instance, **kwargs):
     try:
-        if getattr(instance, "_delete_date", None):
-            recompute_daily_summary_for_date(instance._delete_date)
-
-        if getattr(instance, "_delete_customer_id", None):
-            recompute_outstanding_for_customer(instance._delete_customer_id)
+        with db_transaction.atomic():
+            recompute_daily_summary_for_date(instance.date)
+            recompute_outstanding_for_customer(instance.customer_id)
 
         logger.info("Transaction deleted and summaries updated")
-
     except Exception:
         logger.exception("Error processing DailySaleTransaction post_delete")
 
-@receiver(post_save, sender=Payment)
-def payment_post_save(sender, instance, created, **kwargs):
+# ---------------------------
+# Post-save و post-delete پرداخت‌ها
+# ---------------------------
+@receiver([post_save, post_delete], sender=Payment)
+def payment_update_summaries(sender, instance, **kwargs):
+    tx = instance.transaction
+    if not tx:
+        return
     try:
-        tx = instance.transaction
-        if not tx:
-            return
-
-        if tx.date:
-            recompute_daily_summary_for_date(tx.date)
-
-        if tx.customer_id:
-            recompute_outstanding_for_customer(tx.customer_id)
-
+        with db_transaction.atomic():
+            if tx.date:
+                recompute_daily_summary_for_date(tx.date)
+            if tx.customer_id:
+                recompute_outstanding_for_customer(tx.customer_id)
         logger.info("Payment processed for transaction %s", tx.invoice_number)
-
     except Exception:
-        logger.exception("Error processing Payment post_save")
+        logger.exception("Error processing Payment (%s)", tx.invoice_number)
 
-
-@receiver(post_delete, sender=Payment)
-def payment_post_delete(sender, instance, **kwargs):
+# ---------------------------
+# Post-save برای به‌روزرسانی بدهی مشتری
+# ---------------------------
+def update_customer_debt(transaction_instance):
     try:
-        tx = instance.transaction
-        if not tx:
-            return
+        customer = transaction_instance.customer
+        paid_amount = Payment.objects.filter(transaction=transaction_instance).aggregate(
+            total_paid=Sum('amount')
+        )['total_paid'] or Decimal('0.00')
 
-        if tx.date:
-            recompute_daily_summary_for_date(tx.date)
-
-        if tx.customer_id:
-            recompute_outstanding_for_customer(tx.customer_id)
-
-        logger.info("Payment deleted for transaction %s", tx.invoice_number)
-
+        remaining_amount = (transaction_instance.total_amount or Decimal('0.00')) - paid_amount - (getattr(transaction_instance, 'discount', Decimal('0.00')) or Decimal('0.00'))
+        customer.debt = remaining_amount if remaining_amount > Decimal('0.00') else Decimal('0.00')
+        customer.save()
     except Exception:
-        logger.exception("Error processing Payment post_delete")
+        logger.exception("Error updating debt for customer %s", getattr(transaction_instance.customer, 'id', 'unknown'))
 
-@receiver(post_save, sender=DailySummary)
-def daily_summary_post_save(sender, instance, created, **kwargs):
-    if created:
-        logger.info("DailySummary created for %s", instance.date)
-    else:
-        logger.debug("DailySummary updated for %s", instance.date)
-
-
-@receiver(post_save, sender=OutstandingCustomer)
-def outstanding_post_save(sender, instance, created, **kwargs):
-    customer = getattr(instance.customer, "user", instance.customer)
-    if created:
-        logger.info("Outstanding created for %s", customer)
-    else:
-        logger.debug("Outstanding updated for %s", customer)
-        
-@receiver(post_save, sender=Payment)
-def update_customer_debt_on_payment(sender, instance, created, **kwargs):
-    transaction = instance.transaction
-    paid_amount = Payment.objects.filter(transaction=transaction).aggregate(
-        total_paid=Sum('amount')
-    )['total_paid'] or Decimal('0')
-    
-    remaining_amount = transaction.total_amount - paid_amount - (transaction.discount or Decimal('0'))
-
-    customer = transaction.customer
-    if remaining_amount > Decimal('0'):
-        customer.debt = remaining_amount
-    else:
-        customer.debt = Decimal('0')
-
-    customer.save()
-
-
+# استفاده از تابع مشترک برای تراکنش و پرداخت
 @receiver(post_save, sender=DailySaleTransaction)
-def update_customer_debt_on_transaction(sender, instance, created, **kwargs):
-    customer = instance.customer
-    paid_amount = Payment.objects.filter(transaction=instance).aggregate(
-        total_paid=Sum('amount')
-    )['total_paid'] or Decimal('0')
-    
-    remaining_amount = instance.total_amount - paid_amount - (instance.discount or Decimal('0'))
-    
-    if remaining_amount > Decimal('0'):
-        customer.debt = remaining_amount
-    else:
-        customer.debt = Decimal('0')
+def update_debt_on_transaction(sender, instance, **kwargs):
+    update_customer_debt(instance)
 
-    customer.save()
+@receiver(post_save, sender=Payment)
+def update_debt_on_payment(sender, instance, **kwargs):
+    tx = instance.transaction
+    if tx:
+        update_customer_debt(tx)

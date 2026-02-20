@@ -1,3 +1,4 @@
+# daily_sale/models.py
 from uuid import uuid4
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import models
@@ -6,6 +7,7 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from accounts.models import UserProfile, Company
 from containers.models import Inventory_List, Container
+from .services import CalculationService
 
 class DailySaleTransaction(models.Model):
     TRANSACTION_TYPES = [("sale", "Sale"), ("purchase", "Purchase")]
@@ -26,7 +28,7 @@ class DailySaleTransaction(models.Model):
     discount = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
     tax = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0"))
     advance = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
-    paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # فیلد پرداخت شده
+    paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_status = models.CharField(
         max_length=20,
         choices=[('unpaid', 'Unpaid'), ('partial', 'Partial'), ('paid', 'Paid')],
@@ -58,71 +60,77 @@ class DailySaleTransaction(models.Model):
     def __str__(self):
         return f"{self.invoice_number or 'INV'} | {self.date} | {self.total_amount}"
 
+    def calculate_amounts(self):
+        return CalculationService.calculate_transaction_amounts(
+            quantity=self.quantity,
+            unit_price=self.unit_price,
+            discount=self.discount,
+            tax_percent=self.tax,
+            advance=self.advance
+        )
+
     def save(self, *args, **kwargs):
-        self.subtotal = (Decimal(self.quantity) * Decimal(self.unit_price)).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-
-        taxable_amount = (self.subtotal - Decimal(self.discount)).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-        if taxable_amount < Decimal("0"):
-            taxable_amount = Decimal("0")
-
-        tax_rate = Decimal(self.tax) / Decimal("100")
-        self.tax_amount = (taxable_amount * tax_rate).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-
-        self.total_amount = (taxable_amount + self.tax_amount).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-
-        self.balance = (
-            self.total_amount - Decimal(self.advance) - Decimal(self.paid)
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-        if self.balance <= Decimal("0"):
-            self.payment_status = "paid"
-        elif Decimal(self.advance) > Decimal("0") or Decimal(self.paid) > Decimal("0"):
-            self.payment_status = "partial"
-        else:
-            self.payment_status = "unpaid"
-
-        super().save(*args, **kwargs)
-        
-    def recalculate_totals(self):
-    
-        if self.items.exists():
-            self.subtotal = sum((i.subtotal for i in self.items.all()), Decimal("0"))
-            self.tax_amount = sum((i.tax_amount for i in self.items.all()), Decimal("0"))
-            self.total_amount = sum((i.total_amount for i in self.items.all()), Decimal("0"))
-
-            self.balance = (
-                self.total_amount - Decimal(self.advance) - Decimal(self.paid)
-            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-            if self.balance <= Decimal("0"):
-                self.payment_status = "paid"
-            elif self.advance > 0 or self.paid > 0:
-                self.payment_status = "partial"
+        if self.pk: 
+            items = self.items.all()
+            if items.exists():
+                subtotal = Decimal('0')
+                tax_amount = Decimal('0')
+                discount_total = Decimal('0')
+                
+                for item in items:
+                    subtotal += item.subtotal or Decimal('0')
+                    tax_amount += item.tax_amount or Decimal('0')
+                    discount_total += item.discount or Decimal('0')
+                    
+                self.subtotal = subtotal
+                self.tax_amount = tax_amount
+                self.total_amount = (subtotal - discount_total + tax_amount).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                self.balance = max(self.total_amount - self.advance, Decimal('0'))
+                
+                if self.balance <= Decimal("0") and self.total_amount > Decimal("0"):
+                    self.payment_status = "paid"
+                elif self.advance > Decimal("0"):
+                    self.payment_status = "partial"
+                else:
+                    self.payment_status = "unpaid"
+                    
             else:
-                self.payment_status = "unpaid"
+            # اگر آیتمی وجود ندارد، از متد محاسباتی استفاده کن
+                amounts = self.calculate_amounts()
+                self.subtotal = amounts["subtotal"]
+                self.tax_amount = amounts["tax_amount"]
+                self.total_amount = amounts["total_amount"]
+                self.balance = amounts["balance"]
+                self.payment_status = amounts["payment_status"]
+                
+        else:
+        # تراکنش جدید - از متد محاسباتی استفاده کن
+            amounts = self.calculate_amounts()
+            self.subtotal = amounts["subtotal"]
+            self.tax_amount = amounts["tax_amount"]
+            self.total_amount = amounts["total_amount"]
+            self.balance = amounts["balance"]
+            self.payment_status = amounts["payment_status"]
+            
+        self.paid = self.advance
+        super().save(*args, **kwargs)
 
-            super().save(update_fields=[
-                "subtotal", "tax_amount", "total_amount",
-                "balance", "payment_status"
-            ])
     @property
     def taxable_amount(self):
-        return self.subtotal - self.total_discount
+        taxable = (self.subtotal - self.discount).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        return max(taxable, Decimal("0"))
     
     @property
     def paid_percentage(self):
         if self.total_amount > 0:
-            return (self.advance / self.total_amount) * 100
-        return 0
-
+            return ((self.advance / self.total_amount) * 100).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        return Decimal("0")
 
 
 class DailySaleTransactionItem(models.Model):
@@ -150,7 +158,7 @@ class DailySaleTransactionItem(models.Model):
         Company,
         on_delete=models.SET_NULL, null=True, 
         blank=True
-        )
+    )
 
     quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=18, decimal_places=2)
@@ -164,26 +172,19 @@ class DailySaleTransactionItem(models.Model):
         unique_together = ("transaction", "item")
         ordering = ["id"]
 
+    def calculate_item_amounts(self):
+        return CalculationService.calculate_item_amounts(
+            quantity=self.quantity,
+            unit_price=self.unit_price,
+            discount=self.discount,
+            tax_percent=self.transaction.tax
+        )
+
     def save(self, *args, **kwargs):
-        self.subtotal = (Decimal(self.quantity) * self.unit_price).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-
-        taxable = (self.subtotal - self.discount).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-        if taxable < Decimal("0"):
-            taxable = Decimal("0")
-
-        tax_rate = Decimal(self.transaction.tax) / Decimal("100")
-        self.tax_amount = (taxable * tax_rate).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-
-        self.total_amount = (taxable + self.tax_amount).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-
+        amounts = self.calculate_item_amounts()
+        self.subtotal = amounts["subtotal"]
+        self.tax_amount = amounts["tax_amount"]
+        self.total_amount = amounts["total_amount"]
         super().save(*args, **kwargs)
 
 
@@ -203,9 +204,14 @@ class Payment(models.Model):
     def __str__(self):
         return f"{self.transaction.invoice_number} - {self.amount}"
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.transaction.save()
+
 
 class DailySummary(models.Model):
-    id = models.BigAutoField(primary_key=True)
+    # تغییر به AutoField معمولی
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     date = models.DateField(unique=True, db_index=True)
     
     # آمار اصلی
@@ -217,7 +223,7 @@ class DailySummary(models.Model):
     items_sold = models.PositiveIntegerField(default=0)
     customers_count = models.PositiveIntegerField(default=0)
     
-    # آمار اضافی برای گزارش‌گیری بهتر
+    # آمار اضافی
     gross_profit = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     total_returns = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     total_tax = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
@@ -249,17 +255,19 @@ class DailySummary(models.Model):
 
     @property
     def collection_rate(self):
-        """نرخ وصول"""
         if self.total_sales > 0:
-            return (self.total_paid / self.total_sales) * 100
-        return 0
+            return (self.total_paid / self.total_sales * 100).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        return Decimal("0")
 
     @property
     def avg_items_per_transaction(self):
-        """میانگین اقلام در هر تراکنش"""
         if self.transactions_count > 0:
-            return self.items_sold / self.transactions_count
-        return 0
+            return (self.items_sold / self.transactions_count).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        return Decimal("0")
 
 
 class OutstandingCustomer(models.Model):
@@ -274,5 +282,3 @@ class OutstandingCustomer(models.Model):
 
     def __str__(self):
         return f"{getattr(self.customer, 'user', self.customer)} - {self.total_debt}"
-
-

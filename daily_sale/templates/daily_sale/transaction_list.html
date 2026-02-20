@@ -89,10 +89,10 @@
               Purchases
             </div>
             <div class="h6 mb-0 font-weight-bold text-gray-800">
-              AED {{ stats.avg_transaction|floatformat:0|intcomma }}
+              AED {{ stats.total_purchases|floatformat:0|intcomma }} <!-- اینجا اصلاح شد -->
             </div>
             <div class="mt-2 mb-0 text-muted text-xs">
-              {% if total_count > 0 %}
+              {% if stats.total_purchases > 0 %}
               <span>{{ stats.total_purchases|floatformat:0|intcomma }} in purchases</span>
               {% endif %}
             </div>
@@ -209,7 +209,7 @@
                   </small>
                   {% if transaction.status_filter != 'paid' %}
                   <small class="text-muted d-block">
-                    Due: <span class="text-danger fw-bold">AED {{ transaction.remaining_balance|floatformat:0|intcomma}}</span>
+                    balance: <span class="text-danger fw-bold">AED {{transaction.remaining_balance|floatformat:0|intcomma}}</span>
                   </small>
                   {% endif %}
                 </div>

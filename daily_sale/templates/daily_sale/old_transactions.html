@@ -67,17 +67,19 @@
       </div>
     </div>
 
-    <div class="col-md-3">
-      <div class="card border-start-success border-start-3 shadow-sm hover-lift">
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-success shadow h-100 py-2">
         <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="flex-grow-1">
-              <h6 class="text-muted mb-1">Total Paid</h6>
-              <h4 class="mb-0 text-success">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                Total Paid
+              </div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">
                 AED {{ total_summary.total_paid|floatformat:0|intcomma }}
-              </h4>
+              </div>
             </div>
-            <div class="ms-3">
+            <div class="col-auto">
               <i class="fas fa-check-circle fa-2x text-success"></i>
             </div>
           </div>

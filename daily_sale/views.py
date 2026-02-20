@@ -14,11 +14,11 @@ from io import BytesIO
 import qrcode
 from uuid import UUID
 import base64
-from containers .models import Container
+from containers.models import Container
 from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.utils import timezone
-from decimal import Decimal,ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Sum, Q, F, Count, Avg
 from django.db import connection
 import json
@@ -33,8 +33,8 @@ from .forms import DailySaleTransactionForm, PaymentForm
 from .report import get_sales_summary, sales_timeseries, parse_date_param
 from accounts.models import Company, UserProfile
 from containers.models import Inventory_List
-from .utils import recompute_daily_summary_for_date, recompute_outstanding_for_customer,get_customer_outstanding_summary
-
+from .utils import recompute_daily_summary_for_date, recompute_outstanding_for_customer
+from .services import CalculationService
 logger = logging.getLogger(__name__)
 
 TAX_RATE = Decimal('0.10')
@@ -66,6 +66,8 @@ def customer_detail(request, customer_id=None):
             if tx_id:
                 payment.transaction = get_object_or_404(DailySaleTransaction, id=tx_id)
                 payment.save()
+                # بعد از ثبت پرداخت، تراکنش را به‌روزرسانی کن
+                payment.transaction.save()  # این متد save مقادیر را دوباره محاسبه می‌کند
                 recompute_outstanding_for_customer(customer.id)
                 messages.success(request, "Payment recorded successfully.")
                 return redirect(reverse("daily_sale:customer_detail", kwargs={"customer_id": customer.id}))
@@ -74,88 +76,39 @@ def customer_detail(request, customer_id=None):
     else:
         payment_form = PaymentForm()
 
-    # محاسبه وضعیت بدهی با بررسی کامل
     recompute_outstanding_for_customer(customer.id)
-    outstanding = get_customer_outstanding_summary(customer.id)
-    
-    # بررسی اینکه outstanding یک دیکشنری معتبر هست یا نه
-    if outstanding and isinstance(outstanding, dict):
-        total_debt = outstanding.get('total_debt', Decimal('0.00'))
-        transactions_count = outstanding.get('transactions_count', 0)
-        last_transaction = outstanding.get('last_transaction')
-    else:
-        # مقادیر پیش‌فرض در صورت عدم وجود داده معتبر
-        total_debt = Decimal('0.00')
-        transactions_count = 0
-        last_transaction = None
-        logger.warning(f"Invalid outstanding data for customer {customer.id}: {outstanding}")
-    
-    # دریافت تراکنش‌ها
     transactions = DailySaleTransaction.objects.filter(customer=customer).select_related('item').order_by('-date')
-    
-    # پردازش تراکنش‌ها برای نمایش
     tx_data = []
-    total_sales = Decimal('0.00')
-    total_tax = Decimal('0.00')
-    total_paid = Decimal('0.00')
-    total_remaining = Decimal('0.00')
-    
     for tx in transactions:
-        # مبلغ پرداخت شده
+        # استفاده از مقادیر محاسبه شده مدل
         paid_amount = Payment.objects.filter(transaction=tx).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         
-        # مبلغ باقی‌مانده
-        remaining_amount = (tx.total_amount or Decimal('0.00')) - paid_amount
+        # اگر advance در مدل با paid_amount هماهنگ نیست، آن را به‌روزرسانی کن
+        if tx.advance != paid_amount:
+            tx.advance = paid_amount
+            tx.save()  # این متد save مقادیر را دوباره محاسبه می‌کند
         
-        # محاسبه مالیات
-        tax_rate = getattr(tx, 'tax_rate', 0)
-        if tax_rate is None:
-            tax_rate = 0
-        tax_amount = (tx.total_amount or Decimal('0.00')) * Decimal(str(tax_rate))
-        
-        total_with_tax = (tx.total_amount or Decimal('0.00')) + tax_amount
-        
-        # جمع‌آوری آمار
-        total_sales += tx.total_amount or Decimal('0.00')
-        total_tax += tax_amount
-        total_paid += paid_amount
-        total_remaining += remaining_amount
-        
-        # نوع تراکنش
-        tx_type = tx.transaction_type
-        if hasattr(tx, 'get_transaction_type_display'):
-            tx_type = tx.get_transaction_type_display()
-        
-        # نام آیتم
-        item_name = '-'
-        if tx.item:
-            if hasattr(tx.item, 'name') and tx.item.name:
-                item_name = tx.item.name
-            elif hasattr(tx.item, 'product_name') and tx.item.product_name:
-                item_name = tx.item.product_name
-            else:
-                item_name = str(tx.item)
-        
+        # حالا از مقادیر محاسبه شده مدل استفاده کن
         tx_data.append({
             'id': tx.id,
             'date': tx.date,
-            'type': tx_type,
-            'item': item_name,
+            'type': tx.get_transaction_type_display() if hasattr(tx, 'get_transaction_type_display') else tx.transaction_type,
+            'item': tx.item.name if tx.item else '-',
             'quantity': tx.quantity,
             'unit_price': tx.item.unit_price if tx.item else Decimal('0.00'),
-            'total_amount': tx.total_amount or Decimal('0.00'),
-            'tax_amount': tax_amount,
-            'total_with_tax': total_with_tax,
+            'subtotal': tx.subtotal,
+            'tax_amount': tx.tax_amount,
+            'total_amount': tx.total_amount,
             'paid_amount': paid_amount,
-            'remaining_amount': remaining_amount,
-            'note': tx.note or '',
+            'balance': tx.balance,
+            'payment_status': tx.get_payment_status_display(),
+            'note': tx.note,
         })
 
-    # محاسبه نرخ مالیات (برای نمایش)
-    first_tx = transactions.first()
-    tax_rate_display = 0
-    if first_tx and hasattr(first_tx, 'tax_rate') and first_tx.tax_rate:
-        tax_rate_display = first_tx.tax_rate * 100
+    total_sales = sum(tx['total_amount'] or Decimal('0.00') for tx in tx_data)
+    total_tax = sum(tx['tax_amount'] for tx in tx_data)
+    total_paid = sum(tx['paid_amount'] for tx in tx_data)
+    total_balance = sum(tx['balance'] for tx in tx_data)
 
     context = {
         'customer': customer,
@@ -163,21 +116,18 @@ def customer_detail(request, customer_id=None):
         'total_sales': total_sales,
         'total_tax': total_tax,
         'total_paid': total_paid,
-        'total_remaining': total_remaining,
-        'transactions_count': transactions_count,
-        'last_transaction': last_transaction,
-        'tax_rate': tax_rate_display,
+        'total_balance': total_balance,
+        'tax_rate': (getattr(transactions.first(), 'tax', 0)) if transactions else 0,
         'is_self_view': is_self_view,
         'is_admin': request.user.is_staff,
         'payment_form': payment_form,
     }
-    
     return render(request, 'daily_sale/customer_detail.html', context)
 
 @login_required
-@db_transaction.atomic 
+@db_transaction.atomic  
 def transaction_create(request):
-    """ایجاد تراکنش جدید (نسخه اصلی با لاگ‌گیری بهتر)"""
+    """ایجاد تراکنش جدید با استفاده از سرویس محاسبات"""
     if request.method == "POST":
         logger.info("=" * 50)
         logger.info("🔄 Transaction creation started")
@@ -188,41 +138,20 @@ def transaction_create(request):
             try:
                 transaction = form.save(commit=False)
                 transaction.created_by = request.user
-                transaction.subtotal = Decimal(request.POST.get("subtotal", "0"))
-                transaction.tax_amount = Decimal(request.POST.get("tax_amount", "0"))
-                transaction.total_amount = Decimal(request.POST.get("total_amount", "0"))
-                transaction.balance = Decimal(request.POST.get("balance", "0"))
-                transaction.advance = Decimal(request.POST.get("advance", "0") or "0")
-
-                # وضعیت پرداخت
-                if transaction.advance >= transaction.total_amount and transaction.total_amount > Decimal("0"):
-                    transaction.payment_status = "paid"
-                    transaction.balance = Decimal("0")
-                elif transaction.advance > Decimal("0"):
-                    transaction.payment_status = "partial"
-                    transaction.balance = transaction.total_amount - transaction.advance
-                else:
-                    transaction.payment_status = "unpaid"
-                    transaction.balance = transaction.total_amount
                 
+                # دریافت مقادیر از فرم
+                advance = Decimal(request.POST.get("advance", "0") or "0")
+                transaction.advance = advance
+                transaction.paid = advance
+                
+                # ذخیره موقت برای گرفتن ID
                 transaction.save()
                 logger.info(f"✅ Transaction created: {transaction.id}")
                 
-                # ایجاد پرداخت اولیه اگر وجود دارد
-                if transaction.advance > Decimal("0"):
-                    Payment.objects.create(
-                        transaction=transaction,
-                        amount=transaction.advance,
-                        method=request.POST.get("payment_method", "cash"),
-                        date=transaction.date,
-                        created_by=request.user,
-                        note=f"Initial payment for invoice {transaction.invoice_number or 'N/A'}"
-                    )
-                    logger.info(f"💰 Initial payment created: {transaction.advance}")
-                
-                # ایجاد آیتم‌های تراکنش
+                # پردازش آیتم‌ها
                 items_json = request.POST.get("items_data", "[]")
                 items_created = 0
+                items_list = []
                 
                 try:
                     items_list = json.loads(items_json)
@@ -232,6 +161,11 @@ def transaction_create(request):
                     messages.error(request, "Invalid items data format.")
                     transaction.delete()
                     return render(request, "daily_sale/transaction_create.html", {"form": form})
+                
+                # محاسبه مجموع آیتم‌ها
+                subtotal_total = Decimal('0')
+                discount_total = Decimal('0')
+                tax_total = Decimal('0')
                 
                 for item_data in items_list:
                     raw_item_id = item_data.get("item_id")
@@ -243,15 +177,19 @@ def transaction_create(request):
                         quantity = Decimal(str(item_data.get("quantity", 1)))
                         unit_price = Decimal(str(item_data.get("unit_price", 0)))
                         discount = Decimal(str(item_data.get("discount", 0)))
-                        subtotal = (quantity * unit_price).quantize(Decimal("0.01"))
-                        taxable = (subtotal - discount).quantize(Decimal("0.01"))
-                        if taxable < Decimal("0"):
-                            taxable = Decimal("0")
-
-                        tax_amount = (taxable * transaction.tax / Decimal("100")).quantize(
-                            Decimal("0.01")
+                        
+                        # محاسبه با سرویس
+                        item_calc = CalculationService.calculate_item_amounts(
+                            quantity=quantity,
+                            unit_price=unit_price,
+                            discount=discount,
+                            tax_percent=transaction.tax
                         )
-                        total = (taxable + tax_amount).quantize(Decimal("0.01"))
+                        
+                        subtotal_total += item_calc["subtotal"]
+                        discount_total += discount
+                        tax_total += item_calc["tax_amount"]
+                        
                         container_obj = inventory.container if inventory.container else None
                         
                         DailySaleTransactionItem.objects.create(
@@ -261,9 +199,9 @@ def transaction_create(request):
                             quantity=quantity,
                             unit_price=unit_price,
                             discount=discount,
-                            subtotal=subtotal,
-                            tax_amount=tax_amount,
-                            total_amount=total,
+                            subtotal=item_calc["subtotal"],
+                            tax_amount=item_calc["tax_amount"],
+                            total_amount=item_calc["total_amount"],
                         )
                         items_created += 1
                         
@@ -272,12 +210,33 @@ def transaction_create(request):
                         continue
                 
                 if items_created == 0:
-                    logger.error("❌ No items created, rolling back transaction")
+                    logger.error("❌ No items created")
                     messages.error(request, "No valid item found.")
                     transaction.delete()
                     return render(request, "daily_sale/transaction_create.html", {"form": form})
                 
                 logger.info(f"✅ {items_created} items created successfully")
+                
+                # محاسبه نهایی تراکنش
+                net_amount = max(subtotal_total - discount_total, Decimal("0"))
+                total_amount = (net_amount + tax_total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                balance = max(total_amount - advance, Decimal("0"))
+                
+                # به‌روزرسانی تراکنش
+                transaction.subtotal = subtotal_total
+                transaction.tax_amount = tax_total
+                transaction.total_amount = total_amount
+                transaction.balance = balance
+                
+                # تعیین وضعیت پرداخت
+                if balance <= Decimal("0") and total_amount > Decimal("0"):
+                    transaction.payment_status = "paid"
+                elif advance > Decimal("0"):
+                    transaction.payment_status = "partial"
+                else:
+                    transaction.payment_status = "unpaid"
+                
+                transaction.save()
                 
                 # ایجاد شماره فاکتور
                 if not transaction.invoice_number:
@@ -301,116 +260,94 @@ def transaction_create(request):
                     transaction.save(update_fields=["invoice_number"])
                     logger.info(f"🏷️ Invoice number assigned: {transaction.invoice_number}")
                 
-                # 🔥 **اینجا مهم‌ترین بخش: بازمحاسبه خلاصه روزانه**
-                logger.info(f"📊 Recomputing daily summary for date: {transaction.date}")
-                summary = recompute_daily_summary_for_date(transaction.date)
+                # ایجاد پرداخت اولیه
+                if advance > Decimal("0"):
+                    Payment.objects.create(
+                        transaction=transaction,
+                        amount=advance,
+                        method=request.POST.get("payment_method", "cash"),
+                        date=transaction.date,
+                        created_by=request.user,
+                        note=f"Initial payment"
+                    )
                 
-                if summary:
-                    logger.info(f"✅ Daily summary updated for {transaction.date}")
-                    logger.info(f"   Sales: {summary.total_sales}, Profit: {summary.total_profit}")
-                    logger.info(f"   Transactions: {summary.transactions_count}, Items: {summary.items_sold}")
-                else:
-                    logger.warning(f"⚠️ Could not compute daily summary for {transaction.date}")
-                
-                # بازمحاسبه وضعیت مشتری
-                if transaction.customer:
-                    logger.info(f"👤 Recomputing customer outstanding: {transaction.customer.id}")
-                    try:
-                        recompute_outstanding_for_customer(transaction.customer.id)
-                    except Exception as e:
-                        logger.error(f"❌ Error in customer recompute: {e}")
-                
-                messages.success(
-                    request,
-                    f"transaction is created successfully!"
-                )
-                
-                logger.info("=" * 50)
-                logger.info(f"🎉 Transaction #{transaction.invoice_number} completed successfully")
-                
+                messages.success(request, f"Transaction created successfully")
                 return redirect("daily_sale:invoice", pk=transaction.pk)
 
             except Exception as e:
-                logger.error(f"❌ Error in transaction creation: {str(e)}", exc_info=True)
-                messages.error(request, f"خطا در ایجاد تراکنش: {str(e)}")
+                logger.error(f"❌ Error: {str(e)}", exc_info=True)
+                messages.error(request, f"Error: {str(e)}")
                 return render(request, "daily_sale/transaction_create.html", {"form": form})
         
         else:
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f"{field}: {error}")
-            logger.warning("❌ Form validation failed")
     
     # GET Request
     form = DailySaleTransactionForm(initial={
         "date": timezone.now().date(),
         "tax": Decimal("5.00"),
-        "due_date": timezone.now().date() + timezone.timedelta(days=30),
+        "due_date": timezone.now().date() + timedelta(days=30),
     })
     
-    logger.info("📄 Loading transaction create form")
     return render(request, "daily_sale/transaction_create.html", {"form": form})
 
 @login_required
 @require_GET
 def calculate_tax_preview(request):
-    """API endpoint for real-time tax calculation preview with paid amount"""
+    """API endpoint برای پیش‌نمایش با سرویس محاسبات"""
     try:
         quantity = Decimal(request.GET.get('quantity', 1))
         unit_price = Decimal(request.GET.get('unit_price', 0))
         discount = Decimal(request.GET.get('discount', 0))
         tax_percent = Decimal(request.GET.get('tax', 5))
         paid_amount = Decimal(request.GET.get('paid_amount', 0)) 
-        subtotal = (quantity * unit_price).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        taxable_amount = (subtotal - discount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        if taxable_amount < Decimal('0'):
-            taxable_amount = Decimal('0')
-        tax_amount = (taxable_amount * (tax_percent / Decimal('100'))).quantize(
-            Decimal('0.01'), rounding=ROUND_HALF_UP
+        
+        # استفاده از سرویس محاسبات
+        result = CalculationService.calculate_transaction_amounts(
+            quantity=quantity,
+            unit_price=unit_price,
+            discount=discount,
+            tax_percent=tax_percent,
+            advance=paid_amount
         )
         
-        total_amount = (taxable_amount + tax_amount).quantize(
-            Decimal('0.01'), rounding=ROUND_HALF_UP
-        )
-
-        balance = (total_amount - paid_amount).quantize(
-            Decimal('0.01'), rounding=ROUND_HALF_UP
-        )
-
-        if paid_amount >= total_amount and total_amount > 0:
-            payment_status = 'paid'
-            payment_status_display = 'paid'
-            payment_class = 'success'
-        elif paid_amount > 0:
-            payment_status = 'partial'
-            payment_status_display = 'partial'
-            payment_class = 'warning'
+        # فرمول‌ها برای نمایش
+        subtotal = result["subtotal"]
+        taxable = result["taxable_amount"]
+        tax = result["tax_amount"]
+        total = result["total_amount"]
+        balance = result["balance"]
+        
+        payment_percentage = (paid_amount / total * 100) if total > 0 else 0
+        
+        # تعیین کلاس وضعیت
+        if result["payment_status"] == "paid":
+            status_class = "success"
+        elif result["payment_status"] == "partial":
+            status_class = "warning"
         else:
-            payment_status = 'unpaid'
-            payment_status_display = 'unpaid'
-            payment_class = 'danger'
-        
-        payment_percentage = (paid_amount / total_amount * 100) if total_amount > 0 else 0
+            status_class = "danger"
         
         return JsonResponse({
             'success': True,
             'subtotal': str(subtotal),
-            'taxable_amount': str(taxable_amount),
-            'tax_amount': str(tax_amount),
-            'total_amount': str(total_amount),
+            'taxable_amount': str(taxable),
+            'tax_amount': str(tax),
+            'total_amount': str(total),
             'balance': str(balance),
             'paid_amount': str(paid_amount),
-            'payment_status': payment_status,
-            'payment_status_display': payment_status_display,
-            'payment_class': payment_class,
+            'payment_status': result["payment_status"],
+            'payment_status_display': result["payment_status"].title(),
+            'payment_class': status_class,
             'payment_percentage': round(payment_percentage, 2),
             'calculation_details': {
                 'subtotal_formula': f"{quantity} × {unit_price} = {subtotal}",
-                'taxable_formula': f"{subtotal} - {discount} = {taxable_amount}",
-                'tax_formula': f"{taxable_amount} × ({tax_percent}%) = {tax_amount}",
-                'total_formula': f"{taxable_amount} + {tax_amount} = {total_amount}",
-                'balance_formula': f"{total_amount} - {paid_amount} = {balance}",
-                'payment_percentage_formula': f"({paid_amount} ÷ {total_amount}) × 100 = {payment_percentage:.2f}%",
+                'taxable_formula': f"{subtotal} - {discount} = {taxable}",
+                'tax_formula': f"{taxable} × ({tax_percent}%) = {tax}",
+                'total_formula': f"{taxable} + {tax} = {total}",
+                'balance_formula': f"{total} - {paid_amount} = {balance}",
             }
         })
         
@@ -440,11 +377,12 @@ def transaction_edit(request, pk):
             try:
                 with transaction.atomic():
                     obj = form.save(commit=False)
-                    comp = form.cleaned_data.get("_computed", {}) or {}
-                    obj.subtotal = comp.get("subtotal", Decimal("0.00"))
-                    obj.total_amount = comp.get("total_amount", Decimal("0.00"))
-                    obj.balance = comp.get("balance", Decimal("0.00"))
+                    # نیازی به تنظیم دستی مقادیر نیست، متد save مدل محاسبات را انجام می‌دهد
                     obj.save()
+                    
+                    # بازمحاسبه خلاصه روزانه
+                    recompute_daily_summary_for_date(obj.date)
+                    
                 messages.success(request, "Transaction updated.")
                 return redirect(reverse("daily_sale:transaction_list"))
             except Exception:
@@ -481,103 +419,43 @@ def transaction_list(request):
         customer_id = request.GET.get("customer", "")
         company_id = request.GET.get("company", "")
         invoice_number = request.GET.get("invoice", "").strip()
-        status_filter = request.GET.get("status", "")
+        payment_status = request.GET.get("payment_status", "")
         items_per_page = int(request.GET.get("per_page", 25))
         export_csv = request.GET.get("export") == "csv"
         
-        # کوئری اصلی با لود همه روابط لازم
+        # کوئری اصلی
         qs = DailySaleTransaction.objects.select_related(
             "item", 
             "customer__user", 
             "company", 
             "container"
         ).prefetch_related(
-            "items",  # آیتم‌های تراکنش از DailySaleTransactionItem
-            "items__item",  # آیتم اصلی از Inventory_List
-            "payments"  # پرداخت‌ها
+            "items",
+            "items__item",
+            "payments"
         ).order_by("-date", "-created_at")
-        
-        filter_applied = False
         
         # اعمال فیلترها
         if start_date:
             qs = qs.filter(date__gte=start_date)
-            filter_applied = True
-            
         if end_date:
             qs = qs.filter(date__lte=end_date)
-            filter_applied = True
-            
-        if transaction_type and transaction_type in ['sale', 'purchase', 'return']:
+        if transaction_type:
             qs = qs.filter(transaction_type=transaction_type)
-            filter_applied = True
-            
-        if customer_id and customer_id.isdigit():
-            qs = qs.filter(customer_id=int(customer_id))
-            filter_applied = True
-            
-        if company_id and company_id.isdigit():
-            qs = qs.filter(company_id=int(company_id))
-            filter_applied = True
-            
+        if customer_id:
+            qs = qs.filter(customer_id=customer_id)
+        if company_id:
+            qs = qs.filter(company_id=company_id)
         if invoice_number:
             qs = qs.filter(invoice_number__icontains=invoice_number)
-            filter_applied = True
-
-        # فیلتر وضعیت پرداخت
-        if status_filter:
-            if status_filter == 'paid':
-                qs = qs.filter(payment_status='paid')
-            elif status_filter == 'partial':
-                qs = qs.filter(payment_status='partial')
-            elif status_filter == 'unpaid':
-                qs = qs.filter(payment_status='unpaid')
-            filter_applied = True
+        if payment_status:
+            qs = qs.filter(payment_status=payment_status)
         
         total_count = qs.count()
 
-        # محاسبه آمار
-        stats = {}
-        
-        # مجموع فروش
-        sales_total = qs.filter(transaction_type='sale').aggregate(
-            total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
-        )['total']
-        stats['total_sales'] = sales_total
-        
-        # مجموع خرید
-        purchases_total = qs.filter(transaction_type='purchase').aggregate(
-            total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
-        )['total']
-        stats['total_purchases'] = purchases_total
-        
-        # مجموع برگشت
-        returns_total = qs.filter(transaction_type='return').aggregate(
-            total=Coalesce(Sum('total_amount'), Decimal('0'), output_field=DecimalField())
-        )['total']
-        stats['total_returns'] = returns_total
-        
-        # مانده معوقات
-        outstanding_qs = qs.filter(Q(payment_status='unpaid') | Q(payment_status='partial'))
-        outstanding_total = outstanding_qs.aggregate(
-            total=Coalesce(Sum('balance'), Decimal('0'), output_field=DecimalField())
-        )['total']
-        outstanding_count = outstanding_qs.count()
-        
-        stats['total_outstanding'] = outstanding_total
-        stats['outstanding_count'] = outstanding_count
-        
-        # تعداد کالاهای فروخته شده
-        items_sold = 0
-        for transaction in qs.filter(transaction_type='sale'):
-            # اگر آیتم‌هایی در DailySaleTransactionItem وجود دارند
-            if transaction.items.exists():
-                items_sold += sum(item.quantity for item in transaction.items.all())
-            else:
-                # اگر از فیلد مستقیم quantity استفاده شده
-                items_sold += transaction.quantity
-        
-        stats['items_sold'] = items_sold
+        # محاسبه آمار با سرویس
+        from .services import SummaryService
+        stats = SummaryService.get_transaction_stats(qs)
 
         # صفحه‌بندی
         paginator = Paginator(qs, items_per_page)
@@ -593,54 +471,46 @@ def transaction_list(request):
         # پردازش تراکنش‌ها برای نمایش
         transactions_with_details = []
         for transaction in page_obj:
-            # محاسبه مبلغ پرداخت شده از جدول Payment
-            paid_amount = sum(payment.amount for payment in transaction.payments.all())
+            # محاسبه مبلغ پرداخت شده
+            paid_amount = transaction.payments.aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
             
-            # مانده بدهی
-            remaining = transaction.total_amount - paid_amount
+            # به‌روزرسانی advance اگر لازم باشد
+            if transaction.advance != paid_amount:
+                transaction.advance = paid_amount
+                transaction.paid = paid_amount
+                # ذخیره نمی‌کنیم، فقط برای نمایش
             
-            # وضعیت پرداخت
             transaction.paid_amount = paid_amount
-            transaction.remaining_balance = remaining
+            transaction.remaining_balance = transaction.balance
         
-            # **محاسبه اطلاعات نمایشی از آیتم‌ها**
-            # ابتدا بررسی کن آیا آیتم‌هایی از طریق DailySaleTransactionItem وجود دارند
+            # اطلاعات نمایشی آیتم‌ها
             transaction_items = transaction.items.all()
             
             if transaction_items.exists():
-                # اگر آیتم‌ها از طریق DailySaleTransactionItem هستند
                 first_item = transaction_items.first()
-                
-                # جمع quantity همه آیتم‌ها
                 total_quantity = sum(item.quantity for item in transaction_items)
-                
-                # محاسبه میانگین unit_price (وزنی)
                 total_value = sum(item.quantity * item.unit_price for item in transaction_items)
                 avg_unit_price = total_value / total_quantity if total_quantity > 0 else Decimal('0')
                 
-                # نام آیتم (از اولین آیتم)
+                # نام آیتم
                 item_name = ""
                 if first_item.item:
-                    # همه احتمالات برای نام آیتم
                     if hasattr(first_item.item, 'name') and first_item.item.name:
                         item_name = first_item.item.name
                     elif hasattr(first_item.item, 'product_name') and first_item.item.product_name:
                         item_name = first_item.item.product_name
-                    elif hasattr(first_item.item, 'title') and first_item.item.title:
-                        item_name = first_item.item.title
                     else:
                         item_name = str(first_item.item)
                 
-                # کانتینر (از اولین آیتم)
                 container = first_item.container
                 items_count = transaction_items.count()
                 
             else:
-                # اگر از فیلدهای مستقیم مدل استفاده شده
                 total_quantity = transaction.quantity
                 avg_unit_price = transaction.unit_price
                 
-                # نام آیتم از فیلد مستقیم
                 item_name = ""
                 if transaction.item:
                     if hasattr(transaction.item, 'name') and transaction.item.name:
@@ -653,18 +523,12 @@ def transaction_list(request):
                 container = transaction.container
                 items_count = 1
             
-            # ذخیره اطلاعات نمایشی در آبجکت تراکنش
             transaction.display_item_name = item_name
             transaction.display_quantity = total_quantity
             transaction.display_unit_price = avg_unit_price
             transaction.display_container = container
             transaction.items_count = items_count
-            
-            # اگر total_amount صفر است، از مجموع آیتم‌ها محاسبه کن
-            if transaction.total_amount == Decimal('0') and transaction_items.exists():
-                transaction.display_total = sum(item.total_amount for item in transaction_items)
-            else:
-                transaction.display_total = transaction.total_amount
+            transaction.display_total = transaction.total_amount
             
             transactions_with_details.append(transaction)
 
@@ -677,14 +541,10 @@ def transaction_list(request):
             daily_transactions__isnull=False
         ).distinct().order_by('name')[:50]
 
-        # فرمت تاریخ‌ها برای نمایش در فرم
         start_date_str = start_date.strftime("%Y-%m-%d") if start_date else ""
         end_date_str = end_date.strftime("%Y-%m-%d") if end_date else ""
-        
-        # تاریخ‌های پیش‌فرض
         thirty_days_ago = (datetime.now() - timedelta(days=30)).date()
         
-        # context
         context = {
             "page_obj": page_obj,
             "transactions": transactions_with_details,
@@ -694,9 +554,10 @@ def transaction_list(request):
             "customer_filter": customer_id,
             "company_filter": company_id,
             "invoice_filter": invoice_number,
+            "payment_status_filter": payment_status,
             "per_page": items_per_page,
             "total_count": total_count,
-            "stats": stats,
+            "stats": stats,  # اینجا stats به تمپلیت فرستاده می‌شود
             "customers": customers,
             "companies": companies,
             "today": datetime.now().date(),
@@ -714,10 +575,6 @@ def transaction_list(request):
                 'total_outstanding': str(stats['total_outstanding']),
                 'page_count': paginator.num_pages,
                 'current_page': page_obj.number,
-                'has_previous': page_obj.has_previous(),
-                'has_next': page_obj.has_next(),
-                'previous_page_number': page_obj.previous_page_number() if page_obj.has_previous() else None,
-                'next_page_number': page_obj.next_page_number() if page_obj.has_next() else None,
             }
             return JsonResponse(data)
         
@@ -726,56 +583,62 @@ def transaction_list(request):
     except Exception as e:
         logger.error(f"Error in transaction_list view: {str(e)}", exc_info=True)
         
-        # حالت fallback در صورت خطا
-        try:
-            qs = DailySaleTransaction.objects.select_related(
-                "item", "customer__user", "company", "container"
-            ).prefetch_related("items__item").order_by("-date", "-created_at")[:100]
-            
-            paginator = Paginator(qs, 25)
-            page_obj = paginator.page(1)
-            
-            stats = {
+        # Fallback
+        context = {
+            "page_obj": None,
+            "transactions": [],
+            "start_date": "",
+            "end_date": "",
+            "total_count": 0,
+            "stats": {
                 'total_sales': Decimal('0'),
+                'total_purchases': Decimal('0'),
                 'total_outstanding': Decimal('0'),
+                'outstanding_count': 0,
                 'items_sold': 0,
                 'avg_transaction': Decimal('0'),
-            }
-            
-            context = {
-                "page_obj": page_obj,
-                "transactions": [],
-                "start_date": "",
-                "end_date": "",
-                "stats": stats,
-                "total_count": qs.count(),
-                "error": True,
-                "error_message": "An error occurred while loading transactions.",
-            }
-            return render(request, "daily_sale/transaction_list.html", context)
-        except Exception as inner_e:
-            logger.error(f"Error in transaction_list fallback: {str(inner_e)}")
-            return render(request, "daily_sale/transaction_list.html", {
-                "error": True,
-                "error_message": "Unable to load transactions. Please contact support."
-            })
+            },
+            "customers": [],
+            "companies": [],
+            "today": datetime.now().date(),
+            "thirty_days_ago": (datetime.now() - timedelta(days=30)).date(),
+            "error": True,
+        }
+        return render(request, "daily_sale/transaction_list.html", context)
 
 @login_required
 def transaction_delete(request, pk):
     try:
-        DailySaleTransaction.objects.filter(pk=pk).delete()
-        messages.success(request, "Deleted!")
-    except:
-        messages.error(request, "Error!")
+        transaction = get_object_or_404(DailySaleTransaction, pk=pk)
+        transaction_date = transaction.date
+        transaction.delete()
+        
+        # بازمحاسبه خلاصه روزانه بعد از حذف
+        recompute_daily_summary_for_date(transaction_date)
+        
+        messages.success(request, "Transaction deleted successfully!")
+    except Exception as e:
+        logger.error(f"Error deleting transaction: {e}")
+        messages.error(request, "Error deleting transaction!")
     
     return redirect("daily_sale:transaction_list")
 
 @login_required
 def transaction_detail(request, pk):
-    tx = get_object_or_404(DailySaleTransaction.objects.select_related("item", "customer__user", "company", "container"), pk=pk)
+    tx = get_object_or_404(DailySaleTransaction.objects.select_related(
+        "item", "customer__user", "company", "container"
+    ).prefetch_related("items", "payments"), pk=pk)
+    
     payments = tx.payments.order_by("-date")
     paid_total = payments.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-    remaining = (tx.total_amount or Decimal("0.00")) - paid_total
+    
+    # اگر advance با paid_total همخوانی ندارد، به‌روزرسانی کن
+    if tx.advance != paid_total:
+        tx.advance = paid_total
+        tx.save()  # متد save محاسبات را انجام می‌دهد
+    
+    remaining = tx.balance  # استفاده از balance محاسبه شده
+    
     if request.method == "POST":
         pform = PaymentForm(request.POST)
         if pform.is_valid():
@@ -783,13 +646,24 @@ def transaction_detail(request, pk):
             p.transaction = tx
             p.created_by = request.user
             p.save()
+            
+            # بعد از ثبت پرداخت، تراکنش را به‌روزرسانی کن
+            tx.save()  # متد save محاسبات را انجام می‌دهد
+            
             messages.success(request, "Payment recorded.")
             return redirect(reverse("daily_sale:transaction_detail", args=[tx.pk]))
         else:
             messages.error(request, "Payment invalid.")
     else:
         pform = PaymentForm(initial={"date": timezone.now().date()})
-    return render(request, "daily_sale/transaction_detail.html", {"tx": tx, "payments": payments, "paid_total": paid_total, "remaining": remaining, "pform": pform})
+    
+    return render(request, "daily_sale/transaction_detail.html", {
+        "tx": tx, 
+        "payments": payments, 
+        "paid_total": paid_total, 
+        "remaining": remaining, 
+        "pform": pform
+    })
 
 def calculate_daily_series_from_transactions(start_date, end_date):
     try:
@@ -804,7 +678,7 @@ def calculate_daily_series_from_transactions(start_date, end_date):
             transactions = DailySaleTransaction.objects.filter(date=current_date)
             
             if transactions.exists():
-                # محاسبات روز
+                # محاسبات روز - استفاده از مقادیر محاسبه شده مدل
                 day_stats = transactions.aggregate(
                     total_sales=Sum('total_amount', filter=Q(transaction_type='sale')),
                     total_purchases=Sum('total_amount', filter=Q(transaction_type='purchase')),
@@ -873,29 +747,21 @@ def calculate_sales_trend(daily_series):
         logger.error(f"Error calculating trend: {e}")
         return {'trend': 'stable', 'percentage': 0}
 
-from django.db.models import Sum, Count, Avg, Q, F, DecimalField, IntegerField
-from django.db.models.functions import Coalesce
-from decimal import Decimal
-import json
-from datetime import datetime, timedelta
-import logging
-from django.utils import timezone
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from daily_sale.models import DailySaleTransaction, Payment
-from django.db import transaction
-
-logger = logging.getLogger(__name__)
-
 @login_required
 def daily_summary(request):
     """گزارش‌گیری کامل روزانه، هفتگی، ماهانه، سالانه"""
+    
+    # ========== دیباگ ==========
+    print("\n" + "="*50)
+    print("🔍 DEBUG: Starting daily_summary view")
+    
     try:
-        # پارامترهای جدید
-        report_type = request.GET.get('report_type', 'daily')  # daily, weekly, monthly, yearly
+        # پارامترها
+        report_type = request.GET.get('report_type', 'daily')
         date_str = request.GET.get('date')
         
         today = timezone.now().date()
+        print(f"Today: {today}, Report Type: {report_type}, Date param: {date_str}")
         
         # تاریخ هدف
         if date_str:
@@ -906,29 +772,24 @@ def daily_summary(request):
         else:
             target_date = today
         
-        # تعیین بازه زمانی بر اساس نوع گزارش
+        print(f"Target date: {target_date}")
+        
+        # تعیین بازه زمانی
         if report_type == 'daily':
-            # گزارش روزانه
             start_date = target_date
             end_date = target_date
-            
         elif report_type == 'weekly':
-            # گزارش هفتگی (شنبه تا جمعه)
             week_start = target_date - timedelta(days=target_date.weekday())
             week_end = week_start + timedelta(days=6)
             start_date = week_start
             end_date = week_end
-            
         elif report_type == 'monthly':
-            # گزارش ماهانه
             start_date = target_date.replace(day=1)
             if target_date.month == 12:
                 end_date = target_date.replace(year=target_date.year+1, month=1, day=1) - timedelta(days=1)
             else:
                 end_date = target_date.replace(month=target_date.month+1, day=1) - timedelta(days=1)
-                
         elif report_type == 'yearly':
-            # گزارش سالانه
             start_date = target_date.replace(month=1, day=1)
             end_date = target_date.replace(month=12, day=31)
         else:
@@ -940,13 +801,16 @@ def daily_summary(request):
         if end_date > today:
             end_date = today
         
-        # دریافت تراکنش‌ها از مدل شما
+        print(f"Date range: {start_date} to {end_date}")
+        
+        # دریافت تراکنش‌ها
         transactions = DailySaleTransaction.objects.filter(
             date__range=[start_date, end_date]
         ).select_related('customer', 'company', 'item')
         
-        # محاسبات اصلی با output_field
-        # 1. آمار فروش
+        print(f"Transactions in range: {transactions.count()}")
+        
+        # محاسبات اصلی
         sales_stats = transactions.filter(transaction_type='sale').aggregate(
             total_sales=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00')),
             avg_sale=Coalesce(Avg('total_amount', output_field=DecimalField()), Decimal('0.00')),
@@ -954,21 +818,18 @@ def daily_summary(request):
             total_quantity=Coalesce(Sum('quantity', output_field=DecimalField()), Decimal('0.00'))
         )
         
-        # 2. آمار خرید
         purchase_stats = transactions.filter(transaction_type='purchase').aggregate(
             total_purchases=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00')),
             avg_purchase=Coalesce(Avg('total_amount', output_field=DecimalField()), Decimal('0.00')),
             count_purchases=Count('id')
         )
         
-        # 3. آمار پرداخت‌ها
         payments = Payment.objects.filter(date__range=[start_date, end_date])
         payment_stats = payments.aggregate(
             total_cash_in=Coalesce(Sum('amount', output_field=DecimalField()), Decimal('0.00')),
             count_payments=Count('id')
         )
         
-        # 4. وضعیت پرداخت تراکنش‌ها
         payment_status = {
             'paid': transactions.filter(payment_status='paid').count(),
             'partial': transactions.filter(payment_status='partial').count(),
@@ -976,25 +837,27 @@ def daily_summary(request):
             'total': transactions.count()
         }
         
-        # 5. مانده حساب
         outstanding_result = transactions.filter(
             Q(payment_status='unpaid') | Q(payment_status='partial')
         ).aggregate(total=Coalesce(Sum('balance', output_field=DecimalField()), Decimal('0.00')))
         total_outstanding = outstanding_result['total']
         
-        # 6. سود خالص
         cash_in = payment_stats['total_cash_in']
         cash_out = purchase_stats['total_purchases']
         net_profit = cash_in - cash_out
         
-        # 7. نرخ وصول
         total_sales = sales_stats['total_sales']
         if total_sales and total_sales > 0:
             collection_rate = (cash_in / total_sales * 100)
         else:
             collection_rate = 0
         
-        # 8. مشتریان برتر - با استفاده از UserProfile
+        print(f"Calculated stats:")
+        print(f"  - Total Sales: {total_sales}")
+        print(f"  - Total Purchases: {purchase_stats['total_purchases']}")
+        print(f"  - Total Outstanding: {total_outstanding}")
+        
+        # مشتریان برتر
         top_customers = transactions.filter(
             transaction_type='sale', 
             customer__isnull=False
@@ -1007,195 +870,91 @@ def daily_summary(request):
             transaction_count=Count('id')
         ).order_by('-total_spent')[:10]
         
-        # 9. کالاهای پرفروش - استفاده از product_name به جای name
+        # کالاهای پرفروش
         top_items = transactions.filter(
             transaction_type='sale', 
             item__isnull=False
         ).values(
-            'item__product_name',  # اصلاح شده: product_name به جای name
+            'item__product_name',
             'item__code'
         ).annotate(
             total_sold=Coalesce(Sum('quantity', output_field=DecimalField()), Decimal('0.00')),
             total_revenue=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00'))
         ).order_by('-total_revenue')[:10]
         
-        # 10. سری زمانی برای چارت
+        # سری زمانی برای چارت
         daily_series = []
-        
-        # اگر گزارش روزانه
-        if report_type == 'daily':
-            day_data = {
-                'date': start_date,
-                'total_sales': float(sales_stats['total_sales']),
-                'total_purchases': float(purchase_stats['total_purchases']),
-                'cash_in': float(cash_in),
-                'cash_out': float(cash_out),
-                'profit': float(net_profit),
-                'transactions_count': payment_status['total']
-            }
-            daily_series.append(day_data)
+        current_date = start_date
+        while current_date <= end_date:
+            day_trans = transactions.filter(date=current_date)
+            day_sales = day_trans.filter(transaction_type='sale').aggregate(
+                total=Sum('total_amount')
+            )['total'] or Decimal('0')
             
-        # اگر گزارش هفتگی
-        elif report_type == 'weekly':
-            current_date = start_date
-            while current_date <= end_date:
-                day_trans = transactions.filter(date=current_date)
-                day_sales_result = day_trans.filter(transaction_type='sale').aggregate(
-                    total=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00'))
-                )
-                day_sales = day_sales_result['total']
-                
-                day_payments_result = payments.filter(date=current_date).aggregate(
-                    total=Coalesce(Sum('amount', output_field=DecimalField()), Decimal('0.00'))
-                )
-                day_payments = day_payments_result['total']
-                
-                daily_series.append({
-                    'date': current_date,
-                    'total_sales': float(day_sales),
-                    'cash_in': float(day_payments),
-                    'transactions_count': day_trans.count()
-                })
-                current_date += timedelta(days=1)
-                
-        # اگر گزارش ماهانه
-        elif report_type == 'monthly':
-            current_date = start_date
-            while current_date <= end_date:
-                day_trans = transactions.filter(date=current_date)
-                day_sales_result = day_trans.filter(transaction_type='sale').aggregate(
-                    total=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00'))
-                )
-                day_sales = day_sales_result['total']
-                
-                daily_series.append({
-                    'date': current_date,
-                    'total_sales': float(day_sales),
-                    'transactions_count': day_trans.count()
-                })
-                current_date += timedelta(days=1)
-                
-        # اگر گزارش سالانه
-        elif report_type == 'yearly':
-            import calendar
-            # ماه‌های سال
-            for month in range(1, 13):
-                month_start = start_date.replace(month=month, day=1)
-                if month_start > today:
-                    break
-                    
-                last_day = calendar.monthrange(month_start.year, month)[1]
-                month_end = month_start.replace(day=last_day)
-                if month_end > today:
-                    month_end = today
-                
-                month_trans = transactions.filter(date__range=[month_start, month_end])
-                month_sales_result = month_trans.filter(transaction_type='sale').aggregate(
-                    total=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00'))
-                )
-                month_sales = month_sales_result['total']
-                
-                daily_series.append({
-                    'date': month_start,
-                    'month_name': month_start.strftime('%B'),
-                    'total_sales': float(month_sales),
-                    'transactions_count': month_trans.count()
-                })
+            daily_series.append({
+                'date': current_date,
+                'total_sales': float(day_sales),
+                'transactions_count': day_trans.count(),
+                'month_name': current_date.strftime('%B') if report_type == 'yearly' else None
+            })
+            current_date += timedelta(days=1)
+        
+        print(f"Daily series length: {len(daily_series)}")
         
         # آماده‌سازی داده برای چارت
         chart_labels = []
         chart_data = []
         
         for item in daily_series:
-            if report_type == 'yearly':
-                chart_labels.append(item.get('month_name', ''))
+            if report_type == 'yearly' and item.get('month_name'):
+                chart_labels.append(item['month_name'])
             else:
                 chart_labels.append(item['date'].strftime('%Y-%m-%d'))
             chart_data.append(float(item['total_sales']))
         
-        # محاسبه تاریخ‌های قبلی و بعدی برای ناوبری
-        prev_date = target_date
-        next_date = target_date
+        print(f"Chart data prepared: {len(chart_labels)} points")
         
-        if report_type == 'daily':
-            prev_date = target_date - timedelta(days=1)
-            next_date = target_date + timedelta(days=1)
-            if next_date > today:
-                next_date = target_date
-        elif report_type == 'weekly':
-            prev_date = target_date - timedelta(days=7)
-            next_date = target_date + timedelta(days=7)
-            if next_date > today:
-                next_date = target_date
-        elif report_type == 'monthly':
-            # ماه قبل
-            if target_date.month == 1:
-                prev_date = target_date.replace(year=target_date.year-1, month=12, day=1)
-            else:
-                prev_date = target_date.replace(month=target_date.month-1, day=1)
-            # ماه بعد
-            if target_date.month == 12:
-                next_date = target_date.replace(year=target_date.year+1, month=1, day=1)
-            else:
-                next_date = target_date.replace(month=target_date.month+1, day=1)
-            if next_date > today:
-                next_date = target_date
-        elif report_type == 'yearly':
-            prev_date = target_date.replace(year=target_date.year-1)
-            next_date = target_date.replace(year=target_date.year+1)
-            if next_date > today:
-                next_date = target_date
+        # محاسبه تاریخ‌های قبلی و بعدی
+        prev_date, next_date = calculate_navigation_dates(target_date, report_type, today)
         
-        # تبدیل Decimal به float برای نمایش در تمپلیت
         context = {
-            # تاریخ‌ها
             'start_date': start_date,
             'end_date': end_date,
             'today': today,
             'target_date': target_date,
             'report_type': report_type,
-            
-            # آمار اصلی
-            'total_sales': sales_stats['total_sales'],
+            'total_sales': total_sales,
             'total_purchases': purchase_stats['total_purchases'],
             'total_transactions': payment_status['total'],
             'total_quantity': sales_stats['total_quantity'],
-            
-            # آمار مالی
             'cash_in_total': cash_in,
             'cash_out_total': cash_out,
             'net_profit': net_profit,
             'total_outstanding': total_outstanding,
             'collection_rate': collection_rate,
-            
-            # آمار پرداخت
             'payment_stats': payment_status,
             'paid_count': payment_status['paid'],
             'partial_count': payment_status['partial'],
             'unpaid_count': payment_status['unpaid'],
-            
-            # مشتریان و کالاها
             'top_customers': list(top_customers),
             'top_items': list(top_items),
-            
-            # سری زمانی
             'daily_series': daily_series,
-            
-            # داده چارت
             'chart_labels': json.dumps(chart_labels),
             'chart_data': json.dumps(chart_data),
-            
-            # برای ناوبری
             'prev_date': prev_date,
             'next_date': next_date,
-            
             'error': False,
         }
+        
+        print("✅ View completed successfully")
+        print("="*50)
         
         return render(request, "daily_sale/daily_summary.html", context)
         
     except Exception as e:
         logger.error(f"Error in daily_summary: {str(e)}", exc_info=True)
+        print(f"❌ ERROR: {str(e)}")
+        print("="*50)
         
         today = timezone.now().date()
         context = {
@@ -1225,158 +984,164 @@ def daily_summary(request):
             'prev_date': today,
             'next_date': today,
             'error': True,
-            'error_message': f'خطا در بارگذاری گزارش: {str(e)}'
+            'error_message': f'Error loading report: {str(e)}'
         }
         return render(request, "daily_sale/daily_summary.html", context)
 
+def calculate_navigation_dates(target_date, report_type, today):
+    """محاسبه تاریخ‌های قبلی و بعدی برای ناوبری"""
+    if report_type == 'daily':
+        prev_date = target_date - timedelta(days=1)
+        next_date = target_date + timedelta(days=1)
+        if next_date > today:
+            next_date = target_date
+    elif report_type == 'weekly':
+        prev_date = target_date - timedelta(days=7)
+        next_date = target_date + timedelta(days=7)
+        if next_date > today:
+            next_date = target_date
+    elif report_type == 'monthly':
+        if target_date.month == 1:
+            prev_date = target_date.replace(year=target_date.year-1, month=12, day=1)
+        else:
+            prev_date = target_date.replace(month=target_date.month-1, day=1)
+        if target_date.month == 12:
+            next_date = target_date.replace(year=target_date.year+1, month=1, day=1)
+        else:
+            next_date = target_date.replace(month=target_date.month+1, day=1)
+        if next_date > today:
+            next_date = target_date
+    elif report_type == 'yearly':
+        prev_date = target_date.replace(year=target_date.year-1)
+        next_date = target_date.replace(year=target_date.year+1)
+        if next_date > today:
+            next_date = target_date
+    else:
+        prev_date = target_date
+        next_date = target_date
+    
+    return prev_date, next_date
 
 @login_required
 def outstanding_view(request):
     try:
         search_query = request.GET.get('search', '')
-        non_zero_transactions = DailySaleTransaction.objects.filter(
-            balance__isnull=False,
-            customer__isnull=False
-        ).exclude(balance=0).select_related('customer', 'customer__user')
-    
-    
-        if non_zero_transactions.count() == 0:
-            context = {
-                'outstanding_customers': [],
-                'total_summary': {
-                    'total_debt': 0,
-                    'total_paid': 0,
-                    'total_customers': 0,
-                    'total_transactions': 0,
-                },
-                'search_query': search_query,
-                'customers_count': 0,
-                'info_message': 'All Customers cleared There Account!',
-            }
-            return render(request, 'daily_sale/old_transactions.html', context)
         
-        customers_dict = {}
+        # استفاده از مدل OutstandingCustomer
+        from .models import OutstandingCustomer
         
-        for trans in non_zero_transactions:
-            customer = trans.customer
-            customer_id = str(customer.id)
+        outstanding_customers_qs = OutstandingCustomer.objects.filter(
+            total_debt__gt=0
+        ).select_related('customer', 'customer__user')
+        
+        if search_query:
+            outstanding_customers_qs = outstanding_customers_qs.filter(
+                Q(customer__user__username__icontains=search_query) |
+                Q(customer__user__first_name__icontains=search_query) |
+                Q(customer__user__last_name__icontains=search_query) |
+                Q(customer__phone__icontains=search_query)
+            )
+        
+        # تبدیل به فرمت مورد نیاز
+        outstanding_customers = []
+        total_debt_all = Decimal('0')
+        total_paid_all = Decimal('0')
+        total_customers = 0
+        
+        for oc in outstanding_customers_qs:
+            customer = oc.customer
+            customer_name = customer.full_name or (customer.user.get_full_name() if customer.user else str(customer))
             
-            if customer_id not in customers_dict:
-                # نام مشتری
-                customer_name = customer.full_name
-                if not customer_name and customer.user:
-                    customer_name = customer.user.get_full_name()
-                    if not customer_name:
-                        customer_name = customer.user.username
-                if not customer_name:
-                    customer_name = f"مشتری {customer.id}"
+            # دریافت تراکنش‌های معوق
+            transactions = DailySaleTransaction.objects.filter(
+                customer=customer,
+                balance__gt=0
+            ).select_related('item').order_by('-date')
+            
+            tx_list = []
+            customer_total_amount = Decimal('0')
+            customer_total_paid = Decimal('0')
+            
+            for tx in transactions:
+                # محاسبه مبلغ پرداخت شده از جدول Payment
+                paid_from_payments = tx.payments.aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
                 
-                customers_dict[customer_id] = {
-                    'customer_id': customer_id,
+                # اگر advance با paid_from_payments هماهنگ نیست، به‌روزرسانی کن
+                if tx.advance != paid_from_payments:
+                    tx.advance = paid_from_payments
+                    tx.save()
+                
+                tx_list.append({
+                    'invoice_number': tx.invoice_number or f"TRX-{tx.id}",
+                    'transaction_date': tx.date,
+                    'total_amount': tx.total_amount,
+                    'total_paid': paid_from_payments,
+                    'remaining_debt': tx.balance,
+                    'balance_type': 'debt',
+                    'payment_status': tx.payment_status,
+                    'payment_status_display': tx.get_payment_status_display(),
+                })
+                
+                customer_total_amount += tx.total_amount
+                customer_total_paid += paid_from_payments
+            
+            # فقط مشتریانی که balance دارند
+            if customer_total_amount - customer_total_paid > 0:
+                remaining = customer_total_amount - customer_total_paid
+                
+                outstanding_customers.append({
+                    'customer_id': str(customer.id),
                     'customer_name': customer_name,
-                    'customer_phone': customer.phone or '',
+                    'customer_phone': customer.phone or 'No Phone',
                     'customer_email': customer.user.email if customer.user else '',
-                    'transactions': [],
-                    'total_debt': Decimal('0'),
-                    'total_paid': Decimal('0'),
-                    'remaining_balance': Decimal('0'),
-                    'total_positive_balance': Decimal('0'),  
-                    'total_negative_balance': Decimal('0'), 
-                }
-
-            trans_paid = trans.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            
-            payment_status_display = trans.get_payment_status_display()
-            if payment_status_display == 'paid':
-                payment_status_display = 'Paid'
-            elif payment_status_display == 'partial paid':
-                payment_status_display = 'Partial'
-            elif payment_status_display == 'unpaid':
-                payment_status_display = 'Unpaid'
-            
-            customers_dict[customer_id]['transactions'].append({
-                'invoice_number': trans.invoice_number or f"TRX-{trans.id}",
-                'transaction_date': trans.date,
-                'total_amount': trans.total_amount,
-                'total_paid': trans_paid,
-                'remaining_debt': trans.balance,
-                'balance_type': 'debt' if trans.balance > 0 else 'overpayment',
-                'payment_status': trans.payment_status,
-                'payment_status_display': payment_status_display,
-            })
-            
-            # جمع‌آوری مبالغ
-            customers_dict[customer_id]['total_debt'] += trans.total_amount
-            customers_dict[customer_id]['total_paid'] += trans_paid
-            customers_dict[customer_id]['remaining_balance'] += trans.balance
-            
-            # تفکیک بدهی و اضافه پرداخت
-            if trans.balance > 0:
-                customers_dict[customer_id]['total_positive_balance'] += trans.balance
-            else:
-                customers_dict[customer_id]['total_negative_balance'] += trans.balance
+                    'transactions': tx_list,
+                    'total_amount': customer_total_amount,
+                    'total_paid': customer_total_paid,
+                    'remaining_balance': remaining,
+                    'debt_transactions_count': len(tx_list),
+                    'balance_type': 'debt',
+                    'balance_class': 'danger',
+                    'balance_text': f'Debt: AED {remaining:,.0f}',
+                })
+                
+                total_debt_all += remaining
+                total_paid_all += customer_total_paid
+                total_customers += 1
         
-        # 3. تبدیل به لیست
-        outstanding_customers = list(customers_dict.values())
-
-        
-        # 4. اضافه کردن اطلاعات اضافی
-        for customer in outstanding_customers:
-            customer['debt_transactions_count'] = len(customer['transactions'])
-            customer['total_discount'] = Decimal('0')
-            
-            # محاسبه مانده کل (ممکن است منفی باشد)
-            total_balance = customer['remaining_balance']
-            
-            # تعیین نوع مانده
-            if total_balance > 0:
-                customer['balance_type'] = 'debt'
-                customer['balance_class'] = 'danger'
-                customer['balance_text'] = f'بدهکار: AED {total_balance}'
-            elif total_balance < 0:
-                customer['balance_type'] = 'overpayment'
-                customer['balance_class'] = 'success'
-                customer['balance_text'] = f'اضافه پرداخت: AED {abs(total_balance)}'
-            else:
-                customer['balance_type'] = 'cleared'
-                customer['balance_class'] = 'info'
-                customer['balance_text'] = 'تسویه شده'
-        # 5. محاسبه آمار
-        total_positive = sum(c['total_positive_balance'] for c in outstanding_customers)
-        total_debt= sum(c['total_negative_balance'] for c in outstanding_customers)
-        net_balance = total_positive + total_debt
-        total_paid = sum(c['total_paid'] for c in outstanding_customers)
-        
-        # 6. Context
         context = {
             'outstanding_customers': outstanding_customers,
             'total_summary': {
-                'total_debt': total_debt,  # فقط بدهی‌های مثبت
-                'total_overpayment': abs(total_debt),  # اضافه پرداخت‌ها
-                'net_balance': net_balance,
-                'total_paid': total_paid,
-                'total_customers': len(outstanding_customers),
+                'total_debt': total_debt_all,
+                'total_paid': total_paid_all,
+                'total_customers': total_customers,
                 'total_transactions': sum(c['debt_transactions_count'] for c in outstanding_customers),
-                'debt_customers': sum(1 for c in outstanding_customers if c['balance_type'] == 'debt'),
-                'overpayment_customers': sum(1 for c in outstanding_customers if c['balance_type'] == 'overpayment'),
             },
             'search_query': search_query,
-            'customers_count': len(outstanding_customers),
-            'has_data': len(outstanding_customers) > 0,
+            'customers_count': total_customers,
+            'has_data': total_customers > 0,
         }
         
         return render(request, 'daily_sale/old_transactions.html', context)
         
     except Exception as e:
         import traceback
-        traceback.print_exc()
+        logger.error(f"Error in outstanding_view: {str(e)}")
+        logger.error(traceback.format_exc())
         
         return render(request, 'daily_sale/old_transactions.html', {
             'error': True,
-            'error_message': 'خطا در دریافت داده‌ها.',
+            'error_message': 'Error loading data.',
             'outstanding_customers': [],
             'customers_count': 0,
             'has_data': False,
+            'total_summary': {
+                'total_debt': Decimal('0'),
+                'total_paid': Decimal('0'),
+                'total_customers': 0,
+                'total_transactions': 0,
+            }
         })
 
 class SimpleJSONEncoder(json.JSONEncoder):
@@ -1388,7 +1153,6 @@ class SimpleJSONEncoder(json.JSONEncoder):
         if isinstance(obj, (date, datetime)):
             return obj.isoformat()
         return super().default(obj)
-
 
 @login_required
 def cleared_transactions(request):
@@ -1406,7 +1170,6 @@ def cleared_transactions(request):
             role=UserProfile.ROLE_CUSTOMER
         ).select_related('user')
         
-        # اگر جستجو وجود دارد
         if search_query:
             customers = customers.filter(
                 Q(user__username__icontains=search_query) |
@@ -1421,36 +1184,23 @@ def cleared_transactions(request):
         total_transactions_count = 0
         
         for customer in customers:
-            # بررسی وضعیت تسویه
             customer_status = check_customer_clear_status_simple(customer, start_date, end_date)
             
             if customer_status['is_cleared'] and customer_status['total_transactions'] > 0:
-                # نام مشتری
-                if customer.user:
-                    customer_name = customer.user.get_full_name()
-                    if not customer_name:
-                        customer_name = customer.user.username
-                    customer_email = customer.user.email
-                else:
-                    customer_email = ''
+                customer_name = customer.user.get_full_name() or customer.user.username if customer.user else str(customer)
+                customer_email = customer.user.email if customer.user else ''
                 
                 customer_info = {
                     'customer_id': str(customer.id),
                     'customer_name': customer_name,
                     'customer_phone': getattr(customer, 'phone', ''),
                     'customer_email': customer_email,
-                    
-                    # اطلاعات مالی
                     'total_cleared_amount': customer_status['total_cleared_amount'],
                     'total_transactions': customer_status['total_transactions'],
                     'last_payment_date': customer_status['last_payment_date'],
                     'first_transaction_date': customer_status['first_transaction_date'],
-                    
-                    # وضعیت
                     'clear_status': 'Fully Paid',
                     'clear_days': customer_status['clear_days'],
-                    
-                    # جزئیات تراکنش‌ها
                     'transactions': customer_status['transactions_details'],
                 }
                 
@@ -1459,18 +1209,7 @@ def cleared_transactions(request):
                 total_transactions_count += customer_status['total_transactions']
         
         # مرتب‌سازی
-        if sort_by == 'date_desc':
-            cleared_customers.sort(key=lambda x: x['last_payment_date'] or datetime.min, reverse=True)
-        elif sort_by == 'date_asc':
-            cleared_customers.sort(key=lambda x: x['last_payment_date'] or datetime.min)
-        elif sort_by == 'amount_desc':
-            cleared_customers.sort(key=lambda x: x['total_cleared_amount'], reverse=True)
-        elif sort_by == 'amount_asc':
-            cleared_customers.sort(key=lambda x: x['total_cleared_amount'])
-        elif sort_by == 'name_asc':
-            cleared_customers.sort(key=lambda x: (x['customer_name'] or '').lower())
-        elif sort_by == 'name_desc':
-            cleared_customers.sort(key=lambda x: (x['customer_name'] or '').lower(), reverse=True)
+        cleared_customers = sort_cleared_customers(cleared_customers, sort_by)
         
         # محاسبه آمار
         stats = {
@@ -1482,7 +1221,6 @@ def cleared_transactions(request):
             'period_end': end_date,
         }
         
-        # آماده‌سازی context
         context = {
             'cleared_customers': cleared_customers,
             'stats': stats,
@@ -1513,8 +1251,7 @@ def cleared_transactions(request):
         return render(request, 'daily_sale/cleared_transactions.html', context)
         
     except Exception as e:
-        logger.error(f"Error in cleared_customers_view: {str(e)}", exc_info=True)
-        
+        logger.error(f"Error in cleared_transactions: {str(e)}", exc_info=True)
         context = {
             'error': True,
             'error_message': f'Error loading data: {str(e)}',
@@ -1529,17 +1266,30 @@ def cleared_transactions(request):
             'periods': [],
             'sort_options': []
         }
-        
         return render(request, 'daily_sale/cleared_transactions.html', context)
 
+def sort_cleared_customers(customers, sort_by):
+    """مرتب‌سازی مشتریان تسویه شده"""
+    if sort_by == 'date_desc':
+        customers.sort(key=lambda x: x['last_payment_date'] or datetime.min, reverse=True)
+    elif sort_by == 'date_asc':
+        customers.sort(key=lambda x: x['last_payment_date'] or datetime.min)
+    elif sort_by == 'amount_desc':
+        customers.sort(key=lambda x: x['total_cleared_amount'], reverse=True)
+    elif sort_by == 'amount_asc':
+        customers.sort(key=lambda x: x['total_cleared_amount'])
+    elif sort_by == 'name_asc':
+        customers.sort(key=lambda x: (x['customer_name'] or '').lower())
+    elif sort_by == 'name_desc':
+        customers.sort(key=lambda x: (x['customer_name'] or '').lower(), reverse=True)
+    return customers
 
 def check_customer_clear_status_simple(customer, start_date, end_date):
     """
-    بررسی وضعیت تسویه مشتری - نسخه ساده‌تر
+    بررسی وضعیت تسویه مشتری با استفاده از مقادیر محاسبه شده مدل
     """
     try:
         # دریافت تراکنش‌های فروش مشتری در بازه زمانی
-        # استفاده از daily_transactions که در لیست choices دیدیم
         transactions = customer.daily_transactions.filter(
             date__range=[start_date, end_date],
             transaction_type='sale'
@@ -1565,53 +1315,42 @@ def check_customer_clear_status_simple(customer, start_date, end_date):
         paid_transactions = transactions.filter(payment_status='paid')
         
         for transaction in paid_transactions:
-            # مبلغ قابل پرداخت (بعد از تخفیف)
-            payable_amount = transaction.total_amount or Decimal('0')
+            # مبلغ کل تراکنش
+            total_amount = transaction.total_amount or Decimal('0')
+            total_cleared += total_amount
             
-            # محاسبه مجموع پرداخت‌ها
-            total_paid = Payment.objects.filter(
-                transaction=transaction
-            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            # تاریخ آخرین پرداخت
+            last_payment = transaction.payments.order_by('-date').first()
+            if last_payment:
+                payment_date = last_payment.date
+                if isinstance(payment_date, datetime):
+                    payment_date = payment_date.date()
+                
+                if not last_payment_date or payment_date > last_payment_date:
+                    last_payment_date = payment_date
             
-            # اگر تسویه کامل شده باشد (پرداخت >= مبلغ قابل پرداخت)
-            if total_paid >= payable_amount:
-                total_cleared += payable_amount
-                
-                # تاریخ آخرین پرداخت
-                last_payment = Payment.objects.filter(
-                    transaction=transaction
-                ).order_by('-date').first()
-                
-                if last_payment:
-                    payment_date = last_payment.date
-                    if isinstance(payment_date, datetime):
-                        payment_date = payment_date.date()
-                    
-                    if not last_payment_date or payment_date > last_payment_date:
-                        last_payment_date = payment_date
-                
-                # تاریخ تراکنش
-                transaction_date = transaction.date
-                if isinstance(transaction_date, datetime):
-                    transaction_date = transaction_date.date()
-                
-                if not first_transaction_date or transaction_date < first_transaction_date:
-                    first_transaction_date = transaction_date
-                
-                # جزئیات تراکنش
-                transaction_detail = {
-                    'id': str(transaction.id),
-                    'invoice_number': transaction.invoice_number or f"TRX-{transaction.id}",
-                    'date': transaction_date,
-                    'total_amount': transaction.total_amount or Decimal('0'),
-                    'total_paid': total_paid,
-                    'discount': transaction.discount or Decimal('0'),
-                    'payable_amount': payable_amount,
-                    'status': 'Paid',
-                    'payment_count': Payment.objects.filter(transaction=transaction).count(),
-                    'remaining': payable_amount - total_paid,
-                }
-                transactions_details.append(transaction_detail)
+            # تاریخ تراکنش
+            transaction_date = transaction.date
+            if isinstance(transaction_date, datetime):
+                transaction_date = transaction_date.date()
+            
+            if not first_transaction_date or transaction_date < first_transaction_date:
+                first_transaction_date = transaction_date
+            
+            # جزئیات تراکنش
+            transaction_detail = {
+                'id': str(transaction.id),
+                'invoice_number': transaction.invoice_number or f"TRX-{transaction.id}",
+                'date': transaction_date,
+                'total_amount': total_amount,
+                'total_paid': transaction.advance,
+                'discount': transaction.discount or Decimal('0'),
+                'payable_amount': total_amount,
+                'status': 'Paid',
+                'payment_count': transaction.payments.count(),
+                'remaining': Decimal('0'),
+            }
+            transactions_details.append(transaction_detail)
         
         # محاسبه روزهای از آخرین پرداخت
         clear_days = 0
@@ -1643,9 +1382,7 @@ def check_customer_clear_status_simple(customer, start_date, end_date):
         }
 
 def calculate_simple_date_range(period, today):
-    """
-    محاسبه بازه زمانی ساده
-    """
+    """محاسبه بازه زمانی ساده"""
     from datetime import timedelta
     
     if period == 'today':
@@ -1653,7 +1390,6 @@ def calculate_simple_date_range(period, today):
     elif period == 'week':
         return today - timedelta(days=7), today
     elif period == 'month':
-        # دقیق‌تر: 30 روز قبل
         return today - timedelta(days=30), today
     elif period == 'quarter':
         return today - timedelta(days=90), today
@@ -1661,7 +1397,7 @@ def calculate_simple_date_range(period, today):
         return today - timedelta(days=365), today
     else:
         return today - timedelta(days=365*10), today 
-        
+
 @require_GET
 @login_required
 def ajax_search_containers(request):
@@ -1706,7 +1442,12 @@ def ajax_search_customers(request):
     from accounts.models import UserProfile
     qs = UserProfile.objects.select_related("user").all()
     if q:
-        qs = qs.filter(Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q) | Q(user__email__icontains=q) | Q(phone__icontains=q))
+        qs = qs.filter(
+            Q(user__first_name__icontains=q) | 
+            Q(user__last_name__icontains=q) | 
+            Q(user__email__icontains=q) | 
+            Q(phone__icontains=q)
+        )
     results = []
     for u in qs.order_by("user__first_name")[:limit]:
         text = getattr(u, "display_name", None) or (u.user.get_full_name() if getattr(u, "user", None) else str(u))
@@ -1725,6 +1466,7 @@ def ajax_item_autofill(request):
             'container', 
             'container__company'
         ).get(pk=item_id)
+        
         container_info = None
         container_id = None
         container_name = None
@@ -1742,6 +1484,7 @@ def ajax_item_autofill(request):
                 "size": item.container.size if hasattr(item.container, 'size') else "",
                 "type": item.container.type if hasattr(item.container, 'type') else "",
             }
+        
         company_info = None
         company_id = None
         company_name = None
@@ -1796,7 +1539,6 @@ def ajax_item_autofill(request):
         logger.error(traceback.format_exc())
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
-
 @login_required
 def invoice_view(request, pk):
     transaction = get_object_or_404(
@@ -1814,44 +1556,16 @@ def invoice_view(request, pk):
         'container'
     ).order_by('id')
     
-    # محاسبات واقعی از دیتابیس
-    subtotal = Decimal('0')
-    discount_total = Decimal('0')
-    tax_amount = Decimal('0')
+    # استفاده از مقادیر محاسبه شده مدل
+    subtotal = transaction.subtotal
+    tax_amount = transaction.tax_amount
+    total_amount = transaction.total_amount
+    advance = transaction.advance
+    balance = transaction.balance
+    payment_status = transaction.get_payment_status_display()
     
-    for item in items:
-        # محاسبه سابتوتال از دیتابیس
-        item_subtotal = item.quantity * item.unit_price
-        subtotal += item_subtotal
-        
-        # تخفیف
-        item_discount = item.discount or Decimal('0')
-        discount_total += item_discount
-        
-        # مالیات آیتم
-        item_taxable = item_subtotal - item_discount
-        if item_taxable < Decimal('0'):
-            item_taxable = Decimal('0')
-        item_tax_amount = (item_taxable * transaction.tax / Decimal('100')).quantize(Decimal('0.01'))
-        tax_amount += item_tax_amount
-    
-    # محاسبات نهایی
-    net_amount = subtotal - discount_total
-    if net_amount < Decimal('0'):
-        net_amount = Decimal('0')
-    
-    # استفاده از مقادیر ذخیره شده در تراکنش یا محاسبه مجدد
-    total_amount = transaction.total_amount or (net_amount + tax_amount)
-    advance = transaction.advance or Decimal('0')
-    balance = transaction.balance or (total_amount - advance)
-    
-    # وضعیت پرداخت
-    if advance >= total_amount and total_amount > Decimal('0'):
-        payment_status = 'paid'
-    elif advance > Decimal('0'):
-        payment_status = 'partial'
-    else:
-        payment_status = 'unpaid'
+    # محاسبه تخفیف کل
+    discount_total = sum(item.discount or Decimal('0') for item in items)
     
     # روزهای گذشته
     today = timezone.now().date()
@@ -1882,6 +1596,7 @@ def invoice_view(request, pk):
     }
     
     return render(request, 'daily_sale/invoice.html', context)
+
 @login_required
 def download_invoice_pdf(request, pk):
     transaction = get_object_or_404(
@@ -1943,7 +1658,6 @@ def download_invoice_pdf(request, pk):
     
     return HttpResponse('Error generating PDF', status=500)
 
-
 @login_required
 def detail_view(request, pk):
     transaction = get_object_or_404(
@@ -1961,44 +1675,16 @@ def detail_view(request, pk):
         'container'
     ).order_by('id')
     
-    # محاسبات واقعی از دیتابیس
-    subtotal = Decimal('0')
-    discount_total = Decimal('0')
-    tax_amount = Decimal('0')
+    # استفاده از مقادیر محاسبه شده مدل
+    subtotal = transaction.subtotal
+    tax_amount = transaction.tax_amount
+    total_amount = transaction.total_amount
+    advance = transaction.advance
+    balance = transaction.balance
+    payment_status = transaction.get_payment_status_display()
     
-    for item in items:
-        # محاسبه سابتوتال از دیتابیس
-        item_subtotal = item.quantity * item.unit_price
-        subtotal += item_subtotal
-        
-        # تخفیف
-        item_discount = item.discount or Decimal('0')
-        discount_total += item_discount
-        
-        # مالیات آیتم
-        item_taxable = item_subtotal - item_discount
-        if item_taxable < Decimal('0'):
-            item_taxable = Decimal('0')
-        item_tax_amount = (item_taxable * transaction.tax / Decimal('100')).quantize(Decimal('0.01'))
-        tax_amount += item_tax_amount
-    
-    # محاسبات نهایی
-    net_amount = subtotal - discount_total
-    if net_amount < Decimal('0'):
-        net_amount = Decimal('0')
-    
-    # استفاده از مقادیر ذخیره شده در تراکنش یا محاسبه مجدد
-    total_amount = transaction.total_amount or (net_amount + tax_amount)
-    advance = transaction.advance or Decimal('0')
-    balance = transaction.balance or (total_amount - advance)
-    
-    # وضعیت پرداخت
-    if advance >= total_amount and total_amount > Decimal('0'):
-        payment_status = 'paid'
-    elif advance > Decimal('0'):
-        payment_status = 'partial'
-    else:
-        payment_status = 'unpaid'
+    # محاسبه تخفیف کل
+    discount_total = sum(item.discount or Decimal('0') for item in items)
     
     # روزهای گذشته
     today = timezone.now().date()
