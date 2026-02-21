@@ -132,14 +132,6 @@
           <i class="fas fa-users me-2"></i>
           Outstanding Customers List ({{ customers_count }})
         </h5>
-        <div class="btn-group">
-          <button type="button" class="btn btn-outline-danger btn-sm" onclick="exportToExcel()">
-            <i class="fas fa-file-excel me-1"></i> Export
-          </button>
-          <a href="?" class="btn btn-outline-secondary btn-sm ms-2">
-            <i class="fas fa-sync-alt me-1"></i> Refresh
-          </a>
-        </div>
       </div>
     </div>
 
@@ -233,23 +225,53 @@
               </td>
 
               <!-- Actions -->
+              <!-- Actions -->
               <td class="text-center">
-                <div class="btn-group btn-group-sm">
-                  <button type="button" class="btn btn-outline-primary"
+                <div class="btn-group" role="group" style="gap: 5px;">
+                  <!-- دکمه مشاهده جزئیات -->
+                  <button type="button" class="btn btn-sm btn-outline-primary"
                     onclick="toggleCustomerDetails('{{ customer.customer_id }}')" title="View Details"
                     id="details-btn-{{ customer.customer_id }}">
                     <i class="fas fa-eye"></i>
                   </button>
 
+                  <!-- دکمه مشاهده تراکنش‌ها -->
                   <a href="{% url 'daily_sale:transaction_list' %}?customer={{ customer.customer_id }}"
-                    class="btn btn-outline-info" title="View Transactions">
+                    class="btn btn-sm btn-outline-info" title="View Transactions">
                     <i class="fas fa-receipt"></i>
                   </a>
 
-                  {% if customer.customer_phone %}
-                  <a href="tel:{{ customer.customer_phone }}" class="btn btn-outline-success" title="Call">
-                    <i class="fas fa-phone"></i>
+                  <!-- دکمه ویرایش (فقط برای ادمین) - با منوی کشویی برای انتخاب تراکنش -->
+                  {% if is_admin and customer.transactions %}
+                  {% if customer.transactions|length == 1 %}
+                  <!-- اگر فقط یک تراکنش دارد -->
+                  {% with customer.transactions.0 as first_tx %}
+                  <a href="{% url 'daily_sale:customer_transaction_edit' first_tx.id %}"
+                    class="btn btn-sm btn-outline-warning" title="Edit Transaction">
+                    <i class="fas fa-edit"></i>
                   </a>
+                  {% endwith %}
+                  {% else %}
+                  <!-- اگر چند تراکنش دارد - منوی کشویی -->
+                  <div class="dropdown d-inline-block">
+                    <button class="btn btn-sm btn-outline-warning dropdown-toggle" type="button"
+                      data-bs-toggle="dropdown" aria-expanded="false" title="Edit Transactions">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% for transaction in customer.transactions %}
+                      <li>
+                        <a class="dropdown-item" href="{% url 'daily_sale:customer_transaction_edit' transaction.id %}">
+                          <i class="fas fa-pen me-2"></i>
+                          {{ transaction.invoice_number }}
+                          <br>
+                          <small class="text-muted">{{ transaction.transaction_date|date:"Y-m-d" }} - AED {{transaction.total_amount|floatformat:0|intcomma }}</small>
+                        </a>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                  {% endif %}
                   {% endif %}
                 </div>
               </td>
@@ -429,46 +451,6 @@
         detailsBtn.classList.add('btn-outline-primary');
       }
       currentOpenDetails = null;
-    }
-  }
-
-  // Export to Excel
-  function exportToExcel() {
-    try {
-      let csv = 'Customer Name,Email,Phone,Total Amount,Paid,Balance,Transactions\n';
-
-      // Collect data
-      document.querySelectorAll('tbody tr.customer-row').forEach((row, index) => {
-        const cells = row.querySelectorAll('td');
-        if (cells.length >= 7) {
-          const customerName = cells[1].querySelector('.customer-name')?.textContent?.trim() || '';
-          const email = cells[1].querySelector('small.text-muted')?.textContent?.trim().replace('✉', '') || '';
-          const phone = cells[2].textContent.replace(/[^\d]/g, '').trim();
-          const totalAmount = cells[3].textContent.replace('AED', '').replace(/,/g, '').trim();
-          const paid = cells[4].textContent.replace('AED', '').replace(/,/g, '').trim();
-          const balance = cells[5].textContent.replace('AED', '').replace(/,/g, '').trim();
-          const transactions = cells[6].textContent.replace(/[^\d]/g, '').trim();
-
-          csv += `"${customerName}","${email}","${phone}","${totalAmount}","${paid}","${balance}","${transactions}"\n`;
-        }
-      });
-
-      // Create and download file
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const date = new Date().toISOString().split('T')[0];
-      a.download = `outstanding_customers_${date}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      showNotification('File downloaded successfully', 'success');
-    } catch (error) {
-      console.error('Export error:', error);
-      showNotification('Error creating file', 'error');
     }
   }
 

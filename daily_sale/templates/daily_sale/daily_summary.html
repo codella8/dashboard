@@ -71,7 +71,7 @@
       <div class="row text-center">
         <div class="col">
           {% if report_type == 'daily' %}
-          <a href="?report_type=daily&date={{ prev_date|date:'Y-m-d' }}" class="btn btn-outline-primary">
+          <a href="?report_type=daily&date={{ prev_date|date:'Y-m-d' }}" class="btn btn-outline-primary-summery">
             <i class="fas fa-chevron-left"></i> Previous Day
           </a>
           <span class="mx-3 fw-bold">{{ target_date|date:"Y/m/d" }}</span>

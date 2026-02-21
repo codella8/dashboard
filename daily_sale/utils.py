@@ -8,22 +8,16 @@ from django.utils import timezone
 from .models import DailySaleTransaction, Payment, DailySummary, OutstandingCustomer
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------
-# Aggregation helpers (اصلاح‌شده)
-# ---------------------------
 def _aggregate_transactions(qs, tx_type=None):
     """Aggregate total, count, items for a queryset of transactions"""
     if tx_type:
         qs = qs.filter(transaction_type=tx_type)
     
-    # فقط فیلدهایی که همیشه وجود دارند را aggregate می‌کنیم
     result = qs.aggregate(
         total=Sum('total_amount'),
         count=Count('id'),
     )
-    
-    # اگر نوع تراکنش sale باشد، items_sold را هم محاسبه می‌کنیم
+
     if tx_type == 'sale':
         items_sold_result = qs.aggregate(
             items_sold=Sum('quantity')
@@ -34,9 +28,6 @@ def _aggregate_transactions(qs, tx_type=None):
     
     return result
 
-# ---------------------------
-# Sales summary for a range
-# ---------------------------
 def get_sales_summary(start_date, end_date):
     try:
         sales_agg = _aggregate_transactions(DailySaleTransaction.objects.filter(date__range=[start_date, end_date]), 'sale')
@@ -57,9 +48,7 @@ def get_sales_summary(start_date, end_date):
         logger.exception("Error in get_sales_summary")
         return {'total_sales': 0, 'total_purchases': 0, 'net_revenue': 0, 'transactions_count': 0, 'items_sold': 0}
 
-# ---------------------------
-# Timeseries helpers
-# ---------------------------
+
 def sales_timeseries(start_date, end_date, group_by='day'):
     try:
         if DailySummary.objects.filter(date__range=[start_date, end_date]).exists():
@@ -97,9 +86,7 @@ def _timeseries_from_transactions(start_date, end_date):
         })
     return timeseries
 
-# ---------------------------
-# Daily summary recompute (اصلاح‌شده)
-# ---------------------------
+
 def recompute_daily_summary_for_date(target_date):
     if not target_date:
         logger.warning("recompute_daily_summary_for_date called with no date")
@@ -142,7 +129,6 @@ def recompute_daily_summary_for_date(target_date):
             if transactions_count > 0:
                 avg_transaction_value = total_sales / transactions_count
 
-            # استفاده از update_or_create با UUID
             summary, created = DailySummary.objects.update_or_create(
                 date=target_date,
                 defaults={
@@ -174,9 +160,6 @@ def recompute_daily_summary_for_date(target_date):
         logger.exception(f"Error in recompute_daily_summary_for_date: {e}")
         return None
 
-# ---------------------------
-# Outstanding recompute (اصلاح‌شده)
-# ---------------------------
 def recompute_outstanding_for_customer(customer_id):
     if not customer_id:
         logger.warning("recompute_outstanding_for_customer called with no customer_id")
@@ -185,8 +168,10 @@ def recompute_outstanding_for_customer(customer_id):
     try:
         with db_transaction.atomic():
             transactions = DailySaleTransaction.objects.filter(customer_id=customer_id)
+            
             if not transactions.exists():
                 OutstandingCustomer.objects.filter(customer_id=customer_id).delete()
+                logger.info(f"No transactions found for customer {customer_id}, removed from outstanding")
                 return
 
             total_debt = Decimal('0.00')
@@ -201,7 +186,7 @@ def recompute_outstanding_for_customer(customer_id):
                         last_tx_date = tx.date
 
             if total_debt > Decimal('0.00'):
-                OutstandingCustomer.objects.update_or_create(
+                obj, created = OutstandingCustomer.objects.update_or_create(
                     customer_id=customer_id,
                     defaults={
                         'total_debt': total_debt,
@@ -210,17 +195,17 @@ def recompute_outstanding_for_customer(customer_id):
                         'updated_at': timezone.now(),
                     }
                 )
-                logger.info(f"Updated outstanding for customer {customer_id}: {total_debt:,.2f} AED")
+                logger.info(f"Updated outstanding for customer {customer_id}: {total_debt:,.2f} AED ({'created' if created else 'updated'})")
             else:
-                OutstandingCustomer.objects.filter(customer_id=customer_id).delete()
-                logger.info(f"Removed outstanding for customer {customer_id} (no debt)")
+                deleted_count, _ = OutstandingCustomer.objects.filter(customer_id=customer_id).delete()
+                if deleted_count > 0:
+                    logger.info(f"Removed customer {customer_id} from outstanding (no debt)")
+                else:
+                    logger.info(f"Customer {customer_id} already not in outstanding")
 
     except Exception as e:
-        logger.exception(f"Error in recompute_outstanding_for_customer {customer_id}: {e}")
+        logger.exception(f"Error in recompute_outstanding_for_customer {customer_id}: {str(e)}")
 
-# ---------------------------
-# Wrapper functions
-# ---------------------------
 def generate_daily_summaries_for_range(start_date, end_date):
     success = error = 0
     for i in range((end_date - start_date).days + 1):

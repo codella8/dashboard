@@ -1,0 +1,486 @@
+{% extends "daily_sale/daily_sale_base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'daily_sale/css/edit-transaction-modern.css' %}">
+{% endblock %}
+
+{% block title %}Edit Transaction {{ transaction.invoice_number }} | Admin{% endblock %}
+
+{% block content %}
+<div class="et-wrapper">
+    <div class="et-container et-fade-in">
+        <div class="et-header">
+            <div class="et-header-left">
+                <div class="et-header-icon">
+                    <i class="fas fa-pencil-alt"></i>
+                </div>
+                <div class="et-header-title">
+                    <h1>Edit Transaction #{{ transaction.invoice_number }}</h1>
+                    <p>Update transaction details and items</p>
+                </div>
+            </div>
+            <div class="et-header-badge">
+                <i class="fas fa-history"></i> Last Updated: {{ transaction.updated_at|date:"Y-m-d H:i" }}
+            </div>
+        </div>
+
+        <!-- Customer Info -->
+        <div class="et-customer-card">
+            <div class="et-customer-grid">
+                <div class="et-customer-field">
+                    <div class="et-field-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="et-field-content">
+                        <div class="et-field-label">Customer</div>
+                        <div class="et-field-value">{{ customer.user.get_full_name }}
+                        </div>
+                    </div>
+                </div>
+                <div class="et-customer-field">
+                    <div class="et-field-icon">
+                        <i class="fas fa-phone"></i>
+                    </div>
+                    <div class="et-field-content">
+                        <div class="et-field-label">Phone</div>
+                        <div class="et-field-value">{{ customer.phone|default:"—" }}</div>
+                    </div>
+                </div>
+                <div class="et-customer-field">
+                    <div class="et-field-icon">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <div class="et-field-content">
+                        <div class="et-field-label">Email</div>
+                        <div class="et-field-value">{{ customer.user.email|default:"—" }}</div>
+                    </div>
+                </div>
+                <div class="et-customer-field">
+                    <span class="et-status et-status-{{ transaction.payment_status }}">
+                        <i
+                            class="fas fa-{% if transaction.payment_status == 'paid' %}check-circle{% elif transaction.payment_status == 'partial' %}clock{% else %}exclamation-circle{% endif %}"></i>
+                        {{ transaction.get_payment_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Layout -->
+        <div class="et-main-layout">
+            <!-- Left Column -->
+            <div class="et-left-column">
+                <!-- Transaction Form -->
+                <div class="et-form-card">
+                    <div class="et-card-header">
+                        <i class="fas fa-receipt"></i>
+                        <h2>Transaction Information</h2>
+                    </div>
+                    <div class="et-card-body">
+                        <form method="post" id="tx-form">
+                            {% csrf_token %}
+                            <!-- Hidden fields -->
+                            <input type="hidden" name="subtotal" id="subtotal_hidden"
+                                value="{{ transaction.subtotal }}">
+                            <input type="hidden" name="tax_amount" id="tax_amount_hidden"
+                                value="{{ transaction.tax_amount }}">
+                            <input type="hidden" name="total_amount" id="total_amount_hidden"
+                                value="{{ transaction.total_amount }}">
+                            <input type="hidden" name="balance" id="balance_hidden" value="{{ transaction.balance }}">
+                            <input type="hidden" name="items_data" id="items_data" value='{{ items_json|safe }}'>
+
+                            <div class="et-form-row">
+                                <div class="et-form-group">
+                                    <label class="et-form-label">
+                                        <i class="fas fa-barcode"></i> Invoice Number
+                                    </label>
+                                    <input type="text" class="et-form-control" value="{{ transaction.invoice_number }}"
+                                        readonly>
+                                    <input type="hidden" name="invoice_number" value="{{ transaction.invoice_number }}">
+                                </div>
+                                <div class="et-form-group">
+                                    <label class="et-form-label">
+                                        <i class="fas fa-calendar"></i> Date
+                                    </label>
+                                    <input type="date" class="et-form-control" name="date"
+                                        value="{{ transaction.date|date:'Y-m-d' }}" required>
+                                </div>
+                            </div>
+
+                            <div class="et-form-row">
+                                <div class="et-form-group">
+                                    <label class="et-form-label">
+                                        <i class="fas fa-tag"></i> Transaction Type
+                                    </label>
+                                    <select class="et-form-control" name="transaction_type" required>
+                                        <option value="sale" {% if transaction.transaction_type=='sale'
+                                            %}selected{%endif %}>Sale</option>
+                                        <option value="purchase" {% if transaction.transaction_type=='purchase'
+                                            %}selected{% endif %}>Purchase</option>
+                                    </select>
+                                </div>
+                                <div class="et-form-group">
+                                    <label class="et-form-label">
+                                        <i class="fas fa-percent"></i> Tax Rate
+                                    </label>
+                                    <div class="et-input-group">
+                                        <input type="number" class="et-form-control" name="tax"
+                                            value="{{ transaction.tax }}" step="0.01" min="0" max="100" required>
+                                        <span class="et-input-group-text">%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="et-form-group">
+                                <label class="et-form-label">
+                                    <i class="fas fa-money-bill"></i> Advance Payment
+                                </label>
+                                <div class="et-input-group">
+                                    <input type="number" class="et-form-control" name="advance"
+                                        value="{{ transaction.advance }}" step="0.01" min="0">
+                                    <span class="et-input-group-text">AED</span>
+                                </div>
+                            </div>
+
+                            <div class="et-form-group">
+                                <label class="et-form-label">
+                                    <i class="fas fa-sticky-note"></i> Notes
+                                </label>
+                                <textarea class="et-form-control" name="note" rows="3">{{ transaction.note }}</textarea>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Items Section -->
+                <div class="et-items-card">
+                    <div class="et-items-header">
+                        <div class="et-items-title">
+                            <i class="fas fa-boxes"></i>
+                            <span>Transaction Items</span>
+                            <span class="et-items-count">{{ items|length }} items</span>
+                        </div>
+                        <button type="button" id="add-item-btn" class="et-btn-add">
+                            <i class="fas fa-plus-circle"></i> Add New Item
+                        </button>
+                    </div>
+
+                    <div class="et-table-responsive">
+                        <table class="et-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>ITEM</th>
+                                    <th>QTY</th>
+                                    <th>PRICE</th>
+                                    <th>DISCOUNT</th>
+                                    <th>SUBTOTAL</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="items-list"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="et-alert">
+                        <i class="fas fa-shield-alt"></i>
+                        <span><strong>Admin Action:</strong> Any changes made will be logged and cannot be undone.
+                            Please verify all information before saving.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Preview -->
+            <div class="et-right-column">
+                <div class="et-preview-card">
+                    <div class="et-preview-header">
+                        <h3><i class="fas fa-calculator"></i> Amounts Preview</h3>
+                    </div>
+                    <div class="et-preview-body">
+                        <div class="et-preview-item">
+                            <span class="et-preview-label">Subtotal:</span>
+                            <span class="et-preview-value" id="preview-subtotal">{{ transaction.subtotal|floatformat:2}}
+                                AED</span>
+                        </div>
+                        <div class="et-preview-item">
+                            <span class="et-preview-label">Total Discount:</span>
+                            <span class="et-preview-value text-danger" id="preview-discount">{{
+                                total_discount|floatformat:2 }} AED</span>
+                        </div>
+                        <div class="et-preview-item">
+                            <span class="et-preview-label">Tax (<span id="tax-rate">{{
+                                    transaction.tax}}</span>%):</span>
+                            <span class="et-preview-value text-info"
+                                id="preview-tax">{{transaction.tax_amount|floatformat:2 }} AED</span>
+                        </div>
+
+                        <div class="et-preview-total">
+                            <div class="et-preview-item">
+                                <span class="et-preview-label">TOTAL AMOUNT:</span>
+                                <span class="et-preview-value"
+                                    id="preview-total">{{transaction.total_amount|floatformat:2 }} AED</span>
+                            </div>
+                        </div>
+
+                        <div class="et-preview-item">
+                            <span class="et-preview-label">Advance Paid:</span>
+                            <span class="et-preview-value text-warning"
+                                id="preview-advance">{{transaction.advance|floatformat:2 }} AED</span>
+                        </div>
+
+                        <div class="et-balance-box">
+                            <div class="et-balance-label">BALANCE DUE</div>
+                            <div class="et-balance-amount" id="preview-balance">{{ transaction.balance|floatformat:2 }}
+                                AED</div>
+                        </div>
+
+                        <div class="et-status-box">
+                            <div class="et-status et-status-{{ transaction.payment_status }}" id="payment-status">
+                                {{ transaction.get_payment_status_display }}
+                            </div>
+                        </div>
+
+                        <div class="et-meta-box">
+                            <div class="et-meta-item">
+                                <i class="fas fa-clock"></i>
+                                <span>Last updated: {{ transaction.updated_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                            <div class="et-meta-item">
+                                <i class="fas fa-user"></i>
+                                <span>Created by:
+                                    {{transaction.created_by.get_full_name|default:transaction.created_by.username}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="et-actions">
+            <button type="submit" form="tx-form" class="et-btn et-btn-primary">
+                <i class="fas fa-save"></i> Update Transaction
+            </button>
+            <a href="javascript:history.back()" class="et-btn et-btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        const itemsData = JSON.parse('{{ items_json|safe }}');
+        let itemCounter = itemsData.length;
+
+        function loadExistingItems() {
+            itemsData.forEach((item, index) => {
+                addItemRow(item, index);
+            });
+        }
+
+        function addItemRow(itemData = null, index = null) {
+            if (index === null) {
+                index = itemCounter;
+                itemCounter++;
+            }
+
+            const rowIndex = index;
+            const itemId = itemData ? itemData.item_id : '';
+            const itemName = itemData ? itemData.item_name : '';
+            const quantity = itemData ? itemData.quantity : 1;
+            const unitPrice = itemData ? itemData.unit_price : 0;
+            const discount = itemData ? itemData.discount : 0;
+            const subtotal = itemData ? itemData.subtotal : 0;
+
+            const newRow = `
+            <tr data-item-index="${rowIndex}" data-item-id="${itemId}">
+                <td>${rowIndex + 1}</td>
+                <td>
+                    <select class="et-form-control item-select" name="item_${rowIndex}" required style="width: 100%;">
+                        ${itemId ? `<option value="${itemId}" selected>${itemName}</option>` : '<option value="">Select Item</option>'}
+                    </select>
+                </td>
+                <td>
+                    <input type="number" class="et-form-control qty" name="qty_${rowIndex}" value="${quantity}" min="1" step="1" required>
+                </td>
+                <td>
+                    <input type="number" class="et-form-control unit-price" name="price_${rowIndex}" value="${unitPrice}" min="0" step="0.01" required>
+                </td>
+                <td>
+                    <input type="number" class="et-form-control discount" name="discount_${rowIndex}" value="${discount}" min="0" step="0.01">
+                </td>
+                <td>
+                    <span class="et-preview-value" style="color: var(--et-success);">${subtotal.toFixed(2)} AED</span>
+                </td>
+                <td>
+                    <button type="button" class="et-btn-remove" ${itemsData.length === 1 ? 'disabled' : ''}>
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>`;
+
+            $('#items-list').append(newRow);
+
+            const newSelect = $(`[name="item_${rowIndex}"]`);
+
+            if (itemId) {
+                const option = new Option(itemName, itemId, true, true);
+                newSelect.append(option);
+            }
+
+            newSelect.select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Search item...',
+                width: '100%',
+                ajax: {
+                    url: "{% url 'daily_sale:ajax_search_items' %}",
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return { q: params.term || '' };
+                    },
+                    processResults: function (data) {
+                        return { results: data.results || [] };
+                    }
+                }
+            });
+
+            newSelect.on('change', function () {
+                const itemId = $(this).val();
+                const row = $(this).closest('tr');
+
+                if (!itemId) return;
+
+                $.get("{% url 'daily_sale:ajax_item_autofill' %}", { item_id: itemId }, function (response) {
+                    if (response && response.success) {
+                        row.find('.unit-price').val(response.unit_price || 0);
+                        calculate();
+                    }
+                });
+            });
+
+            updateRemoveButtons();
+        }
+
+        function calculate() {
+            let subtotal = 0;
+            let discountTotal = 0;
+
+            $('#items-list tr').each(function () {
+                const qty = parseFloat($(this).find('.qty').val()) || 0;
+                const price = parseFloat($(this).find('.unit-price').val()) || 0;
+                const discount = parseFloat($(this).find('.discount').val()) || 0;
+
+                const rowSubtotal = qty * price;
+                subtotal += rowSubtotal;
+                discountTotal += discount;
+
+                $(this).find('.row-subtotal').text(rowSubtotal.toFixed(2) + ' AED');
+            });
+
+            const taxRate = parseFloat($('input[name="tax"]').val()) || 0;
+            const netAmount = Math.max(subtotal - discountTotal, 0);
+            const tax = (netAmount * taxRate) / 100;
+            const total = netAmount + tax;
+            const advance = parseFloat($('input[name="advance"]').val()) || 0;
+            const balance = Math.max(total - advance, 0);
+
+            $('#preview-subtotal').text(subtotal.toFixed(2) + ' AED');
+            $('#preview-discount').text(discountTotal.toFixed(2) + ' AED');
+            $('#preview-tax').text(tax.toFixed(2) + ' AED');
+            $('#preview-total').text(total.toFixed(2) + ' AED');
+            $('#preview-advance').text(advance.toFixed(2) + ' AED');
+            $('#preview-balance').text(balance.toFixed(2) + ' AED');
+
+            $('#subtotal_hidden').val(subtotal.toFixed(2));
+            $('#tax_amount_hidden').val(tax.toFixed(2));
+            $('#total_amount_hidden').val(total.toFixed(2));
+            $('#balance_hidden').val(balance.toFixed(2));
+
+            let status = 'UNPAID';
+            let statusClass = 'et-status-unpaid';
+            if (balance <= 0 && total > 0) {
+                status = 'PAID';
+                statusClass = 'et-status-paid';
+            } else if (advance > 0) {
+                status = 'PARTIAL';
+                statusClass = 'et-status-partial';
+            }
+
+            $('#payment-status')
+                .removeClass('et-status-paid et-status-partial et-status-unpaid')
+                .addClass(statusClass)
+                .text(status);
+        }
+
+        function updateRemoveButtons() {
+            const rowCount = $('#items-list tr').length;
+            $('.et-btn-remove').prop('disabled', rowCount === 1);
+        }
+
+        $(document).on('input', '.qty, .unit-price, .discount', calculate);
+        $('input[name="tax"], input[name="advance"]').on('input', calculate);
+
+        $('#add-item-btn').click(function () {
+            addItemRow();
+        });
+
+        $(document).on('click', '.et-btn-remove:not(:disabled)', function () {
+            $(this).closest('tr').remove();
+            calculate();
+            updateRemoveButtons();
+        });
+
+        $('#tx-form').on('submit', function (e) {
+            e.preventDefault();
+
+            const items = [];
+            let hasValidItem = false;
+
+            $('#items-list tr').each(function () {
+                const select = $(this).find('.item-select');
+                const itemId = select.val();
+
+                if (!itemId) return true;
+
+                items.push({
+                    item_id: itemId,
+                    quantity: $(this).find('.qty').val(),
+                    unit_price: $(this).find('.unit-price').val(),
+                    discount: $(this).find('.discount').val() || 0
+                });
+
+                hasValidItem = true;
+            });
+
+            if (!hasValidItem || items.length === 0) {
+                alert('Please add at least one item.');
+                return;
+            }
+
+            $('#items_data').val(JSON.stringify(items));
+
+            if (confirm('Are you sure you want to update this transaction? This action will be logged.')) {
+                this.submit();
+            }
+        });
+
+        loadExistingItems();
+        setTimeout(calculate, 500);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const highlightedRow = document.querySelector('[data-customer-id="{{ highlight_customer }}"]');
+            if (highlightedRow) {
+                highlightedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                highlightedRow.classList.add('table-success');
+                setTimeout(() => {
+                    highlightedRow.classList.remove('table-success');
+                }, 3000);
+            }
+        });
+    });
+</script>
+{% endblock %}

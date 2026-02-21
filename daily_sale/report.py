@@ -4,9 +4,7 @@ from datetime import date
 from django.db.models import Sum, Count, Q
 from .models import (
     DailySaleTransaction,
-    DailySummary,
     OutstandingCustomer,
-    Payment,
 )
 
 def parse_date_param(value):

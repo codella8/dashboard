@@ -3,7 +3,6 @@ from django import forms
 from decimal import Decimal, ROUND_HALF_UP
 from .models import DailySaleTransaction, Payment, DailySaleTransactionItem
 from accounts.models import Company, UserProfile
-from containers.models import Container, Inventory_List
 from django.forms import inlineformset_factory
 
 class DailySaleTransactionForm(forms.ModelForm):
@@ -42,6 +41,7 @@ class DailySaleTransactionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
         self.fields["advance"].required = False

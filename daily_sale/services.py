@@ -1,28 +1,20 @@
 # daily_sale/services.py
 from decimal import Decimal, ROUND_HALF_UP
 import logging
+from django.db.models import Sum
 
 logger = logging.getLogger(__name__)
 
 class CalculationService:
-    """
-    سرویس مرکزی برای محاسبات مالی
-    این کلاس تمام محاسبات را با یک منطق واحد انجام می‌دهد
-    منطق محاسبات دقیقاً مطابق فرم ایجاد تراکنش است
-    """
     
     @staticmethod
     def calculate_transaction_amounts(quantity, unit_price, discount, tax_percent, advance):
-        """
-        محاسبه مقادیر تراکنش با منطق مشابه فرم
-        این متد برای پیش‌نمایش و محاسبات سمت سرور استفاده می‌شود
-        """
-        # محاسبه subtotal
+        # subtotal
         subtotal = (Decimal(quantity) * Decimal(unit_price)).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
-        # محاسبه مبلغ مشمول مالیات (net amount = subtotal - discount)
+        # (net amount = subtotal - discount)
         taxable_amount = (subtotal - Decimal(discount)).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
@@ -97,10 +89,6 @@ class CalculationService:
 
     @staticmethod
     def calculate_transaction_from_items(items_data, tax_percent, advance):
-        """
-        محاسبه مقادیر تراکنش از روی آیتم‌ها
-        items_data: لیست آیتم‌ها با کلیدهای quantity, unit_price, discount
-        """
         subtotal = Decimal("0")
         discount_total = Decimal("0")
         tax_amount_total = Decimal("0")
@@ -122,8 +110,6 @@ class CalculationService:
         )
 
         balance = max(total_amount - Decimal(advance), Decimal("0"))
-
-        # تعیین وضعیت پرداخت
         if balance <= Decimal("0") and total_amount > Decimal("0"):
             payment_status = "paid"
         elif Decimal(advance) > Decimal("0"):
@@ -142,19 +128,9 @@ class CalculationService:
 
 
 class SummaryService:
-    """
-    سرویس مدیریت خلاصه‌ها و آمار
-    این سرویس مستقیماً با کوئری‌های Django کار می‌کند
-    """
     
     @staticmethod
     def get_transaction_stats(queryset):
-        """
-        محاسبه آمار تراکنش‌ها برای نمایش در کارت‌های خلاصه
-        این متد در ویوها استفاده می‌شود
-        """
-        from django.db.models import Sum, Q
-        from decimal import Decimal
         
         # ================ محاسبه مجموع فروش ================
         sales_total = queryset.filter(transaction_type='sale').aggregate(

@@ -97,7 +97,6 @@ class DailySaleTransaction(models.Model):
                     self.payment_status = "unpaid"
                     
             else:
-            # اگر آیتمی وجود ندارد، از متد محاسباتی استفاده کن
                 amounts = self.calculate_amounts()
                 self.subtotal = amounts["subtotal"]
                 self.tax_amount = amounts["tax_amount"]
@@ -106,7 +105,6 @@ class DailySaleTransaction(models.Model):
                 self.payment_status = amounts["payment_status"]
                 
         else:
-        # تراکنش جدید - از متد محاسباتی استفاده کن
             amounts = self.calculate_amounts()
             self.subtotal = amounts["subtotal"]
             self.tax_amount = amounts["tax_amount"]
@@ -210,11 +208,8 @@ class Payment(models.Model):
 
 
 class DailySummary(models.Model):
-    # تغییر به AutoField معمولی
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     date = models.DateField(unique=True, db_index=True)
-    
-    # آمار اصلی
     total_sales = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     total_purchases = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     total_profit = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
@@ -223,7 +218,7 @@ class DailySummary(models.Model):
     items_sold = models.PositiveIntegerField(default=0)
     customers_count = models.PositiveIntegerField(default=0)
     
-    # آمار اضافی
+
     gross_profit = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     total_returns = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     total_tax = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
@@ -231,13 +226,11 @@ class DailySummary(models.Model):
     total_paid = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     avg_transaction_value = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     
-    # آمار وضعیت پرداخت
     paid_transactions = models.PositiveIntegerField(default=0)
     partial_transactions = models.PositiveIntegerField(default=0)
     unpaid_transactions = models.PositiveIntegerField(default=0)
     total_outstanding = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
-    
-    # آمار روش پرداخت
+
     payment_method_cash = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     payment_method_card = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
     payment_method_bank = models.DecimalField(max_digits=24, decimal_places=2, default=Decimal("0"))
@@ -247,8 +240,8 @@ class DailySummary(models.Model):
 
     class Meta:
         ordering = ["-date"]
-        verbose_name = "خلاصه روزانه"
-        verbose_name_plural = "خلاصه‌های روزانه"
+        verbose_name = "Daily Summary "
+        verbose_name_plural = "Daily Summary "
 
     def __str__(self):
         return f"Daily Summary {self.date}"
