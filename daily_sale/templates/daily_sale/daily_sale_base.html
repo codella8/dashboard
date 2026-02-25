@@ -42,8 +42,8 @@
       <div class="collapse navbar-collapse" id="navbarMain">
         <ul class="navbar-nav me-auto">
           <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'accounts:dashboard' %}active{% endif %}"
-              href="{% url 'accounts:dashboard' %}">
+            <a class="nav-link {% if request.resolver_match.url_name == 'daily_sale:dashboard' %}active{% endif %}"
+              href="{% url 'daily_sale:dashboard' %}">
               <i class="bi bi-house me-2"></i>
               Home 
             </a>
@@ -115,21 +115,6 @@
       {% endfor %}
     </div>
     {% endif %}
-
-    <div class="page-header">
-      <div class="page-header-content">
-        <h1 class="page-title">{% block page_title %}Almuqbil{% endblock %}</h1>
-      </div>
-      <div class="page-header-actions">
-        <div class="date-display">
-          <i class="bi bi-calendar3 me-2"></i>
-          <span id="currentDateTime">
-            {% now "F d, Y" %}
-          </span>
-        </div>
-        {% block page_actions %}{% endblock %}
-      </div>
-    </div>
 
     <div class="content-wrapper">
       {% block content %}{% endblock %}

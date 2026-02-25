@@ -229,3 +229,90 @@ def recompute_all_summaries(start_date=None, end_date=None):
             error += 1
     logger.info(f"Recompute complete: {success} success, {error} errors")
     return success, error
+
+def is_customer_fully_paid(customer_id):
+    """
+    بررسی می‌کند که آیا مشتری تمام تراکنش‌هایش را پرداخت کرده است یا نه
+    این تابع مستقل از بازه زمانی کار می‌کند
+    """
+    try:
+        transactions = DailySaleTransaction.objects.filter(customer_id=customer_id)
+        
+        if not transactions.exists():
+            return False
+        
+        # اگر هیچ تراکنشی با balance > 0 وجود نداشته باشد
+        if transactions.filter(balance__gt=0).exists():
+            return False
+        
+        # اگر همه تراکنش‌ها payment_status = 'paid' داشته باشند
+        if transactions.exclude(payment_status='paid').exists():
+            return False
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error checking if customer {customer_id} is fully paid: {str(e)}")
+        return False
+
+
+def get_customer_cleared_data(customer_id):
+    """
+    دریافت اطلاعات مشتری برای نمایش در صفحه تسویه شده‌ها
+    """
+    try:
+        from accounts.models import UserProfile
+        
+        customer = UserProfile.objects.get(id=customer_id)
+        transactions = DailySaleTransaction.objects.filter(
+            customer=customer,
+            payment_status='paid'
+        ).order_by('date')
+        
+        if not transactions.exists():
+            return None
+        
+        total_cleared = transactions.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+        last_payment = transactions.filter(payments__isnull=False).order_by('-payments__date').first()
+        last_payment_date = None
+        if last_payment:
+            last_payment_obj = last_payment.payments.order_by('-date').first()
+            if last_payment_obj:
+                last_payment_date = last_payment_obj.date
+        
+        first_transaction_date = transactions.first().date if transactions.first() else None
+        
+        transactions_details = []
+        for tx in transactions:
+            transactions_details.append({
+                'id': str(tx.id),
+                'invoice_number': tx.invoice_number or f"TRX-{str(tx.id)[:8]}",
+                'date': tx.date,
+                'total_amount': tx.total_amount,
+                'total_paid': tx.advance,
+                'discount': tx.discount,
+                'status': 'Paid',
+            })
+        
+        clear_days = 0
+        if last_payment_date:
+            clear_days = (timezone.now().date() - last_payment_date).days
+        
+        customer_name = customer.user.get_full_name() or customer.user.username if customer.user else str(customer)
+        
+        return {
+            'customer_id': str(customer.id),
+            'customer_name': customer_name,
+            'customer_phone': getattr(customer, 'phone', ''),
+            'customer_email': customer.user.email if customer.user else '',
+            'total_cleared_amount': total_cleared,
+            'total_transactions': transactions.count(),
+            'last_payment_date': last_payment_date,
+            'first_transaction_date': first_transaction_date,
+            'clear_days': clear_days,
+            'transactions': transactions_details,
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting cleared data for customer {customer_id}: {str(e)}")
+        return None

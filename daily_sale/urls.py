@@ -5,6 +5,7 @@ from . import views
 app_name = "daily_sale"
 
 urlpatterns = [
+    path('dashboard/', views.dashboard, name='dashboard'),
     path("cleared_transactions/", views.cleared_transactions, name="cleared_transactions"),
     path("create/", views.transaction_create, name="transaction_create"),
     path("transactions/", views.transaction_list, name="transaction_list"),

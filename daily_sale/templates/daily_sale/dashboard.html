@@ -1,0 +1,197 @@
+{% extends "daily_sale/daily_sale_base.html" %}
+{% load static %}
+{% block title %}Almuqbil | Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <nav class="top-navbar">
+        <div class="navbar-container">
+            <div class="navbar-logo">
+                <div class="logo-text">
+                    <h2>ALMUQBIL</h2>
+                </div>
+            </div>
+
+            <div class="navbar-menu">
+                <ul class="menu-list">
+                    <li class="menu-item">
+                        <a href="{% url 'daily_sale:transaction_list' %}" class="menu-link active" data-app="sales">
+                            <i class="menu-icon fas fa-shopping-cart"></i>
+                            <span class="menu-label">Daily Sales</span>
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="{% url 'containers:list' %}" class="menu-link" data-app="containers">
+                            <i class="menu-icon fas fa-shipping-fast"></i>
+                            <span class="menu-label">Containers</span>
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="{% url 'employee:employee_list' %}" class="menu-link" data-app="employees">
+                            <i class="menu-icon fas fa-users"></i>
+                            <span class="menu-label">Employees</span>
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="{% url 'expenses:expense_list' %}" class="menu-link" data-app="expenses">
+                            <i class="menu-icon fas fa-money-bill-wave"></i>
+                            <span class="menu-label">Expenses</span>
+                        </a>
+                    </li>
+                    <li class="menu-item">
+                        <a href="#" class="menu-link" data-app="reports">
+                            <i class="menu-icon fas fa-chart-pie"></i>
+                            <span class="menu-label">Reports</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="navbar-user">
+                <div class="user-profile">
+                    {% if user.get_full_name %}
+                    {{ user.get_full_name }}
+                    {% else %}
+                    {{ user.username }}
+                    {% endif %}
+                    <i class="bi bi-person-circle me-2"></i>
+                </div>
+            </div>
+        </div>
+    </nav>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const menuLinks = document.querySelectorAll('.menu-link');
+        const sidebar = document.querySelector('.sidebar');
+
+        menuLinks.forEach(link => {
+            link.addEventListener('click', function (e) {
+                menuLinks.forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+
+                const appName = this.getAttribute('data-app');
+                const pageTitle = document.querySelector('.page-title');
+                const pageSubtitle = document.querySelector('.page-subtitle');
+
+                const titles = {
+                    'dashboard': ['Corporate Dashboard', 'Welcome to Enterprise Business Suite'],
+                    'sales': ['Daily Sales', 'Transaction Management'],
+                    'containers': ['Containers', 'Logistics Management'],
+                    'expenses': ['Expenses', 'Cost Management'],
+                    'employees': ['Employees', 'HR Management'],
+                    'cars': ['Premium Cars', 'Luxury Vehicles Collection'],
+                    'reports': ['Reports', 'Business Analytics'],
+                    'settings': ['Settings', 'System Configuration'],
+                    'support': ['Support', 'Help & Assistance']
+                };
+
+                if (titles[appName] && pageTitle && pageSubtitle) {
+                    pageTitle.textContent = titles[appName][0];
+                    pageSubtitle.textContent = titles[appName][1];
+                }
+
+                // Close sidebar on mobile
+                if (window.innerWidth < 768) {
+                    sidebar.classList.remove('active');
+                }
+            });
+        });
+
+        // Quick view buttons
+        const quickViewButtons = document.querySelectorAll('.quick-view-btn');
+        quickViewButtons.forEach(button => {
+            button.addEventListener('click', function (e) {
+                e.stopPropagation();
+                const carCard = this.closest('.car-card');
+                const carTitle = carCard.querySelector('.car-title').textContent;
+                alert(`Quick View: ${carTitle}\nFull details available in the Premium Cars section.`);
+            });
+        });
+
+        // Car card click
+        const carCards = document.querySelectorAll('.car-card');
+        carCards.forEach(card => {
+            card.addEventListener('click', function (e) {
+                if (!e.target.closest('.quick-view-btn') && !e.target.closest('.btn')) {
+                    const carTitle = this.querySelector('.car-title').textContent;
+                    alert(`Selected: ${carTitle}\nRedirecting to details page...`);
+                }
+            });
+        });
+
+        // Hero banner button
+        const heroButton = document.querySelector('.btn-white');
+        if (heroButton) {
+            heroButton.addEventListener('click', function () {
+                const carsLink = document.querySelector('.menu-link[data-app="cars"]');
+                if (carsLink) {
+                    carsLink.click();
+                }
+            });
+        }
+        // Animate elements on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-in');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all animated elements
+        document.querySelectorAll('.stat-card, .car-card, .action-card').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Add CSS for scroll animation
+        const style = document.createElement('style');
+        style.textContent = `
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-in {
+            animation: slideIn 0.6s ease forwards;
+        }
+        
+        .hero-banner {
+            animation: slideIn 0.8s ease;
+        }
+    `;
+
+
+        document.body.appendChild(mobileMenuBtn);
+
+        mobileMenuBtn.addEventListener('click', function () {
+            sidebar.classList.toggle('active');
+        });
+
+        // Show/hide mobile menu button
+        function checkMobile() {
+            if (window.innerWidth < 768) {
+                mobileMenuBtn.style.display = 'flex';
+            } else {
+                mobileMenuBtn.style.display = 'none';
+                sidebar.classList.remove('active');
+            }
+        }
+
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+    });
+</script>
+{% endblock content %}

@@ -114,10 +114,8 @@
                                         <i class="fas fa-tag"></i> Transaction Type
                                     </label>
                                     <select class="et-form-control" name="transaction_type" required>
-                                        <option value="sale" {% if transaction.transaction_type=='sale'
-                                            %}selected{%endif %}>Sale</option>
-                                        <option value="purchase" {% if transaction.transaction_type=='purchase'
-                                            %}selected{% endif %}>Purchase</option>
+                                        <option value="sale" {% if transaction.transaction_type == 'sale'%}selected{%endif %}>Sale</option>
+                                        <option value="purchase" {% if transaction.transaction_type == 'purchase' %}selected{% endif %}>Purchase</option>
                                     </select>
                                 </div>
                                 <div class="et-form-group">

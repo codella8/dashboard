@@ -3,6 +3,7 @@ from decimal import Decimal
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from functools import wraps
 from django.views.decorators.http import require_GET
 from django.db import transaction as db_transaction
 from django.contrib import messages
@@ -26,8 +27,10 @@ from django.db.models import DecimalField
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 import csv
 from django.utils.encoding import smart_str
-from .models import DailySaleTransaction, Payment, DailySaleTransactionItem,OutstandingCustomer
+from .models import DailySaleTransaction, Payment, DailySaleTransactionItem,OutstandingCustomer, DailySaleTransaction
+from containers.models import Container
 from .forms import DailySaleTransactionForm, PaymentForm
+from django.contrib.auth.models import User
 from .report import get_sales_summary, sales_timeseries, parse_date_param
 from accounts.models import Company, UserProfile
 from containers.models import Inventory_List
@@ -36,6 +39,83 @@ from .services import CalculationService
 logger = logging.getLogger(__name__)
 
 TAX_RATE = Decimal('0.10')
+
+
+def admin_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            messages.error(request, ("Please login first"))
+            return redirect('accounts:login')
+        if not request.user.is_staff:
+            messages.error(request, ("Admin access required"))
+            return redirect('accounts:home')
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
+
+@login_required
+@admin_required
+def dashboard(request):
+    try:
+        total_sales = DailySaleTransaction.objects.count()
+    except:
+        total_sales = 0 
+    
+    try:
+        total_containers = Container.objects.count()
+    except:
+        total_containers = 0
+    
+    try:
+        total_users = User.objects.count()
+    except:
+        total_users = 0
+    
+    quick_stats = {
+        'total_sales': total_sales,
+        'total_containers': total_containers,
+        'total_users': total_users,
+    }
+    
+    apps = [
+        {
+            'name': 'Daily Sales', 
+            'url': 'daily_sale:transaction_list/',
+            'icon': 'fas fa-shopping-cart', 
+            'description': 'Daily transactions and sales management'
+        },
+        {
+            'name': 'Containers', 
+            'url': 'containers:list',
+            'icon': 'fas fa-shipping-fast', 
+            'description': 'Container and shipping management'
+        },
+        {
+            'name': 'Expenses', 
+            'url': 'expenses:expense_list/', 
+            'icon': 'fas fa-money-bill-wave', 
+            'description': 'Expense tracking and management'
+        },
+        {
+            'name': 'Employees', 
+            'url': 'employee:list/', 
+            'icon': 'fas fa-users',  
+            'description': 'Employee and staff management'
+        },
+
+        {
+            'name': 'Reports', 
+            'url': '#',  
+            'icon': 'fas fa-file-alt', 
+            'description': 'Comprehensive reporting system'
+        },
+    ]
+
+    context = {
+        'quick_stats': quick_stats,
+        'apps': apps
+    }
+    return render(request, 'daily_sale/dashboard.html', context)
 
 @login_required
 def customer_detail(request, customer_id=None):
@@ -947,27 +1027,40 @@ def outstanding_view(request):
 
 @login_required
 def customer_transaction_edit(request, transaction_id):
+    """
+    ویرایش تراکنش از صفحه مشتری - فقط برای ادمین
+    """
+    # بررسی ادمین بودن
     if not request.user.is_staff:
         messages.error(request, "Access denied. Admin privileges required.")
         return redirect('daily_sale:transaction_list')
     
+    # دریافت تراکنش
     transaction_obj = get_object_or_404(
         DailySaleTransaction.objects.select_related('customer', 'company', 'customer__user'),
         pk=transaction_id
     )
+    
+    # ذخیره customer_id قبل از ویرایش برای بررسی بعدی
+    customer = transaction_obj.customer
+    customer_id = customer.id if customer else None
     
     if request.method == "POST":
         form = DailySaleTransactionForm(request.POST, instance=transaction_obj)
         
         if form.is_valid():
             try:
+                from django.db import transaction as db_transaction
                 
                 with db_transaction.atomic():
+                    # ذخیره تراکنش اصلی
                     edited_tx = form.save(commit=False)
                     edited_tx.save()
                     
+                    # حذف آیتم‌های قبلی
                     DailySaleTransactionItem.objects.filter(transaction=edited_tx).delete()
                     
+                    # ایجاد آیتم‌های جدید
                     items_json = request.POST.get("items_data", "[]")
                     items_list = json.loads(items_json)
                     
@@ -1008,15 +1101,19 @@ def customer_transaction_edit(request, transaction_id):
                             total_amount=item_calc["total_amount"],
                         )
                     
+                    # محاسبه نهایی تراکنش
                     net_amount = max(subtotal_total - discount_total, Decimal("0"))
                     total_amount = (net_amount + tax_total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
                     advance = edited_tx.advance or Decimal('0')
                     balance = max(total_amount - advance, Decimal("0"))
+                    
+                    # به‌روزرسانی تراکنش با مقادیر نهایی
                     edited_tx.subtotal = subtotal_total
                     edited_tx.tax_amount = tax_total
                     edited_tx.total_amount = total_amount
                     edited_tx.balance = balance
                     
+                    # تعیین وضعیت پرداخت
                     if balance <= Decimal("0") and total_amount > Decimal("0"):
                         edited_tx.payment_status = "paid"
                     elif advance > Decimal("0"):
@@ -1027,24 +1124,32 @@ def customer_transaction_edit(request, transaction_id):
                     edited_tx.paid = advance
                     edited_tx.save()
                     
+                    # بازمحاسبه خلاصه روزانه
                     recompute_daily_summary_for_date(edited_tx.date)
-
+                    
+                    # ========== بررسی وضعیت مشتری ==========
                     if edited_tx.customer:
-
+                        # بازمحاسبه بدهی مشتری
                         recompute_outstanding_for_customer(edited_tx.customer.id)
-
+                        
+                        # بررسی وضعیت پرداخت همه تراکنش‌های مشتری
                         all_customer_transactions = DailySaleTransaction.objects.filter(
                             customer=edited_tx.customer
                         )
                         
+                        # تعداد تراکنش‌های پرداخت نشده
                         unpaid_count = all_customer_transactions.exclude(payment_status='paid').count()
                         
                         messages.success(request, f"Transaction {edited_tx.invoice_number} updated successfully!")
-                        if all_customer_transactions.exists() and unpaid_count == 0:
-                            messages.info(request, f"Customer {edited_tx.customer.user.get_full_name()} has fully cleared all debts and has been moved to cleared transactions.")
                         
-                            return redirect(f"{reverse('daily_sale:cleared_transactions')}?period=all&highlight={edited_tx.customer.id}")
+                        # اگر همه تراکنش‌ها وضعیت paid دارند
+                        if all_customer_transactions.exists() and unpaid_count == 0:
+                            messages.info(request, f"🎉 Customer {edited_tx.customer.user.get_full_name()} has fully cleared all debts and has been moved to cleared transactions.")
+                            
+                            cleared_url = reverse('daily_sale:cleared_transactions')
+                            return redirect(f"{cleared_url}?period=all&highlight={edited_tx.customer.id}")
                         else:
+                            # اگر هنوز بدهکار است، به صفحه همان مشتری برگرد
                             return redirect('daily_sale:customer_detail', customer_id=edited_tx.customer.id)
                     else:
                         return redirect('daily_sale:transaction_list')
@@ -1060,8 +1165,8 @@ def customer_transaction_edit(request, transaction_id):
     else:
         form = DailySaleTransactionForm(instance=transaction_obj)
     
-    items = DailySaleTransactionItem.objects.filter(transaction=transaction_obj).select_related('item', 'container', 'company')
-    
+    # بقیه کد برای نمایش فرم ویرایش
+    items = DailySaleTransactionItem.objects.filter(transaction=transaction_obj).select_related('item')
     items_data = []
     total_discount = Decimal('0')
     
@@ -1075,14 +1180,8 @@ def customer_transaction_edit(request, transaction_id):
             'subtotal': float(item.subtotal),
             'tax_amount': float(item.tax_amount),
             'total_amount': float(item.total_amount),
-            'container': item.container.name if item.container else None,
-            'company': item.company.name if item.company else None,
         })
         total_discount += item.discount
-    
-    paid_percentage = 0
-    if transaction_obj.total_amount > 0:
-        paid_percentage = (transaction_obj.advance / transaction_obj.total_amount) * 100
     
     context = {
         'form': form,
@@ -1090,8 +1189,6 @@ def customer_transaction_edit(request, transaction_id):
         'items': items,
         'items_json': json.dumps(items_data),
         'total_discount': total_discount,
-        'paid_percentage': paid_percentage,
-        'is_edit': True,
         'customer': transaction_obj.customer,
         'is_admin': request.user.is_staff,
     }

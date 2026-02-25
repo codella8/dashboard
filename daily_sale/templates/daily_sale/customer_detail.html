@@ -121,7 +121,7 @@
                                 <i class="bi bi-check-circle"></i>
                             </div>
                             <h6 class="text-uppercase text-muted mb-2">Total Paid</h6>
-                            <h2 class="mb-1 amount-positive">${{ total_paid|floatformat:2|intcomma }}</h2>
+                            <h2 class="mb-1 amount-positive">AED{{ total_paid|floatformat:0|intcomma }}</h2>
                             <small class="text-muted">
                                 {% if total_sales > 0 %}
                                 {% widthratio total_paid total_sales 100 %}% paid
@@ -131,24 +131,10 @@
                             </small>
                             {% if total_sales > 0 %}
                             <div class="progress mt-3">
-                                <div class="progress-bar bg-success"
-                                    style="width: {% widthratio total_paid total_sales 100 %}%">
+                                <div class="progress-bar bg-success">
                                 </div>
                             </div>
                             {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-md-6">
-                    <div class="card stat-card debt h-100">
-                        <div class="card-body">
-                            <div class="stat-icon debt">
-                                <i class="bi bi-exclamation-circle"></i>
-                            </div>
-                            <h6 class="text-uppercase text-muted mb-2">Remaining Balance</h6>
-                            <h2 class="mb-1 amount-negative">${{ total_remaining|floatformat:2|intcomma }}</h2>
-                            <small class="text-muted">Outstanding amount</small>
                         </div>
                     </div>
                 </div>
@@ -201,7 +187,7 @@
                                     <th class="text-end">Tax</th>
                                     <th class="text-end">Total</th>
                                     <th class="text-end">Paid</th>
-                                    <th class="text-end">Balance</th>
+                                    
                                     <th>Status</th>
                                     <th>Note</th>
                                 </tr>
@@ -213,7 +199,7 @@
                                     data-status="{% if tx.remaining_amount == 0 %}paid{% elif tx.paid_amount > 0 %}partial{% else %}unpaid{% endif %}">
                                     <td>
                                         <div class="fw-semibold">{{ tx.date|date:"M d, Y" }}</div>
-                                        <small class="text-muted">{{ tx.date|date:"h:i A" }}</small>
+
                                     </td>
                                     <td>
                                         <span
@@ -222,28 +208,21 @@
                                         </span>
                                     </td>
                                     <td>
-                                        <div class="fw-medium">{{ tx.item }}</div>
-                                        <small class="text-muted">ID: {{ tx.id|slice:":8" }}</small>
+                                        <div class="fw-medium">{{ tx.product_name }}</div>
+                                        
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-light text-dark">{{ tx.quantity }}</span>
                                     </td>
-                                    <td class="text-end">${{ tx.unit_price|floatformat:2|intcomma }}</td>
-                                    <td class="text-end fw-semibold">${{ tx.total_amount|floatformat:2|intcomma }}</td>
-                                    <td class="text-end">
-                                        <span class="text-muted">${{ tx.tax_amount|floatformat:2|intcomma }}</span>
-                                    </td>
-                                    <td class="text-end fw-bold text-primary">${{
-                                        tx.total_with_tax|floatformat:2|intcomma }}</td>
-                                    <td class="text-end">
-                                        <span class="amount-positive">${{ tx.paid_amount|floatformat:2|intcomma
-                                            }}</span>
+                                    <td class="text-end">AED{{ tx.unit_price|floatformat:0|intcomma }}</td>
+                                    <td class="text-end fw-semibold">AED{{ tx.total_amount|floatformat:0|intcomma }}
                                     </td>
                                     <td class="text-end">
-                                        <span
-                                            class="{% if tx.remaining_amount > 0 %}amount-negative{% else %}amount-positive{% endif %}">
-                                            ${{ tx.remaining_amount|floatformat:2|intcomma }}
-                                        </span>
+                                        <span class="text-muted">AED{{ tx.tax_amount|floatformat:0|intcomma }}</span>
+                                    </td>
+                                    <td class="text-end fw-bold text-primary">AED{{tx.total_with_tax|floatformat:0|intcomma }}</td>
+                                    <td class="text-end">
+                                        <span class="amount-positive">AED{{ tx.paid_amount|floatformat:0|intcomma}}</span>
                                     </td>
                                     <td>
                                         {% if tx.remaining_amount == 0 %}
@@ -276,11 +255,11 @@
                             <tfoot class="table-dark">
                                 <tr>
                                     <th colspan="5" class="text-start">GRAND TOTALS</th>
-                                    <th class="text-end">${{ total_sales|floatformat:2|intcomma }}</th>
-                                    <th class="text-end">${{ total_tax|floatformat:2|intcomma }}</th>
-                                    <th class="text-end">${{ total_sales|add:total_tax|floatformat:2|intcomma }}</th>
-                                    <th class="text-end amount-positive">${{ total_paid|floatformat:2|intcomma }}</th>
-                                    <th class="text-end amount-negative">${{ total_remaining|floatformat:2|intcomma }}
+                                    <th class="text-end">AED{{ total_sales|floatformat:0|intcomma }}</th>
+                                    <th class="text-end">AED{{ total_tax|floatformat:0|intcomma }}</th>
+                                    <th class="text-end">AED{{ total_sales|add:total_tax|floatformat:0|intcomma }}</th>
+                                    <th class="text-end amount-positive">AED{{ total_paid|floatformat:0|intcomma }}</th>
+                                    <th class="text-end amount-negative">AED{{ total_remaining|floatformat:0|intcomma }}
                                     </th>
                                     <th colspan="2"></th>
                                 </tr>
@@ -320,9 +299,9 @@
                         <div class="col-md-4">
                             <label class="form-label">Amount *</label>
                             <input type="number" name="amount" class="form-control" placeholder="0.00" step="0.01"
-                                min="0.01" max="{{ total_remaining|floatformat:2 }}"
-                                value="{{ total_remaining|floatformat:2 }}" required>
-                            <small class="text-muted">Max: ${{ total_remaining|floatformat:2 }}</small>
+                                min="0.01" max="{{ total_remaining|floatformat:0 }}"
+                                value="{{ total_remaining|floatformat:0 }}" required>
+                            <small class="text-muted">Max: AED{{ total_remaining|floatformat:0 }}</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Payment Method</label>
@@ -344,8 +323,7 @@
                                 {% for tx in transactions %}
                                 {% if tx.remaining_amount > 0 %}
                                 <option value="{{ tx.id }}">
-                                    {{ tx.date|date:"m/d/Y" }} - {{ tx.item }} - ${{ tx.remaining_amount|floatformat:2
-                                    }}
+                                    {{ tx.date|date:"m/d/Y" }} - {{ tx.item }} - AED{{ tx.remaining_amount|floatformat:0}}
                                 </option>
                                 {% endif %}
                                 {% endfor %}
@@ -374,57 +352,6 @@
                 </div>
             </div>
             {% endif %}
-
-            <!-- Summary Stats -->
-            {% if transactions %}
-            <div class="row g-4">
-                <div class="col-lg-4">
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted mb-3">
-                                <i class="bi bi-pie-chart me-2"></i>Payment Overview
-                            </h6>
-                            <div id="paymentChart"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-8">
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted mb-3">
-                                <i class="bi bi-bar-chart me-2"></i>Transaction Statistics
-                            </h6>
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <div class="text-center">
-                                        <h3 class="mb-1 text-primary">{{ transactions_count }}</h3>
-                                        <small class="text-muted">Total Transactions</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <div class="text-center">
-                                        <h3 class="mb-1 text-success">
-                                            {% if transactions_count > 0 %}
-                                            ${{ total_sales|divisibleby:transactions_count|floatformat:2|intcomma }}
-                                            {% else %}
-                                            $0
-                                            {% endif %}
-                                        </h3>
-                                        <small class="text-muted">Average per Transaction</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <div class="text-center">
-                                        <h3 class="mb-1 text-info">{{ tax_rate|floatformat:1 }}%</h3>
-                                        <small class="text-muted">Tax Rate</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
             {% endblock %}
         </div>
     </main>
@@ -448,7 +375,7 @@
                                 value="{{ total_remaining|floatformat:2 }}" max="{{ total_remaining|floatformat:2 }}"
                                 step="0.01" required>
                             <div class="form-text">
-                                Outstanding balance: ${{ total_remaining|floatformat:2 }}
+                                Outstanding balance: AED{{ total_remaining|floatformat:2 }}
                             </div>
                         </div>
                         <div class="mb-3">
@@ -483,7 +410,7 @@
 
     <script>
         // Initialize when page loads
-        $(document).ready(function () {
+        AED(document).ready(function () {
             // Update current date/time
             function updateDateTime() {
                 const now = new Date();
@@ -495,59 +422,59 @@
                     hour: '2-digit',
                     minute: '2-digit'
                 };
-                $('#currentDateTime').text(now.toLocaleDateString('en-US', options));
+                AED('#currentDateTime').text(now.toLocaleDateString('en-US', options));
             }
             updateDateTime();
             setInterval(updateDateTime, 60000);
 
             // Initialize Select2
-            $('.form-select').select2({
+            AED('.form-select').select2({
                 theme: 'bootstrap-5',
                 width: '100%'
             });
 
             // Initialize tooltips
-            $('[data-bs-toggle="tooltip"]').tooltip();
+            AED('[data-bs-toggle="tooltip"]').tooltip();
 
             // Animate alerts
-            $('.alert').addClass('animate__animated animate__fadeIn');
+            AED('.alert').addClass('animate__animated animate__fadeIn');
 
             // Create payment chart
             createPaymentChart();
         });
 
         // Table filtering functions
-        $('#searchInput').on('input', function () {
-            const searchTerm = $(this).val().toLowerCase();
-            $('#transactionsTable tbody tr').each(function () {
-                const text = $(this).text().toLowerCase();
+        AED('#searchInput').on('input', function () {
+            const searchTerm = AED(this).val().toLowerCase();
+            AED('#transactionsTable tbody tr').each(function () {
+                const text = AED(this).text().toLowerCase();
                 if (text.includes(searchTerm)) {
-                    $(this).show();
-                    $(this).addClass('highlight');
-                    setTimeout(() => $(this).removeClass('highlight'), 1000);
+                    AED(this).show();
+                    AED(this).addClass('highlight');
+                    setTimeout(() => AED(this).removeClass('highlight'), 1000);
                 } else {
-                    $(this).hide();
+                    AED(this).hide();
                 }
             });
             updateRecordCount();
         });
 
-        $('#typeFilter, #dateFilter, #statusFilter').on('change', filterTable);
+        AED('#typeFilter, #dateFilter, #statusFilter').on('change', filterTable);
 
         function filterTable() {
-            const typeFilter = $('#typeFilter').val();
-            const dateFilter = $('#dateFilter').val();
-            const statusFilter = $('#statusFilter').val();
+            const typeFilter = AED('#typeFilter').val();
+            const dateFilter = AED('#dateFilter').val();
+            const statusFilter = AED('#statusFilter').val();
             const cutoffDate = new Date();
 
             if (dateFilter) {
                 cutoffDate.setDate(cutoffDate.getDate() - parseInt(dateFilter));
             }
 
-            $('#transactionsTable tbody tr').each(function () {
-                const rowType = $(this).data('type');
-                const rowDate = new Date($(this).data('date'));
-                const rowStatus = $(this).data('status');
+            AED('#transactionsTable tbody tr').each(function () {
+                const rowType = AED(this).data('type');
+                const rowDate = new Date(AED(this).data('date'));
+                const rowStatus = AED(this).data('status');
 
                 let show = true;
 
@@ -564,11 +491,11 @@
                 }
 
                 if (show) {
-                    $(this).show();
-                    $(this).addClass('filtered-in');
+                    AED(this).show();
+                    AED(this).addClass('filtered-in');
                 } else {
-                    $(this).hide();
-                    $(this).removeClass('filtered-in');
+                    AED(this).hide();
+                    AED(this).removeClass('filtered-in');
                 }
             });
 
@@ -576,22 +503,22 @@
         }
 
         function resetFilters() {
-            $('#searchInput').val('');
-            $('#typeFilter').val('').trigger('change');
-            $('#dateFilter').val('').trigger('change');
-            $('#statusFilter').val('').trigger('change');
+            AED('#searchInput').val('');
+            AED('#typeFilter').val('').trigger('change');
+            AED('#dateFilter').val('').trigger('change');
+            AED('#statusFilter').val('').trigger('change');
 
-            $('#transactionsTable tbody tr').each(function () {
-                $(this).show();
-                $(this).removeClass('filtered-in');
+            AED('#transactionsTable tbody tr').each(function () {
+                AED(this).show();
+                AED(this).removeClass('filtered-in');
             });
 
             updateRecordCount();
         }
 
         function updateRecordCount() {
-            const visibleCount = $('#transactionsTable tbody tr:visible').length;
-            $('#recordCount').text(visibleCount + ' records');
+            const visibleCount = AED('#transactionsTable tbody tr:visible').length;
+            AED('#recordCount').text(visibleCount + ' records');
         }
 
         // Payment reminder
@@ -621,9 +548,9 @@
 
         // Quick payment
         function submitQuickPayment() {
-            const amount = $('#quickAmount').val();
-            const method = $('#quickMethod').val();
-            const reference = $('#quickReference').val();
+            const amount = AED('#quickAmount').val();
+            const method = AED('#quickMethod').val();
+            const reference = AED('#quickReference').val();
 
             if (!amount || parseFloat(amount) <= 0) {
                 showNotification('Please enter a valid amount', 'danger');
@@ -637,7 +564,7 @@
             }
 
             // Submit the quick payment form
-            $('#quickPaymentForm').submit();
+            AED('#quickPaymentForm').submit();
         }
 
         // Export CSV
@@ -646,17 +573,17 @@
             const headers = [];
 
             // Get headers
-            $('#transactionsTable thead th').each(function () {
-                headers.push('"' + $(this).text().trim() + '"');
+            AED('#transactionsTable thead th').each(function () {
+                headers.push('"' + AED(this).text().trim() + '"');
             });
             rows.push(headers.join(','));
 
             // Get data
-            $('#transactionsTable tbody tr:visible').each(function () {
+            AED('#transactionsTable tbody tr:visible').each(function () {
                 const rowData = [];
-                $(this).find('td').each(function () {
-                    let text = $(this).text().trim();
-                    text = text.replace(/\$/g, '').replace(/,/g, '');
+                AED(this).find('td').each(function () {
+                    let text = AED(this).text().trim();
+                    text = text.replace(/\AED/g, '').replace(/,/g, '');
                     rowData.push('"' + text + '"');
                 });
                 rows.push(rowData.join(','));
@@ -683,7 +610,7 @@
 
         // Show notification
         function showNotification(message, type = 'info') {
-            const notification = $('<div>', {
+            const notification = AED('<div>', {
                 class: 'alert alert-' + type + ' alert-dismissible fade show position-fixed',
                 css: {
                     top: '20px',
@@ -692,13 +619,13 @@
                     minWidth: '300px'
                 },
                 html: `
-                    <i class="bi bi-${type === 'success' ? 'check' : type === 'danger' ? 'exclamation' : 'info'}-circle me-2"></i>
-                    ${message}
+                    <i class="bi bi-AED{type === 'success' ? 'check' : type === 'danger' ? 'exclamation' : 'info'}-circle me-2"></i>
+                    AED{message}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `
             });
 
-            $('body').append(notification);
+            AED('body').append(notification);
 
             // Remove after 5 seconds
             setTimeout(() => {
@@ -708,8 +635,8 @@
 
         // Clear form
         function clearForm() {
-            $('form[method="post"]')[0].reset();
-            $('input[name="amount"]').val('{{ total_remaining|floatformat:2 }}');
+            AED('form[method="post"]')[0].reset();
+            AED('input[name="amount"]').val('{{ total_remaining|floatformat:2 }}');
         }
 
         // Create payment chart
@@ -721,11 +648,11 @@
             const remainingAmount = parseFloat('{{ total_remaining|default:"0" }}');
 
             // Create canvas if not exists
-            if (!$(ctx).find('canvas').length) {
-                $(ctx).html('<canvas></canvas>');
+            if (!AED(ctx).find('canvas').length) {
+                AED(ctx).html('<canvas></canvas>');
             }
 
-            const canvas = $(ctx).find('canvas')[0];
+            const canvas = AED(ctx).find('canvas')[0];
             const chart = new Chart(canvas, {
                 type: 'doughnut',
                 data: {
@@ -753,7 +680,7 @@
                                 label: function (context) {
                                     let label = context.label || '';
                                     if (label) {
-                                        label += ': $';
+                                        label += ': AED';
                                     }
                                     label += context.raw.toLocaleString('en-US', {
                                         minimumFractionDigits: 2,

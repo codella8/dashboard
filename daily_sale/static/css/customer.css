@@ -54,9 +54,9 @@ body {
 .brand-text {
     font-size: 1.8rem;
     font-weight: 800;
-    background: linear-gradient(135deg, #fff, #e0e7ff);
-    --webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    background: none;
+    border-radius: 5%;
+    color: #e7dbdb;
     letter-spacing: 1px;
 }
 

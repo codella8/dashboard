@@ -47,7 +47,7 @@
                     <ul class="dropdown-menu luxury-dropdown-menu">
                         {% if user.is_staff %}
                         <li>
-                            <a class="dropdown-item luxury-dropdown-item" href="{% url 'accounts:dashboard' %}">
+                            <a class="dropdown-item luxury-dropdown-item" href="{% url 'daily_sale:dashboard' %}">
                                 <i class="bi bi-speedometer2 me-2"></i>
                                 Admin Dashboard
                             </a>
@@ -124,7 +124,7 @@
 
             {% if user.is_staff %}
             <li class="nav-item">
-                <a class="nav-link luxury-mobile-nav-link" href="{% url 'accounts:dashboard' %}">
+                <a class="nav-link luxury-mobile-nav-link" href="{% url 'daily_sale:dashboard' %}">
                     <i class="bi bi-speedometer2 me-2"></i>
                     Admin Dashboard
                 </a>

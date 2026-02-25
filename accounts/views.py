@@ -2,10 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from daily_sale.models import DailySaleTransaction
-from containers.models import Container
 from .forms import SignUpForm, UserUpdateForm, UpdatePasswordForm
-from django.contrib.auth.models import User
 from django.utils.translation import gettext as _
 from functools import wraps
 from .models import Product
@@ -32,7 +29,7 @@ def login_user(request):
         messages.info(request, _("You are already logged in!"))
         
         if request.user.is_staff:
-            return redirect("accounts:dashboard")
+            return redirect("daily_sale:dashboard")
         else:
             return redirect("daily_sale:customer_detail")
 
@@ -54,7 +51,7 @@ def login_user(request):
                 if user.is_staff:
                     if next_page and '/admin/' in next_page:
                         return redirect(next_page)
-                    return redirect('accounts:dashboard')
+                    return redirect('daily_sale:dashboard')
 
                 else:
                     if next_page and ('/admin/' in next_page or '/dashboard/' in next_page):
@@ -85,70 +82,6 @@ def product(request, pk):
     return render(request, 'product.html', {
         'product': product,
     })
-
-@login_required
-@admin_required
-def dashboard(request):
-    try:
-        total_sales = DailySaleTransaction.objects.count()
-    except:
-        total_sales = 0 
-    
-    try:
-        total_containers = Container.objects.count()
-    except:
-        total_containers = 0
-    
-    try:
-        total_users = User.objects.count()
-    except:
-        total_users = 0
-    
-    quick_stats = {
-        'total_sales': total_sales,
-        'total_containers': total_containers,
-        'total_users': total_users,
-    }
-    
-    apps = [
-        {
-            'name': 'Daily Sales', 
-            'url': 'daily_sale:transaction_list/',
-            'icon': 'fas fa-shopping-cart', 
-            'description': 'Daily transactions and sales management'
-        },
-        {
-            'name': 'Containers', 
-            'url': 'containers:list',
-            'icon': 'fas fa-shipping-fast', 
-            'description': 'Container and shipping management'
-        },
-        {
-            'name': 'Expenses', 
-            'url': 'expenses:expense_list/', 
-            'icon': 'fas fa-money-bill-wave', 
-            'description': 'Expense tracking and management'
-        },
-        {
-            'name': 'Employees', 
-            'url': 'employee:list/', 
-            'icon': 'fas fa-users',  
-            'description': 'Employee and staff management'
-        },
-
-        {
-            'name': 'Reports', 
-            'url': '#',  
-            'icon': 'fas fa-file-alt', 
-            'description': 'Comprehensive reporting system'
-        },
-    ]
-
-    context = {
-        'quick_stats': quick_stats,
-        'apps': apps
-    }
-    return render(request, 'dashboard.html', context)
 
 @login_required
 @admin_required
